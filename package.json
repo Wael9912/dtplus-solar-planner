@@ -9,7 +9,8 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "test": "vitest run",
-    "deploy": "npm run build && gh-pages -d dist"
+    "deploy": "npm run build && gh-pages -d dist",
+    "deploy:cf": "VITE_BASE=/ npm run build && rm -f dist/404.html && wrangler pages deploy dist --project-name dtplus-solar-planner --branch main"
   },
   "dependencies": {
     "exceljs": "^4.4.0",
@@ -33,6 +34,7 @@
     "tailwindcss": "^4.3.3",
     "typescript": "~7.0.2",
     "vite": "^8.3.5",
-    "vitest": "^5.0.5"
+    "vitest": "^5.0.5",
+    "wrangler": "^4.156.0"
   }
 }

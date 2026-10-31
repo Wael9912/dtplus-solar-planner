@@ -6,4 +6,4 @@
 - Tailwind v4: custom classes cannot be composed with `@apply` of other custom classes — share base styles with grouped selectors (see `src/index.css`).
 - i18n: `src/i18n/en.ts` is the type source (`Dict`); `ar.ts` must have the same keys. Engine checks carry `messageAr` + `step`; BOM lines carry `nameAr`/`specAr`; city names live in `src/i18n/places.ts`. Export strings live in `src/export/labels.ts`. PDFs support Arabic via the embedded IBM Plex Sans Arabic font (`src/export/fonts/`, lazy-loaded; run all PDF text through `pdfkit.ts` helpers).
 - Tests: `npx vitest run` (tests/). Fixtures come from §13 of the methodology doc; note the doc's example (a) mis-adds connected load (410 W, not 420 W).
-- Deploy: GitHub Pages via Actions on push to `main`; `base` is `/dtplus-solar-planner/` (override with `VITE_BASE`).
+- Deploy: GitHub Pages via Actions on push to `main`; `base` is `/dtplus-solar-planner/` (override with `VITE_BASE`). Cloudflare Pages is manual: `npm run deploy:cf` (base `/`, deletes `dist/404.html` so Pages serves index.html for unknown paths instead of a redirect loop; routing is hash-based).
