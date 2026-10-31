@@ -160,7 +160,7 @@ export const appliances: Appliance[] = [
   "hoursPerDay": 8,
   "surgeFactor": 3.0,
   "phase": 3,
-  "nameAr": "مكيف كاسيت 4 طن (3 فاز)"
+  "nameAr": "مكيف كاسيت 4 طن (ثلاثي الأطوار)"
  },
  {
   "id": "water_cooler",
@@ -330,7 +330,7 @@ export const appliances: Appliance[] = [
   "hoursPerDay": 10,
   "surgeFactor": 1.0,
   "phase": 1,
-  "nameAr": "نقطة بيع + طابعة فواتير"
+  "nameAr": "جهاز نقاط بيع + طابعة إيصالات"
  },
  {
   "id": "cctv_4ch",
@@ -360,7 +360,7 @@ export const appliances: Appliance[] = [
   "hoursPerDay": 24,
   "surgeFactor": 1.2,
   "phase": 1,
-  "nameAr": "سيرفر وشبكة"
+  "nameAr": "خزانة سيرفر وشبكة (سيرفر + سويتش)"
  },
  {
   "id": "washing_machine",
@@ -476,7 +476,7 @@ export const appliances: Appliance[] = [
   "id": "pump_surface_0_5hp",
   "name": "Surface water pump 0.5 HP",
   "category": "pump",
-  "watts": 400,
+  "watts": 500,
   "hoursPerDay": 2,
   "surgeFactor": 3.0,
   "phase": 1,
@@ -486,7 +486,7 @@ export const appliances: Appliance[] = [
   "id": "pump_surface_1hp",
   "name": "Surface water pump 1 HP",
   "category": "pump",
-  "watts": 750,
+  "watts": 1000,
   "hoursPerDay": 2,
   "surgeFactor": 3.0,
   "phase": 1,
@@ -496,7 +496,7 @@ export const appliances: Appliance[] = [
   "id": "pump_sub_0_5hp",
   "name": "Submersible well pump 0.5 HP",
   "category": "pump",
-  "watts": 400,
+  "watts": 550,
   "hoursPerDay": 3,
   "surgeFactor": 5.0,
   "phase": 1,
@@ -506,7 +506,7 @@ export const appliances: Appliance[] = [
   "id": "pump_sub_1hp",
   "name": "Submersible well pump 1 HP",
   "category": "pump",
-  "watts": 750,
+  "watts": 1050,
   "hoursPerDay": 3,
   "surgeFactor": 5.0,
   "phase": 1,
@@ -516,7 +516,7 @@ export const appliances: Appliance[] = [
   "id": "pump_sub_1_5hp",
   "name": "Submersible well pump 1.5 HP",
   "category": "pump",
-  "watts": 1100,
+  "watts": 1500,
   "hoursPerDay": 4,
   "surgeFactor": 5.0,
   "phase": 1,
@@ -526,7 +526,7 @@ export const appliances: Appliance[] = [
   "id": "pump_sub_2hp",
   "name": "Submersible well pump 2 HP",
   "category": "pump",
-  "watts": 1500,
+  "watts": 2050,
   "hoursPerDay": 4,
   "surgeFactor": 5.0,
   "phase": 1,
@@ -536,27 +536,27 @@ export const appliances: Appliance[] = [
   "id": "pump_sub_3hp_3ph",
   "name": "Submersible well pump 3 HP (3-phase)",
   "category": "pump",
-  "watts": 2200,
+  "watts": 2700,
   "hoursPerDay": 5,
   "surgeFactor": 5.0,
   "phase": 3,
-  "nameAr": "مضخة غاطسة 3 حصان (3 فاز)"
+  "nameAr": "مضخة غاطسة 3 حصان (ثلاثية الأطوار)"
  },
  {
   "id": "pump_sub_5hp_3ph",
   "name": "Submersible well pump 5 HP (3-phase)",
   "category": "pump",
-  "watts": 3700,
+  "watts": 4400,
   "hoursPerDay": 6,
   "surgeFactor": 5.0,
   "phase": 3,
-  "nameAr": "مضخة غاطسة 5 حصان (3 فاز)"
+  "nameAr": "مضخة غاطسة 5 حصان (ثلاثية الأطوار)"
  },
  {
   "id": "pressure_booster",
   "name": "Pressure booster pump 0.75 HP",
   "category": "pump",
-  "watts": 550,
+  "watts": 750,
   "hoursPerDay": 1.5,
   "surgeFactor": 3.0,
   "phase": 1,
@@ -566,47 +566,47 @@ export const appliances: Appliance[] = [
   "id": "motor_3ph_5hp",
   "name": "3-phase induction motor 5 HP",
   "category": "motor",
-  "watts": 3700,
+  "watts": 4300,
   "hoursPerDay": 6,
   "surgeFactor": 4.0,
   "phase": 3,
-  "nameAr": "موتور 3 فاز 5 حصان"
+  "nameAr": "محرك حثّي ثلاثي الأطوار 5 حصان"
  },
  {
   "id": "motor_3ph_10hp",
   "name": "3-phase induction motor 10 HP",
   "category": "motor",
-  "watts": 7500,
+  "watts": 8400,
   "hoursPerDay": 6,
   "surgeFactor": 4.0,
   "phase": 3,
-  "nameAr": "موتور 3 فاز 10 حصان"
+  "nameAr": "محرك حثّي ثلاثي الأطوار 10 حصان"
  },
  {
   "id": "motor_3ph_20hp",
   "name": "3-phase induction motor 20 HP",
   "category": "motor",
-  "watts": 15000,
+  "watts": 16600,
   "hoursPerDay": 6,
   "surgeFactor": 4.0,
   "phase": 3,
-  "nameAr": "موتور 3 فاز 20 حصان"
+  "nameAr": "محرك حثّي ثلاثي الأطوار 20 حصان"
  },
  {
   "id": "grain_mill",
   "name": "Grain / flour mill 7.5 HP (3-phase)",
   "category": "agri",
-  "watts": 5500,
+  "watts": 6400,
   "hoursPerDay": 4,
   "surgeFactor": 4.0,
   "phase": 3,
-  "nameAr": "طاحونة حبوب 7.5 حصان (3 فاز)"
+  "nameAr": "طاحونة حبوب 7.5 حصان (ثلاثية الأطوار)"
  },
  {
   "id": "milking_machine",
   "name": "Milking machine 1 HP",
   "category": "agri",
-  "watts": 750,
+  "watts": 1000,
   "hoursPerDay": 2,
   "surgeFactor": 3.0,
   "phase": 1,
@@ -626,7 +626,7 @@ export const appliances: Appliance[] = [
   "id": "poultry_fan",
   "name": "Poultry house ventilation fan 1 HP",
   "category": "agri",
-  "watts": 750,
+  "watts": 950,
   "hoursPerDay": 12,
   "surgeFactor": 3.0,
   "phase": 1,
@@ -646,11 +646,11 @@ export const appliances: Appliance[] = [
   "id": "compressor_2hp",
   "name": "Air compressor 2 HP",
   "category": "workshop",
-  "watts": 1500,
+  "watts": 2000,
   "hoursPerDay": 2,
   "surgeFactor": 4.0,
   "phase": 1,
-  "nameAr": "كمبروسر هواء 2 حصان"
+  "nameAr": "ضاغط هواء (كمبروسر) 2 حصان"
  },
  {
   "id": "angle_grinder",
@@ -660,7 +660,7 @@ export const appliances: Appliance[] = [
   "hoursPerDay": 1,
   "surgeFactor": 2.0,
   "phase": 1,
-  "nameAr": "صاروخ / عدة كهربائية"
+  "nameAr": "جلّاخة (صاروخ) / عُدد كهربائية"
  },
  {
   "id": "led_highbay_150w",
@@ -680,7 +680,7 @@ export const appliances: Appliance[] = [
   "hoursPerDay": 8,
   "surgeFactor": 3.0,
   "phase": 3,
-  "nameAr": "وحدة تكييف مركزي 10 طن (3 فاز)"
+  "nameAr": "وحدة تكييف مركزي 10 طن (ثلاثية الأطوار)"
  },
  {
   "id": "vaccine_fridge",
@@ -710,7 +710,7 @@ export const appliances: Appliance[] = [
   "hoursPerDay": 12,
   "surgeFactor": 1.0,
   "phase": 1,
-  "nameAr": "عمود إنارة 60 واط"
+  "nameAr": "كشاف شارع / فناء 60 واط"
  },
  {
   "id": "ev_charger_7kw",
@@ -720,7 +720,7 @@ export const appliances: Appliance[] = [
   "hoursPerDay": 3,
   "surgeFactor": 1.0,
   "phase": 1,
-  "nameAr": "شاحن سيارة كهربائية 7 ك.و"
+  "nameAr": "شاحن سيارة كهربائية 7 كيلوواط"
  }
 ]
 

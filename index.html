@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" dir="ltr">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
@@ -7,6 +7,23 @@
     <meta name="description" content="DT+ Solar Planner — step-by-step solar PV load analysis, system sizing, bill of materials and quotation tool." />
     <meta name="theme-color" content="#0f766e" />
     <title>DT+ Solar Planner</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" />
+    <script>
+      // Set language/direction before the app paints (no LTR→RTL flash). ?lang=ar|en deep links win over the stored choice.
+      (function () {
+        try {
+          var q = new URLSearchParams(location.search).get('lang')
+          var s = JSON.parse(localStorage.getItem('dtplus-solar-planner-v1') || 'null')
+          var lang = q === 'ar' || q === 'en' ? q : s && s.state && s.state.lang ? s.state.lang : (navigator.languages && /^ar/i.test(navigator.languages[0] || '') ? 'ar' : 'en')
+          document.documentElement.lang = lang
+          document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr'
+          if (lang === 'ar') document.title = 'مخطط DT+‎ للطاقة الشمسية'
+          window.__DT_LANG__ = lang
+        } catch (e) { /* ignore */ }
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>

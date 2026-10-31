@@ -13,7 +13,7 @@ export const panels: Panel[] = [
   "vmp": 18.6,
   "isc": 5.75,
   "imp": 5.38,
-  "efficiencyPct": 20.0,
+  "efficiencyPct": 14.5,
   "tempCoeffPmaxPctPerC": -0.37,
   "tempCoeffVocPctPerC": -0.29,
   "noct": 45,
@@ -25,7 +25,9 @@ export const panels: Panel[] = [
   "technology": "PERC",
   "bifacial": false,
   "warrantyYears": 10,
-  "approxPriceUsd": 45
+  "approxPriceUsd": 45,
+  "maxSystemVoltage": 1000,
+  "maxSeriesFuseA": 10
  },
  {
   "id": "pnl-gen-150-12v",
@@ -36,7 +38,7 @@ export const panels: Panel[] = [
   "vmp": 18.9,
   "isc": 8.6,
   "imp": 7.95,
-  "efficiencyPct": 20.3,
+  "efficiencyPct": 15.1,
   "tempCoeffPmaxPctPerC": -0.37,
   "tempCoeffVocPctPerC": -0.29,
   "noct": 45,
@@ -48,7 +50,9 @@ export const panels: Panel[] = [
   "technology": "PERC",
   "bifacial": false,
   "warrantyYears": 10,
-  "approxPriceUsd": 60
+  "approxPriceUsd": 60,
+  "maxSystemVoltage": 1000,
+  "maxSeriesFuseA": 15
  },
  {
   "id": "pnl-gen-200-12v",
@@ -59,7 +63,7 @@ export const panels: Panel[] = [
   "vmp": 20.4,
   "isc": 10.6,
   "imp": 9.8,
-  "efficiencyPct": 20.5,
+  "efficiencyPct": 18.4,
   "tempCoeffPmaxPctPerC": -0.36,
   "tempCoeffVocPctPerC": -0.28,
   "noct": 45,
@@ -71,7 +75,9 @@ export const panels: Panel[] = [
   "technology": "PERC",
   "bifacial": false,
   "warrantyYears": 10,
-  "approxPriceUsd": 75
+  "approxPriceUsd": 75,
+  "maxSystemVoltage": 1000,
+  "maxSeriesFuseA": 20
  },
  {
   "id": "pnl-gen-330-poly",
@@ -94,7 +100,9 @@ export const panels: Panel[] = [
   "technology": "poly",
   "bifacial": false,
   "warrantyYears": 10,
-  "approxPriceUsd": 70
+  "approxPriceUsd": 70,
+  "maxSystemVoltage": 1000,
+  "maxSeriesFuseA": 15
  },
  {
   "id": "pnl-trina-400-vertexs",
@@ -117,7 +125,9 @@ export const panels: Panel[] = [
   "technology": "PERC",
   "bifacial": false,
   "warrantyYears": 15,
-  "approxPriceUsd": 85
+  "approxPriceUsd": 85,
+  "maxSystemVoltage": 1500,
+  "maxSeriesFuseA": 25
  },
  {
   "id": "pnl-jinko-410-neo54",
@@ -140,7 +150,9 @@ export const panels: Panel[] = [
   "technology": "TOPCon",
   "bifacial": false,
   "warrantyYears": 15,
-  "approxPriceUsd": 90
+  "approxPriceUsd": 90,
+  "maxSystemVoltage": 1500,
+  "maxSeriesFuseA": 25
  },
  {
   "id": "pnl-cs-450-hiku6",
@@ -163,7 +175,9 @@ export const panels: Panel[] = [
   "technology": "PERC",
   "bifacial": false,
   "warrantyYears": 12,
-  "approxPriceUsd": 95
+  "approxPriceUsd": 95,
+  "maxSystemVoltage": 1500,
+  "maxSeriesFuseA": 25
  },
  {
   "id": "pnl-longi-500-himo5",
@@ -186,7 +200,9 @@ export const panels: Panel[] = [
   "technology": "PERC",
   "bifacial": false,
   "warrantyYears": 12,
-  "approxPriceUsd": 100
+  "approxPriceUsd": 100,
+  "maxSystemVoltage": 1500,
+  "maxSeriesFuseA": 25
  },
  {
   "id": "pnl-jinko-545-tigerpro",
@@ -209,7 +225,9 @@ export const panels: Panel[] = [
   "technology": "PERC",
   "bifacial": false,
   "warrantyYears": 12,
-  "approxPriceUsd": 105
+  "approxPriceUsd": 105,
+  "maxSystemVoltage": 1500,
+  "maxSeriesFuseA": 30
  },
  {
   "id": "pnl-ja-550-jam72s30",
@@ -232,7 +250,9 @@ export const panels: Panel[] = [
   "technology": "PERC",
   "bifacial": false,
   "warrantyYears": 12,
-  "approxPriceUsd": 108
+  "approxPriceUsd": 108,
+  "maxSystemVoltage": 1500,
+  "maxSeriesFuseA": 25
  },
  {
   "id": "pnl-jinko-580-neo72",
@@ -255,7 +275,9 @@ export const panels: Panel[] = [
   "technology": "TOPCon",
   "bifacial": true,
   "warrantyYears": 12,
-  "approxPriceUsd": 110
+  "approxPriceUsd": 110,
+  "maxSystemVoltage": 1500,
+  "maxSeriesFuseA": 30
  },
  {
   "id": "pnl-longi-585-himox6",
@@ -278,7 +300,9 @@ export const panels: Panel[] = [
   "technology": "HPBC",
   "bifacial": false,
   "warrantyYears": 15,
-  "approxPriceUsd": 118
+  "approxPriceUsd": 118,
+  "maxSystemVoltage": 1500,
+  "maxSeriesFuseA": 30
  },
  {
   "id": "pnl-ja-585-jam72d40",
@@ -301,7 +325,9 @@ export const panels: Panel[] = [
   "technology": "TOPCon",
   "bifacial": true,
   "warrantyYears": 12,
-  "approxPriceUsd": 112
+  "approxPriceUsd": 112,
+  "maxSystemVoltage": 1500,
+  "maxSeriesFuseA": 30
  },
  {
   "id": "pnl-cs-600-tophiku6",
@@ -324,7 +350,9 @@ export const panels: Panel[] = [
   "technology": "TOPCon",
   "bifacial": false,
   "warrantyYears": 12,
-  "approxPriceUsd": 120
+  "approxPriceUsd": 120,
+  "maxSystemVoltage": 1500,
+  "maxSeriesFuseA": 30
  },
  {
   "id": "pnl-jinko-610-neo78",
@@ -347,7 +375,9 @@ export const panels: Panel[] = [
   "technology": "TOPCon",
   "bifacial": true,
   "warrantyYears": 12,
-  "approxPriceUsd": 125
+  "approxPriceUsd": 125,
+  "maxSystemVoltage": 1500,
+  "maxSeriesFuseA": 30
  },
  {
   "id": "pnl-astro-620-n7",
@@ -370,7 +400,9 @@ export const panels: Panel[] = [
   "technology": "TOPCon",
   "bifacial": true,
   "warrantyYears": 12,
-  "approxPriceUsd": 125
+  "approxPriceUsd": 125,
+  "maxSystemVoltage": 1500,
+  "maxSeriesFuseA": 30
  },
  {
   "id": "pnl-risen-650-titan",
@@ -393,7 +425,9 @@ export const panels: Panel[] = [
   "technology": "PERC",
   "bifacial": true,
   "warrantyYears": 12,
-  "approxPriceUsd": 125
+  "approxPriceUsd": 125,
+  "maxSystemVoltage": 1500,
+  "maxSeriesFuseA": 35
  },
  {
   "id": "pnl-trina-700-vertexn",
@@ -416,7 +450,9 @@ export const panels: Panel[] = [
   "technology": "TOPCon",
   "bifacial": true,
   "warrantyYears": 12,
-  "approxPriceUsd": 140
+  "approxPriceUsd": 140,
+  "maxSystemVoltage": 1500,
+  "maxSeriesFuseA": 35
  },
  {
   "id": "pnl-cs-720-topbihiku7",
@@ -439,7 +475,9 @@ export const panels: Panel[] = [
   "technology": "TOPCon",
   "bifacial": true,
   "warrantyYears": 12,
-  "approxPriceUsd": 145
+  "approxPriceUsd": 145,
+  "maxSystemVoltage": 1500,
+  "maxSeriesFuseA": 35
  }
 ]
 
@@ -838,7 +876,8 @@ export const batteries: Battery[] = [
   "weightKg": 63.8,
   "formFactor": "floor",
   "parallelMax": 2,
-  "approxPriceUsd": 3200
+  "approxPriceUsd": 3200,
+  "inverterBrands": ["Huawei"]
  }
 ]
 
@@ -1156,7 +1195,8 @@ export const inverters: Inverter[] = [
   "efficiencyPct": 98.4,
   "parallelMax": 1,
   "generatorInput": false,
-  "approxPriceUsd": 1200
+  "approxPriceUsd": 1200,
+  "batteryBrands": ["Huawei","LG"]
  },
  {
   "id": "inv-lux-lxp-lb-eu-10k",
@@ -1308,7 +1348,7 @@ export const inverters: Inverter[] = [
  {
   "id": "inv-growatt-mod10-xh",
   "brand": "Growatt",
-  "model": "MOD 10KTL3-XH 10 kW 3-ph hybrid (HV battery 600-950 V)",
+  "model": "MOD 10KTL3-XH 10 kW 3-ph hybrid (HV battery 100-550 V)",
   "type": "hybrid",
   "phase": 3,
   "ratedAcKw": 10.0,
@@ -1318,8 +1358,8 @@ export const inverters: Inverter[] = [
   "mpptMaxV": 1000,
   "mpptCount": 2,
   "maxInputCurrentPerMppt": 16,
-  "batteryVoltage": "600-950",
-  "maxChargeA": 18.5,
+  "batteryVoltage": "100-550",
+  "maxChargeA": 25,
   "surgeKw": 20.0,
   "efficiencyPct": 98.6,
   "parallelMax": 1,
@@ -1366,7 +1406,8 @@ export const inverters: Inverter[] = [
   "efficiencyPct": 98.6,
   "parallelMax": 1,
   "generatorInput": false,
-  "approxPriceUsd": 1600
+  "approxPriceUsd": 1600,
+  "batteryBrands": ["Huawei","LG"]
  },
  {
   "id": "inv-sma-sb3",

@@ -4,7 +4,8 @@ import { describe, it, expect } from 'vitest'
 import {
   computeProject, computeLoads, cellTemp, designStrings, sizeCable, fitsSystemVoltage, recommendInverter, recommendBattery, INV_EFF_BATT,
 } from '../src/engine/compute'
-import { roundUpStd, STD_MCB_A, STD_PV_FUSE_A } from '../src/engine/standards'
+import { roundUpStd, nextStd, STD_MCB_A, STD_PV_FUSE_A } from '../src/engine/standards'
+import { computeEconomics } from '../src/engine/economics'
 import { newProject, siteFromLocation, defaultDesign, defaultPricing } from '../src/engine/defaults'
 import type { LoadItem, Panel, Inverter, Project, Results } from '../src/engine/types'
 import { catalog } from '../src/data/catalog'
@@ -112,11 +113,12 @@ describe('§3 derate chain and PV sizing', () => {
     expect(r.derate).toBeCloseTo(r.derateBreakdown.reduce((a, b) => a * b.factor, 1), 12)
     expect(r.derateBreakdown.some((b) => b.name.startsWith('Battery'))).toBe(false)
   })
-  it('off-grid Khartoum: 0.892 base chain × battery round-trip 0.92 (100 % via battery) = 0.704637', () => {
+  it('off-grid Khartoum with a separate MPPT controller: 0.892 base chain × η_cc 0.97 × battery round-trip 0.92 = 0.683497', () => {
     const r = computeProject(projectA())
-    // f_temp = 1 − 0.003 × 36 = 0.892 ; × 0.97 × 0.97 × 0.97 × 0.96 × 0.98 = 0.7659093 ; × 0.92 = 0.7046366
+    // f_temp = 1 − 0.003 × 36 = 0.892 ; × 0.97 × 0.97 × 0.97 × 0.96 × 0.98 = 0.7659093 ; × η_cc 0.97 (§3.2) = 0.7429320 ; × 0.92 = 0.6834975
     expect(r.derateBreakdown[0].factor).toBeCloseTo(0.892, 9)
-    expect(r.derate).toBeCloseTo(0.7046366, 6)
+    expect(r.derate).toBeCloseTo(0.6834975, 6)
+    expect(r.derateBreakdown.at(-2)!.factor).toBeCloseTo(0.97, 9)
     expect(r.derateBreakdown.at(-1)!.factor).toBeCloseTo(0.92, 9)
   })
   it('hybrid Riyadh: night share 60 % → battery factor 1 − 0.6 × 0.08 = 0.952 ; derate 0.771061 × 0.952 = 0.734050', () => {
@@ -126,8 +128,8 @@ describe('§3 derate chain and PV sizing', () => {
   })
   it('PV_kWp = E/(PSH × D) × oversize ; N = ceil(kWp × 1000 / 580)', () => {
     const a = computeProject(projectA())
-    // 3 / (6.0 × 0.7046366) × 1.2 = 3.6 / 4.2278 = 0.85150 kWp → ceil(851.5/580) = 2 → 1.16 kWp
-    expect(a.requiredPvKwp).toBeCloseTo(0.85150, 4)
+    // 3 / (6.0 × 0.6834975) × 1.2 = 3.6 / 4.100985 = 0.877838 kWp → ceil(877.8/580) = 2 → 1.16 kWp
+    expect(a.requiredPvKwp).toBeCloseTo(0.877838, 4)
     expect(a.panelQty).toBe(2)
     expect(a.arrayKwp).toBeCloseTo(1.16, 9)
     const b = computeProject(projectB())
@@ -136,12 +138,17 @@ describe('§3 derate chain and PV sizing', () => {
     expect(b.panelQty).toBe(12)
     expect(b.strings!.notes.join(' ')).toMatch(/adjusted from 11 to 12/)
   })
-  it('monthly production uses days-in-month; annual = kWp × PSH × 365 × D when PSH is flat', () => {
+  it('monthly production uses days-in-month and the monthly tilt shape; annual = kWp × PSH × 365 × D when PSH is flat and the tilt is the reference', () => {
     const r = computeProject(projectB())
-    // 6.96 × 5.8 × 365 × 0.7340503 = 10815.7 kWh ; Feb = 6.96 × 5.8 × 28 × 0.7340503 = 829.69
+    // tilt gain factor 1 at the location's optimal tilt → the monthly shape averages (day-weighted) to exactly 1
+    expect(r.tiltGainUsed).toBeCloseTo(1, 9)
+    expect(r.monthlyTiltGain.reduce((a, g, m) => a + g * [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][m], 0) / 365).toBeCloseTo(1, 9)
+    expect(r.monthlyTiltGain[11]).toBeGreaterThan(1.2) // Riyadh winter boost at 21° tilt (isotropic model, relative to the annual mean)
+    expect(r.monthlyTiltGain[5]).toBeLessThan(0.9)
+    // 6.96 × 5.8 × 365 × 0.7340503 = 10815.7 kWh ; Feb = 6.96 × 5.8 × g_Feb × 28 × 0.7340503
     expect(r.annualProductionKwh).toBeCloseTo(6.96 * 5.8 * 365 * r.derate, 6)
     expect(r.annualProductionKwh).toBeCloseTo(10815.7, 0)
-    expect(r.monthlyProductionKwh[1]).toBeCloseTo(6.96 * 5.8 * 28 * r.derate, 6)
+    expect(r.monthlyProductionKwh[1]).toBeCloseTo(6.96 * 5.8 * r.monthlyTiltGain[1] * 28 * r.derate, 6)
     expect(r.specificYield).toBeCloseTo(5.8 * 365 * r.derate, 6) // 1554.0 kWh/kWp
     expect(r.monthlyKwh).toBeCloseTo(25 * 30.4, 6)
     expect(r.annualKwh).toBeCloseTo(25 * 365, 6)
@@ -151,6 +158,7 @@ describe('§3 derate chain and PV sizing', () => {
     p.site.monthlyPsh = []
     const r = computeProject(p)
     expect(r.monthlyProductionKwh).toHaveLength(12)
+    expect(r.monthlyPshUsed).toEqual(Array(12).fill(5.8))
     expect(r.annualProductionKwh).toBeCloseTo(r.arrayKwp * 5.8 * 365 * r.derate, 6)
   })
   it('off-grid default carries the §3.1 offGridMargin 1.20; hybrid/grid-tied 1.0', () => {
@@ -193,20 +201,29 @@ describe('§4 battery sizing', () => {
     expect(r.batteryAh).toBe(200) // parallel × 100 Ah (series does not add Ah)
     expect(r.batteryKwh).toBeCloseTo(10.24, 9)
   })
-  it('auto-selected unit: requirement is re-based on the unit DoD before counting modules (HV: BYD HVS 10.24 kWh, DoD 100 %)', () => {
+  it('auto-selected unit: requirement is re-based on the unit DoD before counting modules; HV pairing respects the inverter', () => {
     const p = projectB()
     p.design = { ...p.design, systemVoltage: 'hv', batteryId: 'auto', inverterId: null, generatorBackup: false }
     p.loads = [L('x', 1000, 1, 7.695)] // night 7695 Wh → 7.695 / (0.9 × 0.95) = 9.000 kWh at the chemistry DoD
     const r = computeProject(p)
-    expect(recommendBattery('hv', 9)?.id).toBe('bat-byd-hvs102') // 1 module (vs 2 × LUNA 5 kWh)
+    // Without an inverter: BYD 10.24 kWh (DoD 100 %: 8.1 kWh → 1 module, $5,540) beats 2 × LUNA 5 kWh ($6,480)
+    expect(recommendBattery('hv', 9)?.id).toBe('bat-byd-hvs102')
+    // The only single-phase HV hybrid is the Huawei SUN2000-5KTL-L1, which only takes LUNA2000 → 2 × 5 kWh
+    expect(r.inverter?.id).toBe('inv-huawei-5ktl-l1')
+    expect(r.battery?.id).toBe('bat-huawei-luna5')
     expect(r.dod).toBe(1.0)
     expect(r.batteryRequiredKwh).toBeCloseTo(8.1, 6) // 9.0 × 0.9 / 1.0
-    expect(r.batteryQty).toBe(1)
+    expect(r.batteryQty).toBe(2) // ceil(8.1 / 5)
     expect(r.batteryUsableKwh).toBeGreaterThanOrEqual(r.batteryRequiredKwh)
+    expect(check(r, 'batt-inverter')).toBeUndefined()
   })
-  it('recommendBattery prefers the fewest modules, then lowest $/kWh, within parallelMax', () => {
-    // 10 kWh at 48 V: one-module candidates 48v200 ($122/kWh), 48v280 ($118.6/kWh), 48v300 ($120.4/kWh), felicity ($156/kWh) → 48v280
-    expect(recommendBattery(48, 10)?.id).toBe('bat-gen-48v280')
+  it('recommendBattery picks the cheapest adequate configuration (modules × (price + $40 BOS)) within parallelMax', () => {
+    // 10 kWh at 48 V (usable 9 kWh): 48v200 1 × $1,290 < 2 × rack $1,380 < 48v280 $1,740 → 48v200 (was 48v280 = fewest-modules rule)
+    expect(recommendBattery(48, 10)?.id).toBe('bat-gen-48v200')
+    // 24.21 kWh: 5 × 5.12 kWh rack = 5 × $690 = $3,450 < 2 × 48v280 = $3,480 < 3 × 48v200 = $3,870
+    expect(recommendBattery(48, 24.21)?.id).toBe('bat-gen-48v100-rack')
+    // 2 kWh at 24 V: 24v100 2.56 kWh $460 < 24v200 $820
+    expect(recommendBattery(24, 2.0)?.id).toBe('bat-gen-24v100-lfp')
     expect(recommendBattery(12, 1, 'AGM')?.id).toBe('bat-gen-12v200-agm')
     expect(recommendBattery(48, 5, 'NMC')).toBeNull()
   })
@@ -219,13 +236,13 @@ describe('§4 battery sizing', () => {
     expect(fitsSystemVoltage(b(51.2), 24)).toBe(false) // k = 0
     expect(fitsSystemVoltage(b(12.8), 12)).toBe(true)
   })
-  it('C-rate: inverter 12 kW on a single 100 A module → I = 12000/(48 × 0.95) = 263 A > 100 A → warning', () => {
+  it('C-rate: inverter 12 kW on a single 100 A module → I = 12000/(48 × 0.94) = 266 A > 100 A → warning', () => {
     const p = projectB()
     p.design = { ...p.design, inverterId: 'inv-deye-12k-sg02lp1', batteryOverrideQty: 1, generatorBackup: false }
     const r = computeProject(p)
     expect(r.batteryQty).toBe(1)
     expect(check(r, 'batt-discharge')?.level).toBe('warn')
-    expect(check(r, 'batt-discharge')?.message).toMatch(/263 A/)
+    expect(check(r, 'batt-discharge')?.message).toMatch(/266 A/)
   })
   it('off-grid without a battery is an error, hybrid without one a warning', () => {
     const a = projectA(); a.design = { ...a.design, batteryId: null }
@@ -249,8 +266,11 @@ describe('§5 inverter sizing & auto-selection', () => {
     // surge rejects: 6176 W peak × 1.25 = 7.72 kW but a 20 kW surge needs more than the 8 kW Deye (16 kW surge) → next unit whose surge ≥ 20 kW is the Luxpower 10 kW (20 kW surge)
     expect(recommendInverter('hybrid', 1, 7.72, 20, 48)?.inverter.id).toBe('inv-lux-lxp-lb-eu-10k')
     expect(recommendInverter('hybrid', 1, 7.72, 21, 48)?.inverter.id).toBe('inv-deye-12k-sg02lp1') // 24 kW surge
-    // grid-tied ignores the battery-voltage filter
-    expect(recommendInverter('gridtie', 3, 100, 100, 48)?.inverter.id).toBe('inv-huawei-100ktl-m2')
+    // grid-tied ignores the battery-voltage filter and the surge; cheapest adequate grid-tie unit (100 kW: Growatt MAX $5,500 < Huawei/Sungrow $6,500)
+    const gt = recommendInverter('gridtie', 3, 100, 100, 48)
+    expect(gt?.inverter.type).toBe('gridtie')
+    expect(gt?.inverter.ratedAcKw).toBeGreaterThanOrEqual(100)
+    expect(gt?.inverter.id).toBe('inv-growatt-max100-lv')
   })
   it('parallel stacking: 40 kW single-phase 48 V → 3 × 16 kW (ceil(40/16) = 3 ≤ parallelMax 16)', () => {
     expect(recommendInverter('hybrid', 1, 40, 40, 48)).toEqual({ inverter: expect.objectContaining({ id: 'inv-deye-16k-sg01lp1' }), qty: 3 })
@@ -373,14 +393,17 @@ describe('§8 cable sizing and protection', () => {
     expect(c.currentA).toBe(14)
     expect(c.voltage).toBe(86)
   })
-  it('three-phase uses √3: 144.3 A, 40 m, 400 V → 95 mm² (232 × 0.87 = 201.8 ≥ 180.4), 0.54 %, 200 A breaker', () => {
+  it('three-phase uses √3 and method C 3-loaded column: 144.3 A, 40 m, 400 V → 200 A breaker → 120 mm² (259 × 0.87 = 225 ≥ 200; 95 mm² gives 194), 0.43 %', () => {
     const c = sizeCable('ac', 144.3, 40, 400, 2, true)
-    // Vd = √3 × 40 × 144.3 × 0.0206 / 95 = 2.168 V → 0.542 % ; 70 mm² fails ampacity (192 × 0.87 = 167 < 180.4)
-    expect(c.sizeMm2).toBe(95)
-    expect(c.dropPct).toBeCloseTo(0.54, 2)
-    expect(c.breakerA).toBe(200) // nextStd(144.3 × 1.25 = 180.4)
+    // breaker nextStd(144.3 × 1.25 = 180.4) = 200 A ; I_z ≥ I_n = 200 ; Vd = √3 × 40 × 144.3 × 0.0206 / 120 = 1.7162 V → 0.429 %
+    expect(c.breakerA).toBe(200)
+    expect(c.sizeMm2).toBe(120) // doc fixture (c): 4 × 120 mm²
+    expect(c.ampacityA).toBeCloseTo(259 * 0.87, 1)
+    expect(c.dropPct).toBeCloseTo(0.43, 2)
+    // single-phase (method C, 2 loaded): 95 mm² = 258 × 0.87 = 224.5 ≥ 200 ; Vd = 2 × 40 × 144.3 × 0.0206 / 95 = 2.5032 V → 0.626 %
     const single = sizeCable('ac', 144.3, 40, 400, 2, false)
-    expect(single.dropPct / c.dropPct).toBeCloseTo(2 / Math.sqrt(3), 1) // same size, k = 2 vs √3
+    expect(single.sizeMm2).toBe(95)
+    expect(single.dropPct).toBeCloseTo(0.63, 2)
   })
   it('AC minimum is 2.5 mm²: 4.35 A → 2.5 mm², 0.47 %, 6 A MCB', () => {
     const c = sizeCable('ac', 4.35, 15, 230, 2)
@@ -389,18 +412,19 @@ describe('§8 cable sizing and protection', () => {
     expect(c.dropPct).toBeCloseTo(0.47, 2)
     expect(c.breakerA).toBe(6) // nextStd(5.44)
   })
-  it('battery minimum is 10 mm² and the fuse list starts at 63 A: 22.2 A → 10 mm², 0.38 %, 63 A', () => {
+  it('battery minimum is 10 mm²: 22.2 A → fuse nextStd(27.75) = 30 A (doc fixture a), 10 mm², 0.38 %', () => {
     const c = sizeCable('battery', 22.2, 2, 48, 1.5)
-    // Vd = 2 × 2 × 22.2 × 0.0206 / 10 = 0.1829 V → 0.381 %
+    // Vd = 2 × 2 × 22.2 × 0.0206 / 10 = 0.1829 V → 0.381 % ; method F 10 mm² = 80 × 0.87 = 69.6 A ≥ 30 A
     expect(c.sizeMm2).toBe(10)
     expect(c.dropPct).toBeCloseTo(0.38, 2)
-    expect(c.breakerA).toBe(63)
+    expect(c.breakerA).toBe(30)
   })
-  it('ampacity derating k_amb 0.87 × 1.25 design margin picks the size: 175.4 A battery → 120 mm² (269 × 0.87 = 234 ≥ 219.3; 95 mm² gives 201.8)', () => {
+  it('I_B ≤ I_n ≤ I_z: 175.4 A battery → 225 A fuse → 70 mm² method F (269 × 0.87 = 234 ≥ 225; 50 mm² gives 181.8)', () => {
     const c = sizeCable('battery', 175.44, 2, 48, 1.5)
-    expect(c.sizeMm2).toBe(120)
-    expect(c.breakerA).toBe(250) // nextStd(219.3)
-    expect(c.dropPct).toBeCloseTo(0.25, 2) // 2 × 2 × 175.44 × 0.0206 / 120 = 0.1205 V → 0.251 %
+    expect(c.breakerA).toBe(225) // nextStd(219.3) — 225 A is in the §8.3 list
+    expect(c.sizeMm2).toBe(70)
+    expect(c.ampacityA!).toBeGreaterThanOrEqual(c.breakerA)
+    expect(c.dropPct).toBeCloseTo(0.43, 2) // 2 × 2 × 175.44 × 0.0206 / 70 = 0.2065 V → 0.430 %
   })
   it('when no size meets the drop target the largest (240 mm²) is returned with its real drop, and the project warns', () => {
     const c = sizeCable('dc', 14, 1000, 86, 2)
@@ -412,39 +436,45 @@ describe('§8 cable sizing and protection', () => {
     expect(check(computeProject(p), 'vdrop-dc')?.level).toBe('warn')
     expect(check(computeProject(projectB()), 'vdrop-dc')).toBeUndefined()
   })
-  it('roundUpStd returns the next standard size and silently caps at the list maximum', () => {
+  it('roundUpStd (legacy) caps at the list maximum; nextStd returns null above the list so the engine can flag it', () => {
     expect(roundUpStd(21.84, STD_PV_FUSE_A)).toBe(25)
     expect(roundUpStd(32, STD_PV_FUSE_A)).toBe(32)
-    expect(roundUpStd(1000, STD_MCB_A)).toBe(400)
+    expect(roundUpStd(1000, STD_MCB_A)).toBe(1000)
+    expect(roundUpStd(5000, STD_MCB_A)).toBe(1600)
+    expect(nextStd(21.84, STD_PV_FUSE_A)).toBe(25)
+    expect(nextStd(5000, STD_MCB_A)).toBeNull()
   })
-  it('end-to-end fixture (b) cables: DC 4 mm² at 255.5 V (1.16 %), battery 175.4 A → 120 mm² / 250 A, AC 34.8 A → 10 mm² / 50 A (0.93 %)', () => {
+  it('end-to-end fixture (b) cables: DC 4 mm² at 255.5 V (1.16 %), battery 177.3 A → 70 mm² / 225 A, AC 34.8 A → 10 mm² / 50 A (0.93 %)', () => {
     const r = computeProject(projectB())
     const dc = r.cables.find((c) => c.use === 'dc')!, bt = r.cables.find((c) => c.use === 'battery')!, ac = r.cables.find((c) => c.use === 'ac')!
     expect(dc).toMatchObject({ sizeMm2: 4, voltage: 256, breakerA: 25 }) // 6 × 42.59 = 255.5 V ; 2.96 V / 255.5 = 1.16 %
     expect(dc.dropPct).toBeCloseTo(1.16, 2)
-    expect(bt.currentA).toBeCloseTo(175.4, 1) // 8000 / (48 × 0.95)
-    expect(bt).toMatchObject({ sizeMm2: 120, breakerA: 250 })
+    expect(bt.currentA).toBeCloseTo(177.3, 1) // 8000 / (48 × 0.94) — §8.3 η_inv 0.94
+    expect(bt).toMatchObject({ sizeMm2: 70, breakerA: 225 }) // doc fixture (b): 225 A class T, 70 mm²
+    expect(ac.ampacityA).toBeCloseTo(63 * 0.87, 1) // 54.8 A ≥ 50 A breaker
     expect(ac.currentA).toBeCloseTo(34.8, 1) // 8000 / 230
     expect(ac).toMatchObject({ sizeMm2: 10, breakerA: 50 })
     expect(ac.dropPct).toBeCloseTo(0.93, 2) // 2 × 15 × 34.78 × 0.0206 / 10 = 2.15 V / 230
   })
-  it('end-to-end fixture (c) AC: 100 kW / (√3 × 400) = 144.3 A → 95 mm², 200 A, 0.20 % over 15 m', () => {
+  it('end-to-end fixture (c) AC: 100 kW / (√3 × 400) = 144.3 A → 200 A, 120 mm² (doc), 0.16 % over 15 m', () => {
     const ac = computeProject(projectC()).cables.find((c) => c.use === 'ac')!
     expect(ac.currentA).toBeCloseTo(144.3, 1)
-    expect(ac).toMatchObject({ sizeMm2: 95, breakerA: 200, voltage: 400 })
-    expect(ac.dropPct).toBeCloseTo(0.2, 2) // √3 × 15 × 144.34 × 0.0206 / 95 = 0.813 V / 400
+    expect(ac).toMatchObject({ sizeMm2: 120, breakerA: 200, voltage: 400 })
+    expect(ac.dropPct).toBeCloseTo(0.16, 2) // √3 × 15 × 144.34 × 0.0206 / 120 = 0.6438 V / 400
   })
 })
 
 // ---------------------------------------------------------------- §11 generator
 describe('§11 generator sizing', () => {
-  it('fixture (b): charge 0.2 C × 20.48 = 4.096 kW (< 9.12 kW charger); (6.176 + 4.096/0.95) × 1.1 / 0.8 = 14.4 kVA ≥ 1.5 × 8 → 15 kVA', () => {
-    expect(computeProject(projectB()).generatorKva).toBe(15)
+  it('fixture (b): charge 0.2 C × 20.48 = 4.096 kW (< 9.12 kW charger); (6.176 + 4.096/0.95) × 1.1 / 0.8 = 14.4 kVA ≥ 1.5 × 8; × 1.1 above 40 °C = 15.85 → 20 kVA (doc genKvaHotDerated)', () => {
+    expect(computeProject(projectB()).generatorKva).toBe(20)
+    const cool = projectB(); cool.site = { ...cool.site, ambientHighC: 38 }
+    expect(computeProject(cool).generatorKva).toBe(15) // doc genKvaBase
   })
-  it('fixture (a): (0.41 + 1.024/0.95) × 1.1 / 0.8 = 2.05 kVA but ≥ 1.5 × 4 kW inverter = 6 → 7.5 kVA', () => {
+  it('fixture (a): (0.41 + 1.024/0.95) × 1.1 / 0.8 = 2.05 kVA but ≥ 1.5 × 4 kW inverter = 6; × 1.1 (42 °C) = 6.6 → 7.5 kVA', () => {
     expect(computeProject(projectA()).generatorKva).toBe(7.5)
   })
-  it('lead-acid recharges at 0.1 C: 28 × 2.4 kWh AGM = 67.2 kWh → 6.72 kW; (5 + 6.72/0.95) × 1.1 / 0.8 = 16.6 kVA → 20 kVA', () => {
+  it('lead-acid recharges at 0.1 C: 28 × 2.4 kWh AGM = 67.2 kWh → 6.72 kW; (5 + 6.72/0.95) × 1.1 / 0.8 = 16.6 kVA × 1.1 = 18.3 → 20 kVA', () => {
     const p = projectB()
     p.design = { ...p.design, batteryId: 'bat-gen-12v200-agm', coincidenceFactor: 1 }
     p.loads = [L('x', 5000, 1, 6)] // night 30 kWh → 30 / (0.5 × 0.95) = 63.2 kWh → ceil(63.2/2.4) = 27 → 4S × 7P = 28 units
@@ -472,20 +502,27 @@ describe('§12 bill of materials quantity rules', () => {
     expect(bomQty(r, 'triangle-frame')).toBe(12) // flat-concrete default
     expect(bomQty(r, 'ballast-block')).toBe(24)
   })
-  it('fixture (b) electrical: DC 2 strings × 20 m × 2 = 80 m; MC4 2 × 2 + 2 = 6; no combiner/fuses (1 string per MPPT); AC 15 m × 3 cores = 45 m', () => {
+  it('fixture (b) electrical: every cable/device line carries exactly the designed rating', () => {
     const r = computeProject(projectB())
-    expect(bomQty(r, 'dc-cable-4')).toBe(80)
-    expect(bomQty(r, 'mc4-pair')).toBe(6)
-    expect(bomQty(r, 'combiner-box')).toBeUndefined()
+    expect(bomQty(r, 'dc-cable-4')).toBe(80) // 2 strings × 20 m × 2
+    expect(bomQty(r, 'mc4-pair')).toBe(6) // 2 × 2 + 2
+    expect(bomQty(r, 'combiner-box')).toBeUndefined() // 1 string per MPPT
     expect(r.bom.some((b) => b.id.startsWith('pv-fuse'))).toBe(false)
-    expect(bomQty(r, 'dc-isolator')).toBe(1)
-    expect(bomQty(r, 'spd-dc')).toBe(1)
-    expect(bomQty(r, 'batt-cable-95')).toBeCloseTo(6.4, 6) // (2 × 2 + 4 × 0.6) × 1 (largest stocked size for a 120 mm² result)
+    // String Voc_cold 329.7 V → 600 V class; 1.25 × 14.37 × 1 string = 18 A → 25 A; at the inverter + at the array (run 20 m > 10 m)
+    expect(r.protection).toMatchObject({ dcIsolatorV: 600, dcIsolatorA: 25, spdDcV: 600 })
+    expect(bomQty(r, 'dc-isolator-600v-25a')).toBe(2)
+    expect(bomQty(r, 'spd-dc-600v')).toBe(2)
+    expect(bomQty(r, 'batt-cable-70')).toBeCloseTo(6.4, 6) // 70 mm² as designed: 2 m × 2 × 1 inverter + 4 × 0.6 m
     expect(bomQty(r, 'cable-lug')).toBe(20) // 4 × 4 + 4
-    expect(bomQty(r, 'batt-fuse-250')).toBe(1)
-    expect(bomQty(r, 'ac-cable-10')).toBe(45)
-    expect(bomQty(r, 'ac-mcb-63')).toBe(2) // inverter output + grid input
-    expect(bomQty(r, 'changeover-63')).toBe(1)
+    expect(bomQty(r, 'batt-fuse-225')).toBe(1)
+    // AC: inverter output 15 m + grid input 15 m, 3 cores, 10 mm² / 50 A ; generator 20 kVA / 230 = 87 A → 125 A → 50 mm² (168 × 0.87 = 146)
+    expect(bomQty(r, 'ac-cable-10')).toBe(90)
+    expect(bomQty(r, 'ac-mcb-50')).toBe(2) // inverter output + grid input
+    expect(bomQty(r, 'ac-cable-50')).toBe(45)
+    expect(bomQty(r, 'ac-mcb-125')).toBe(1) // generator input
+    expect(bomQty(r, 'rcd-63')).toBe(1) // 30 mA RCCB ≥ 50 A on the backup board
+    expect(bomQty(r, 'ats-125')).toBe(1) // generator present → ATS ≥ max(50, 125) A
+    expect(bomQty(r, 'changeover-63')).toBeUndefined()
     expect(bomQty(r, 'ct-meter')).toBe(1)
     expect(bomQty(r, 'wifi-dongle')).toBe(1)
     expect(bomQty(r, 'earth-rod')).toBe(1)
@@ -493,11 +530,18 @@ describe('§12 bill of materials quantity rules', () => {
     expect(bomQty(r, 'conduit')).toBe(37) // 20 + 15 + 2
     expect(bomQty(r, 'cable-ties-labels')).toBe(1)
     expect(bomQty(r, 'generator')).toBe(1)
+    const gen = r.bom.find((b) => b.id === 'generator')!
+    expect(gen.spec).toMatch(/^20 kVA/)
+    expect(gen.unitPriceUsd).toBe(20 * 220) // indicative $220/kVA for 10–30 kVA sets
     expect(bomQty(r, 'battery-rack')).toBe(1) // ceil(4/4)
+    expect(bomQty(r, 'earth-clip')).toBe(12)
   })
-  it('fixture (c): 3-ph AC cable 15 × 5 cores = 75 m; 12 strings on 10 MPPTs (≤ 2 per input) need no string fuses; > 20 kWp adds a lightning arrestor and 2 earth rods', () => {
+  it('fixture (c): 3-ph AC cable 15 × 5 cores = 75 m of 120 mm²; 12 strings on 10 MPPTs (≤ 2 per input) need no string fuses; > 20 kWp adds a lightning arrestor and 2 earth rods', () => {
     const r = computeProject(projectC())
-    expect(bomQty(r, 'ac-cable-35')).toBe(75)
+    expect(bomQty(r, 'ac-cable-120')).toBe(75)
+    expect(bomQty(r, 'ac-mccb-200')).toBe(2) // inverter output + point of connection
+    expect(bomQty(r, 'dc-isolator-1000v-50a')).toBe(2) // Voc_cold 984.4 V → 1000 V class; 1.25 × 14.37 × 2 strings = 35.9 A → 50 A
+    expect(bomQty(r, 'spd-dc-1000v')).toBe(2)
     expect(bomQty(r, 'dc-cable-4')).toBe(480) // 12 × 20 × 2
     expect(bomQty(r, 'mc4-pair')).toBe(26)
     expect(bomQty(r, 'combiner-box')).toBeUndefined()
@@ -511,13 +555,19 @@ describe('§12 bill of materials quantity rules', () => {
     expect(bomQty(r, 'cable-ties-labels')).toBe(11) // ceil(216/20)
     expect(bomQty(r, 'changeover-63')).toBeUndefined() // grid-tied
   })
-  it('string fuses + combiner appear only when ≥ 3 strings share one MPPT input: 18 panels on a single-MPPT SPF 5000 ES → 3 × 6S → 6 fuses, 1 combiner', () => {
+  it('string fuses + combiner appear only when ≥ 3 strings share one MPPT input: 18 panels on a single-MPPT SPF 5000 ES → 3 × 6S → 6 × 25 A fuses, 1 combiner, sized combiner output', () => {
     const p = projectA()
-    p.design = { ...p.design, inverterId: 'inv-growatt-spf5000es', panelOverrideQty: 18, generatorBackup: false }
+    p.design = { ...p.design, inverterId: 'inv-growatt-spf5000es', panelOverrideQty: 18, generatorBackup: false, useSeparateController: false }
     const r = computeProject(p)
     expect(r.strings).toMatchObject({ panelsPerString: 6, strings: 3 })
     expect(bomQty(r, 'combiner-box')).toBe(1) // ceil(3/6)
-    expect(bomQty(r, 'pv-fuse-30')).toBe(6) // 2 per string; 1.56 × 14.37 = 22.4 → 25 A → stocked 30 A item
+    expect(bomQty(r, 'pv-fuse-25')).toBe(6) // 2 per string; nextStd(1.56 × 14.37 = 22.4) = 25 A ≤ module max 30 A — exactly the designed rating
+    // Combiner → inverter: 3 × 14.37 = 43.1 A ; fuse nextStd(1.56 × 43.1 = 67.3) = 80 A ; PV cable ≥ 80 A → 10 mm² (98 × 0.87 = 85.3)
+    const arr = r.cableSchedule.find((c) => c.id === 'pv-array')!
+    expect(arr).toMatchObject({ breakerA: 80, sizeMm2: 10, count: 1 })
+    expect(bomQty(r, 'pv-array-fuse-80')).toBe(2)
+    expect(bomQty(r, 'dc-cable-10')).toBe(6) // 1 output × 3 m × 2
+    expect(r.protection).toMatchObject({ stringFuseA: 25, arrayFuseA: 80, dcIsolatorV: 600, dcIsolatorA: 63 }) // 1.25 × 14.37 × 3 = 53.9 → 63 A
     expect(check(r, 'strings')?.level).toBe('warn') // 3 strings > 1 MPPT × 1 string capacity
   })
   it('controller path (Victron, 1 string) gets no combiner; roof type drives the fixings', () => {
@@ -541,48 +591,86 @@ describe('§12 bill of materials quantity rules', () => {
     expect(rod).toMatchObject({ qty: 3, unitPriceUsd: 10, totalUsd: 30 })
     expect(r.labourUsd).toBeCloseTo(6.96 * 120 + 100 + 150, 6) // 1085.2
   })
-  it('cost chain: margin on subtotal, discount on (subtotal + margin), VAT after discount', () => {
+  it('cost chain: markup on cost (spread into line prices, rounded per unit), discount on (subtotal + markup), VAT after discount', () => {
     const p = projectB()
     p.pricing = { ...defaultPricing(20, 15), discountPct: 5 }
     const r = computeProject(p)
     expect(r.subtotalUsd).toBeCloseTo(r.equipmentCostUsd + r.labourUsd, 6)
-    expect(r.marginUsd).toBeCloseTo(0.2 * r.subtotalUsd, 6)
-    expect(r.discountUsd).toBeCloseTo(0.05 * 1.2 * r.subtotalUsd, 6)
-    expect(r.vatUsd).toBeCloseTo(0.15 * (1.2 - 0.06) * r.subtotalUsd, 6)
-    expect(r.totalUsd).toBeCloseTo(1.311 * r.subtotalUsd, 6) // 1.2 × 0.95 × 1.15
+    // markup = Σ qty × round(unit × 1.2) − Σ qty × unit: within half a cent per unit of 20 % of cost
+    const slack = r.bom.reduce((a, b) => a + b.qty * 0.005, 0) + 0.01
+    expect(Math.abs(r.marginUsd - 0.2 * r.subtotalUsd)).toBeLessThanOrEqual(slack)
+    expect(r.discountUsd).toBeCloseTo(0.05 * (r.subtotalUsd + r.marginUsd), 2)
+    expect(r.vatUsd).toBeCloseTo(0.15 * (r.subtotalUsd + r.marginUsd - r.discountUsd), 2)
+    expect(r.totalUsd).toBeCloseTo(r.subtotalUsd + r.marginUsd - r.discountUsd + r.vatUsd, 9)
+    expect(Math.abs(r.totalUsd - 1.311 * r.subtotalUsd)).toBeLessThanOrEqual(slack * 1.311 + 0.02) // 1.2 × 0.95 × 1.15
     expect(r.costPerWp).toBeCloseTo(r.totalUsd / 6960, 9)
   })
 })
 
 // ---------------------------------------------------------------- §10 economics
 describe('§10 economics', () => {
-  it('savings are capped at consumption; payback = capex / savings; CO₂ = offset × EF', () => {
+  it('grid-tied (no battery, no feed-in tariff): savings and CO₂ count daytime self-consumption only; payback = capex / savings', () => {
     const p = projectC()
     const r = computeProject(p)
-    // production 125.28 × 5.5 × 365 × 0.771061 = 193 922 kWh > consumption 22 kW × 24 × 365 = 192 720 kWh → offset 192 720
+    // production 125.28 × 5.5 × 365 × 0.771061 = 193 922 kWh ; the 22 kW plant runs 24 h → ≥ (24 − 12)/24 = 50 % at night (§1.4 floor,
+    // the 20 % entered is impossible) → daytime load 0.5 × 528 kWh × 365 = 96 360 kWh = self-consumption; the surplus earns nothing
     expect(r.annualProductionKwh).toBeCloseTo(193921.6, 0)
     expect(r.annualKwh).toBeCloseTo(192720, 6)
-    expect(r.annualSavingsUsd).toBeCloseTo(192720 * p.site.gridTariff, 6)
+    expect(r.dayWh).toBeCloseTo(264000, 6)
+    expect(r.usefulEnergyKwh).toBeCloseTo(96360, 6)
+    expect(r.savingsBasis).toBe('grid')
+    expect(r.annualSavingsUsd).toBeCloseTo(96360 * p.site.gridTariff, 6)
     expect(r.paybackYears).toBeCloseTo(r.totalUsd / r.annualSavingsUsd, 9)
-    expect(r.co2TonsPerYear).toBeCloseTo((192720 * p.site.gridEmission) / 1000, 6)
+    expect(r.co2TonsPerYear).toBeCloseTo((96360 * p.site.gridEmission) / 1000, 6)
   })
-  it('degradation 0.5 %/yr over 25 years: lifetime = E₁ × Σ 0.995^(t−1) = 23.556 × E₁; LCOE = capex / lifetime', () => {
-    const r = computeProject(projectB())
+  it('doc fixture (c) economics: LCOE (capex + Σ O&M/(1+r)^t) / Σ E_t/(1+r)^t = $0.0373/kWh, payback 5.06 yr, 110.7 t CO₂', () => {
+    // §13(c): capex 81 432, E₁ 201 200 kWh, d 0.5 %, r 6 %, O&M 1 % = 814/yr, 25 yr, tariff 0.08 flat, 100 % self-consumed
+    const e = computeEconomics({ systemType: 'gridtie', annualProductionKwh: 201200, annualLoadKwh: 1e9, dayLoadKwhYr: 1e9, nightLoadKwhYr: 0, batteryUsableKwh: 0,
+      tariffUsdPerKwh: 0.08, gridEmissionKgPerKwh: 0.55, capexUsd: 81432, batteryReplacementUsd: 0, batteryLifeYears: null, inverterReplacementUsd: 0, inverterLifeYears: 15,
+      years: 25, degradationPct: 0.5, escalationPct: 0, discountRatePct: 6, omPctPerYear: 1 })
+    expect(e.lcoeUsdPerKwh).toBeCloseTo(0.0373, 4) // (81 432 + 814.32 × 12.7834) / (201 200 × 12.2224) = 91 842 / 2 459 147
+    expect(e.lifetimeProductionKwh).toBeCloseTo(4739450, -2)
+    expect(e.annualSavingsUsd).toBeCloseTo(16096, 0)
+    expect(e.paybackYears).toBeCloseTo(5.06, 2)
+    expect(e.co2TonsPerYear).toBeCloseTo(110.66, 1)
+    expect(e.omUsdPerYear).toBeCloseTo(814.32, 6)
+  })
+  it('hybrid (projectB): LCOE / NPV / cash flow use the useful energy, O&M 1 %/yr and battery + inverter replacement at year 15', () => {
+    const p = projectB()
+    const r = computeProject(p)
     let f = 0
     for (let t = 1; t <= 25; t++) f += Math.pow(0.995, t - 1)
     expect(f).toBeCloseTo(23.556, 3) // = (1 − 0.995^25) / 0.005
     expect(r.lifetimeProductionKwh).toBeCloseTo(r.annualProductionKwh * f, 3)
-    expect(r.lcoeUsdPerKwh).toBeCloseTo(r.totalUsd / r.lifetimeProductionKwh, 9)
+    // useful = min(prod, day 10 kWh × 365 + min(night 15 kWh × 365, usable 18.432 × 0.95 × 365)) = min(10 816, 3 650 + 5 475) = 9 125 kWh (whole load)
+    expect(r.usefulEnergyKwh).toBeCloseTo(9125, 6)
+    // replacements: LiFePO4 min(6000/365 = 16.4, 15 calendar) = 15 yr; inverter 15 yr — both at client price (line cost × total/subtotal)
+    const ratio = r.totalUsd / r.subtotalUsd
+    const batt = r.bom.find((b) => b.id === 'bat-gen-48v100-rack')!.totalUsd * ratio
+    const inv = r.bom.find((b) => b.id === 'inv-deye-8k-sg01lp1')!.totalUsd * ratio
+    expect(r.replacements).toEqual([{ year: 15, item: 'battery', usd: expect.closeTo(batt, 6) }, { year: 15, item: 'inverter', usd: expect.closeTo(inv, 6) }])
+    const om = r.totalUsd * 0.01
+    expect(r.omUsdPerYear).toBeCloseTo(om, 9)
+    let pvCost = r.totalUsd, pvE = 0, npv = -r.totalUsd
+    for (let t = 1; t <= 25; t++) {
+      const used = Math.min(r.annualProductionKwh * Math.pow(0.995, t - 1), 9125)
+      const repl = t === 15 ? batt + inv : 0
+      pvCost += (om + repl) / Math.pow(1.06, t); pvE += used / Math.pow(1.06, t)
+      npv += (used * p.site.gridTariff * Math.pow(1.03, t - 1) - om - repl) / Math.pow(1.06, t)
+    }
+    expect(r.lcoeUsdPerKwh).toBeCloseTo(pvCost / pvE, 9)
+    expect(r.npvUsd).toBeCloseTo(npv, 6)
   })
-  it('cumulative cashflow: starts at −capex, year-1 step = min(E₁, load) × tariff, 3 % escalation, ROI = (Σ savings − capex)/capex', () => {
+  it('cumulative cashflow: starts at −capex, step = useful × tariff × 1.03^(t−1) − O&M − replacements; ROI = (Σ net − capex)/capex', () => {
     const p = projectB()
     const r = computeProject(p)
     expect(r.cumulativeCashflow).toHaveLength(26)
     expect(r.cumulativeCashflow[0]).toBeCloseTo(-r.totalUsd, 9)
-    const y1 = Math.min(r.annualProductionKwh, r.annualKwh) * p.site.gridTariff
-    expect(r.cumulativeCashflow[1] - r.cumulativeCashflow[0]).toBeCloseTo(y1, 6)
-    const y2 = Math.min(r.annualProductionKwh * 0.995, r.annualKwh) * p.site.gridTariff * 1.03
-    expect(r.cumulativeCashflow[2] - r.cumulativeCashflow[1]).toBeCloseTo(y2, 6)
+    const om = r.omUsdPerYear
+    expect(r.cumulativeCashflow[1] - r.cumulativeCashflow[0]).toBeCloseTo(9125 * p.site.gridTariff - om, 6)
+    expect(r.cumulativeCashflow[2] - r.cumulativeCashflow[1]).toBeCloseTo(9125 * p.site.gridTariff * 1.03 - om, 6)
+    const repl15 = r.replacements.filter((x) => x.year === 15).reduce((a, x) => a + x.usd, 0)
+    expect(r.cumulativeCashflow[15] - r.cumulativeCashflow[14]).toBeCloseTo(9125 * p.site.gridTariff * Math.pow(1.03, 14) - om - repl15, 6)
     expect(r.roi25Pct).toBeCloseTo(((r.cumulativeCashflow[25] + r.totalUsd) / r.totalUsd - 1) * 100, 9)
   })
   it('respects analysisYears', () => {
@@ -601,7 +689,9 @@ describe('edge cases produce finite numbers and the right checks', () => {
     const scalars: (number | null)[] = [r.dailyWh, r.peakW, r.surgeW, r.monthlyKwh, r.annualKwh, r.derate, r.requiredPvKwp, r.panelQty, r.arrayKwp, r.arrayAreaM2,
       r.tiltedPsh, r.annualProductionKwh, r.specificYield, r.batteryRequiredKwh, r.batteryQty, r.batteryKwh, r.batteryUsableKwh, r.batteryAh, r.batteryHoursBackup, r.dod,
       r.requiredInverterKw, r.inverterTotalKw, r.requiredControllerA, r.totalUsd, r.costPerWp, r.annualSavingsUsd, r.paybackYears, r.lcoeUsdPerKwh, r.co2TonsPerYear,
-      r.lifetimeProductionKwh, r.roi25Pct, ...r.cumulativeCashflow, ...r.monthlyProductionKwh]
+      r.lifetimeProductionKwh, r.roi25Pct, ...r.cumulativeCashflow, ...r.monthlyProductionKwh,
+      r.autonomyDays, r.footprintM2, r.tiltGainUsed, r.coincidenceFactor, r.npvUsd, r.usefulEnergyKwh, r.lifetimeUsefulKwh, r.omUsdPerYear, r.dcAcRatio,
+      ...r.monthlyTiltGain, ...r.cableSchedule.flatMap((c) => [c.currentA, c.sizeMm2, c.dropPct, c.breakerA, c.ampacityA ?? 0]), ...r.bom.map((b) => b.totalUsd)]
     for (const v of scalars) expect(v === null || Number.isFinite(v)).toBe(true)
   }
   it('no loads: zero energy, no battery, null payback, no NaN, "no-loads" error', () => {
@@ -614,7 +704,9 @@ describe('edge cases produce finite numbers and the right checks', () => {
     expect(r.batteryQty).toBe(0)
     expect(r.annualSavingsUsd).toBe(0)
     expect(r.paybackYears).toBeNull()
-    expect(r.roi25Pct).toBe(-100)
+    // no savings: you lose the capex plus 25 years of O&M and the inverter replacement → ROI below −100 %
+    expect(r.roi25Pct).toBeCloseTo(((r.cumulativeCashflow[25] + r.totalUsd) / r.totalUsd - 1) * 100, 9)
+    expect(r.roi25Pct!).toBeLessThan(-100)
     expect(check(r, 'no-loads')?.level).toBe('error')
   })
   it('PSH 0: no production, zero LCOE, null payback, no division by zero', () => {
@@ -626,6 +718,7 @@ describe('edge cases produce finite numbers and the right checks', () => {
     expect(r.annualProductionKwh).toBe(0)
     expect(r.lcoeUsdPerKwh).toBe(0)
     expect(r.paybackYears).toBeNull()
+    expect(check(r, 'psh')).toMatchObject({ level: 'error', step: 'site' })
   })
   it('all three fixtures are finite and the "all-ok" sentinel only appears when nothing else is flagged', () => {
     for (const p of [projectA(), projectB(), projectC()]) {

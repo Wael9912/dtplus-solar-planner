@@ -1,40 +1,163 @@
 @import "tailwindcss";
 
+/* ---------------------------------------------------------------------------
+   DT+ Solar Planner design tokens — "calm workspace, one loud number".
+   Colour roles: ink slate-900 · body slate-700 · muted slate-500 (never lighter for information)
+   brand = teal (primary actions, selection) · sun = data-viz only · amber = review · red = must fix.
+   --------------------------------------------------------------------------- */
 @theme {
   --color-brand-50: #f0fdfa;
   --color-brand-100: #ccfbf1;
   --color-brand-200: #99f6e4;
+  --color-brand-300: #5eead4;
   --color-brand-500: #14b8a6;
   --color-brand-600: #0d9488;
   --color-brand-700: #0f766e;
   --color-brand-800: #115e59;
   --color-brand-900: #134e4a;
+  --color-sun-300: #fcd34d;
   --color-sun-400: #fbbf24;
   --color-sun-500: #f59e0b;
-  --font-sans: "Inter", "Segoe UI", "Noto Sans Arabic", system-ui, -apple-system, sans-serif;
+
+  /* Role-based type scale */
+  --text-display: 1.625rem;
+  --text-display--line-height: 2.125rem;
+  --text-display--letter-spacing: -0.015em;
+  --text-display--font-weight: 650;
+  --text-title: 1.0625rem;
+  --text-title--line-height: 1.5rem;
+  --text-title--font-weight: 600;
+  --text-kpi: 1.875rem;
+  --text-kpi--line-height: 2.25rem;
+  --text-kpi--letter-spacing: -0.02em;
+  --text-kpi--font-weight: 650;
+  --text-kpi-sm: 1.25rem;
+  --text-kpi-sm--line-height: 1.75rem;
+  --text-kpi-sm--font-weight: 600;
+
+  --font-sans: "Inter", "IBM Plex Sans Arabic", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-arabic: "IBM Plex Sans Arabic", "Inter", "Segoe UI", "Geeza Pro", system-ui, sans-serif;
+
+  --shadow-card: 0 1px 2px 0 rgb(15 23 42 / 0.05);
+  --shadow-float: 0 10px 30px -8px rgb(15 23 42 / 0.25);
+
+  --animate-sheet-up: sheet-up 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+  --animate-fade-in: fade-in 0.18s ease-out;
+  --animate-pop-in: pop-in 0.16s ease-out;
+  @keyframes sheet-up { from { transform: translateY(24px); opacity: 0.4 } to { transform: none; opacity: 1 } }
+  @keyframes fade-in { from { opacity: 0 } to { opacity: 1 } }
+  @keyframes pop-in { from { transform: scale(0.97); opacity: 0 } to { transform: none; opacity: 1 } }
 }
 
-html { color-scheme: light; }
-body { @apply bg-slate-50 text-slate-800 antialiased; margin: 0; }
-[dir="rtl"] body { font-family: "Noto Sans Arabic", "Segoe UI", system-ui, sans-serif; }
+html { color-scheme: light; -webkit-text-size-adjust: 100%; }
+body { @apply bg-slate-50 text-slate-700 antialiased; margin: 0; font-family: var(--font-sans); }
+[dir="rtl"] body, body:where([dir="rtl"] *) { font-family: var(--font-arabic); }
+[dir="rtl"] body { line-height: 1.65; }
+/* Numbers and Latin model codes inside Arabic text: keep them in Inter for a crisp look */
+[dir="rtl"] .num, [dir="rtl"] bdi[dir="ltr"] { font-family: var(--font-sans); }
+
+/* Recharts: no focus box around the whole chart after a tap */
+.recharts-wrapper:focus, .recharts-surface:focus, .recharts-wrapper *:focus { outline: none; }
 
 @layer components {
-  .card { @apply bg-white rounded-xl border border-slate-200 shadow-sm; }
-  .btn, .btn-primary, .btn-secondary, .btn-ghost, .btn-danger { @apply inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition disabled:opacity-50 disabled:cursor-not-allowed; }
-  .btn-primary { @apply bg-brand-700 text-white hover:bg-brand-800; }
-  .btn-secondary { @apply bg-white border border-slate-300 text-slate-700 hover:bg-slate-50; }
-  .btn-ghost { @apply text-slate-600 hover:bg-slate-100; }
-  .btn-danger { @apply bg-white border border-red-300 text-red-700 hover:bg-red-50; }
-  .input { @apply w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200; }
-  .label { @apply block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1; }
-  .stat { @apply rounded-xl border border-slate-200 bg-white p-4; }
-  .stat-value { @apply text-2xl font-bold text-slate-900 tabular-nums; }
-  .stat-label { @apply text-xs text-slate-500 mt-1; }
-  .badge, .badge-ok, .badge-warn, .badge-err { @apply inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium; }
-  .badge-ok { @apply bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200; }
-  .badge-warn { @apply bg-amber-50 text-amber-700 ring-1 ring-amber-200; }
-  .badge-err { @apply bg-red-50 text-red-700 ring-1 ring-red-200; }
+  .card { @apply rounded-xl border border-slate-200 bg-white shadow-[var(--shadow-card)]; }
+  .card-title { @apply text-title text-slate-900; }
+
+  /* Buttons: 44px on touch / phones, 40px with a mouse */
+  .btn, .btn-primary, .btn-secondary, .btn-ghost, .btn-danger, .btn-danger-solid {
+    @apply inline-flex min-h-11 select-none items-center justify-center gap-2 rounded-lg px-4 text-sm font-medium whitespace-nowrap transition-colors
+      disabled:cursor-not-allowed disabled:opacity-50
+      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2;
+  }
+  .btn-primary { @apply bg-brand-700 text-white shadow-sm hover:bg-brand-800 active:bg-brand-900; }
+  .btn-secondary { @apply border border-slate-300 bg-white text-slate-800 hover:bg-slate-50 active:bg-slate-100; }
+  .btn-ghost { @apply text-slate-700 hover:bg-slate-100 hover:text-slate-900 active:bg-slate-200; }
+  .btn-danger { @apply border border-red-200 bg-white text-red-700 hover:bg-red-50; }
+  .btn-danger-solid { @apply bg-red-600 text-white hover:bg-red-700; }
+  .btn-icon { @apply size-11 shrink-0 px-0; }
+  .btn-link { @apply inline-flex items-center gap-1 rounded text-sm font-medium text-brand-700 underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500; }
+
+  .label { @apply mb-1.5 block text-sm font-medium text-slate-700; }
+  .help { @apply mt-1.5 block text-xs leading-5 text-slate-500; }
+  .error-text { @apply mt-1.5 block text-xs leading-5 font-medium text-red-700; }
+
+  /* Inputs: 16px text on phones/touch (no iOS zoom), 44px tall */
+  .input { @apply block min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-base text-slate-900 shadow-none placeholder:text-slate-400
+      focus:border-brand-600 focus:outline-none focus:ring-3 focus:ring-brand-500/20
+      disabled:bg-slate-50 disabled:text-slate-500
+      aria-[invalid=true]:border-red-500 aria-[invalid=true]:ring-red-500/20; }
+  textarea.input { @apply py-2.5; }
+  select.input { @apply pe-9; }
+  .input-quiet { @apply block min-h-10 w-full rounded-md border border-transparent bg-transparent px-2 text-base text-slate-900 tabular-nums
+      hover:border-slate-300 focus:border-brand-600 focus:bg-white focus:outline-none focus:ring-3 focus:ring-brand-500/20
+      aria-[invalid=true]:border-red-500; }
+
+  .eyebrow { @apply text-xs font-medium uppercase tracking-wide text-slate-500; }
   .table { @apply w-full text-sm; }
-  .table th { @apply text-start text-xs font-semibold uppercase tracking-wide text-slate-500 border-b border-slate-200 px-3 py-2 bg-slate-50; }
-  .table td { @apply border-b border-slate-100 px-3 py-2 align-middle; }
+  .table th { @apply border-b border-slate-200 bg-slate-50 px-3 py-2.5 text-start text-xs font-medium tracking-wide whitespace-nowrap text-slate-500 uppercase; }
+  .table td { @apply border-b border-slate-100 px-3 py-1.5 align-middle; }
+  .table td.num, .table th.num { @apply text-end whitespace-nowrap tabular-nums; }
+
+  /* KPI tiles (Stat): one hero per screen */
+  .stat, .stat-hero { @apply min-w-0 rounded-xl border border-slate-200 bg-white p-3 sm:p-4; }
+  .stat-hero { @apply border-brand-200 bg-brand-50; }
+  .stat-value { @apply text-kpi-sm break-words text-slate-900 tabular-nums; }
+  .stat-hero .stat-value { @apply text-[1.5rem] leading-8 font-semibold sm:text-kpi; }
+  .stat-label { @apply mt-0.5 text-sm text-slate-600; }
+  .stat-sub { @apply mt-0.5 text-xs text-slate-500; }
+
+  .badge, .badge-ok, .badge-warn, .badge-err, .badge-neutral, .badge-info { @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap ring-1 ring-inset; }
+  .badge-ok { @apply bg-emerald-50 text-emerald-700 ring-emerald-200; }
+  .badge-warn { @apply bg-amber-50 text-amber-800 ring-amber-200; }
+  .badge-err { @apply bg-red-50 text-red-700 ring-red-200; }
+  .badge-neutral { @apply bg-slate-100 text-slate-700 ring-slate-200; }
+  .badge-info { @apply bg-sky-50 text-sky-800 ring-sky-200; }
+
+  .chip { @apply inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-full border border-slate-300 bg-white px-3 text-sm font-medium whitespace-nowrap text-slate-700 hover:bg-slate-50
+      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 aria-pressed:border-slate-900 aria-pressed:bg-slate-900 aria-pressed:text-white; }
+
+  .disclosure > summary { @apply flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 text-sm font-medium text-slate-700 select-none hover:text-slate-900; }
+  .disclosure > summary::-webkit-details-marker { display: none; }
+  .disclosure[open] > summary .disclosure-chevron { transform: rotate(180deg); }
+}
+
+/* Arabic: no uppercase / letter-spacing (breaks cursive joining), slightly larger small labels */
+@layer components {
+  [dir="rtl"] .eyebrow, [dir="rtl"] .table th { letter-spacing: 0; text-transform: none; font-size: 0.8125rem; }
+  [dir="rtl"] .help, [dir="rtl"] .stat-sub { line-height: 1.6; }
+}
+
+/* Desktop with a mouse: denser controls (inside the components layer so utilities still win) */
+@layer components {
+  @media (min-width: 640px) and (pointer: fine) {
+    .btn, .btn-primary, .btn-secondary, .btn-ghost, .btn-danger, .btn-danger-solid { min-height: 2.5rem; }
+    .btn-icon { width: 2.5rem; height: 2.5rem; }
+    .input { min-height: 2.5rem; font-size: 0.875rem; }
+    .input-quiet { min-height: 2.25rem; font-size: 0.875rem; }
+    .chip { min-height: 2rem; }
+  }
+}
+
+/* Phone keyboard open: hide the sticky wizard bar so it doesn't ride on top of the keyboard */
+@media (max-width: 639px) {
+  body:has(main input:not([type=checkbox]):not([type=radio]):focus, main textarea:focus) .wizard-bar { display: none; }
+}
+
+@layer components {
+  /* Input with adornments (unit suffix, ± key, −/+ stepper). The group carries the border; the inner input is bare. */
+  .input-group { @apply flex min-h-11 w-full min-w-0 items-stretch overflow-hidden rounded-lg border border-slate-300 bg-white
+      focus-within:border-brand-600 focus-within:ring-3 focus-within:ring-brand-500/20
+      has-[input[aria-invalid=true]]:border-red-500 has-[input:disabled]:bg-slate-50; }
+  .input-group > input { @apply w-full min-w-0 flex-1 border-0 bg-transparent px-3 text-base text-slate-900 tabular-nums outline-none placeholder:text-slate-400 disabled:text-slate-500; }
+  .input-group.quiet { @apply border-transparent bg-transparent hover:border-slate-300 focus-within:bg-white; }
+  .input-group .adorn { @apply flex shrink-0 items-center pe-3 text-sm whitespace-nowrap text-slate-500 select-none; }
+  .input-group .adorn-btn { @apply flex w-11 shrink-0 items-center justify-center text-base font-semibold text-slate-600 hover:bg-slate-100 active:bg-slate-200 disabled:opacity-40 focus-visible:bg-slate-100 focus-visible:outline-none; }
+}
+@layer components {
+  @media (min-width: 640px) and (pointer: fine) {
+    .input-group { min-height: 2.5rem; }
+    .input-group > input { font-size: 0.875rem; }
+    .input-group .adorn-btn { width: 2.25rem; }
+    .input-group.quiet { min-height: 2.25rem; }
+  }
 }

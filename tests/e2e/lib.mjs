@@ -59,7 +59,7 @@ export async function overflow(page) {
   })
 }
 
-export async function checkPage(page, label, { allowDash = true } = {}) {
+export async function checkPage(page, label) {
   const tp = await textProblems(page)
   if (tp.length) issue(`${label}: text problems: ${JSON.stringify(tp.slice(0, 5))}`)
   const ov = await overflow(page)
@@ -79,16 +79,40 @@ export async function gotoApp(page) {
   await page.goto(URL, { waitUntil: 'networkidle' })
 }
 
-/** Click a wizard step tab by index (0-6). */
+/** Go to a wizard step by index (0-6): desktop stepper, or the step-list sheet on phones. */
 export async function goStep(page, i) {
-  await page.locator('ol.card li button').nth(i).click()
+  const sheetBtn = page.getByTestId('step-sheet-btn')
+  if (await sheetBtn.isVisible()) { await sheetBtn.click(); await page.getByTestId(`sheet-step-${i}`).click() }
+  else await page.getByTestId(`step-${i}`).click()
   await page.waitForTimeout(250)
 }
 
+/** Load the 4 sample projects (first-run card, or the Projects page ⋯ menu). */
 export async function loadSamples(page) {
-  await page.getByRole('button', { name: 'Load sample projects' }).click()
+  const first = page.getByTestId('load-samples')
+  if (await first.isVisible()) await first.click()
+  else { await page.getByTestId('projects-menu').click(); await page.getByTestId('menu-samples').click() }
   await page.waitForTimeout(300)
 }
+
+/** Header navigation that works on desktop (buttons) and phones (⋯ menu). */
+export async function nav(page, where /* 'projects' | 'settings' | 'new' */) {
+  const direct = page.getByTestId(`nav-${where}`)
+  if (await direct.isVisible()) await direct.click()
+  else { await page.getByTestId('nav-menu').click(); await page.getByTestId(`menu-${where}`).click() }
+  await page.waitForTimeout(250)
+}
+export const newProject = (page) => nav(page, 'new')
+export const projectCards = (page) => page.getByTestId('project-card')
+export async function openCard(page, i) { await projectCards(page).nth(i).getByTestId('project-open').click(); await page.waitForTimeout(250) }
+/** Click the download action of an Export-step document (0 proposal, 1 technical, 2 Excel, 3 JSON). */
+export async function exportDoc(page, i) {
+  const key = ['proposal', 'tech', 'excel', 'json'][i]
+  const btn = page.getByTestId(`export-${key}-download`)
+  if (await btn.count()) await btn.click(); else await page.locator('main button.card').nth(i).click()
+}
+/** Language switch (segmented EN | عربي in the header). */
+export async function setLang(page, l) { await page.getByTestId(`lang-${l}`).click(); await page.waitForTimeout(200) }
 
 export async function clearStorage(page) {
   await page.evaluate(() => localStorage.clear())

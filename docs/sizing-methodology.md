@@ -2,6 +2,8 @@
 
 Version 1.0 — 2026-10-31. Scope: off-grid, hybrid/backup and grid-tied PV systems, single- and three-phase, residential / commercial / agricultural. This document is the implementation spec: every formula, default, rounding rule and standard-size list below is to be implemented as written. All quantities carry explicit units. "ceil" = round up to the next integer; "nextStd(x, list)" = smallest value in list that is ≥ x.
 
+Implementation status: §15 records the formulas exactly as implemented in `src/engine/` (engine v2, 2026-11-01), every default, and each documented deviation from §1–§14.
+
 Conventions used throughout:
 - Energy in Wh (daily) or kWh (annual); power in W / kW (real) and VA / kVA (apparent); voltage in V; current in A; cable area in mm²; temperature in °C; irradiation in kWh/m²/day (= Peak Sun Hours, PSH).
 - STC = 1000 W/m², 25 °C cell, AM1.5. NOCT (NMOT) = 800 W/m², 20 °C ambient, 1 m/s wind.
@@ -74,7 +76,7 @@ Reporting: show E_day (kWh/day), monthly kWh = E_day × 30.4, P_sum, P_peak, P_s
 
 ## 2. APPLIANCE LIBRARY
 
-66 entries. Watts are typical electrical input for a mid-size current-production unit in a hot-climate market (Sudan / Gulf); `hoursPerDay` are typical ON hours (duty-cycled for thermostatic loads); `surgeFactor` per §1.3; `phase` 1 or 3. Users can edit every number. AC tonnage: 1 ton = 12,000 BTU/h = 3.517 kW cooling; input W ≈ cooling kW / COP (COP 2.8–3.5 for modern splits; fixed-speed units draw ~1.2 kW/ton, inverter units ~0.85–0.9 kW/ton average). Pump watts: HP × 746 W / motor efficiency (~0.75 for small single-phase, ~0.85 for 3-phase) ≈ HP × 750–1000 W input; library uses ~750 W/HP for ≥1 HP and 800 W/HP for 0.5 HP.
+66 entries. Watts are typical electrical input for a mid-size current-production unit in a hot-climate market (Sudan / Gulf); `hoursPerDay` are typical ON hours (duty-cycled for thermostatic loads); `surgeFactor` per §1.3; `phase` 1 or 3. Users can edit every number. AC tonnage: 1 ton = 12,000 BTU/h = 3.517 kW cooling; input W ≈ cooling kW / COP (COP 2.8–3.5 for modern splits; fixed-speed units draw ~1.2 kW/ton, inverter units ~0.85–0.9 kW/ton average). Pump and motor watts are **electrical input**: HP × 746 W / motor efficiency (~0.70–0.75 for small single-phase / submersible units, ~0.85–0.89 for 3-phase motors) ≈ HP × 1,000–1,100 W for small pumps and ≈ 830–870 W/HP for 3-phase motors (e.g. 2 HP submersible ≈ 2,050 W, Grundfos/Pedrollo P1 2.0–2.2 kW). Values revised 2026-11-01 (the earlier library used ~750 W/HP, i.e. shaft power, which under-sized PV, battery and inverter by 20–35 %).
 
 Sources for typical wattages: U.S. DOE appliance energy calculator https://www.energy.gov/energysaver/estimating-appliance-and-home-electronic-energy-use ; generator wattage charts https://whatsizeappliance.com/generator/wattage-chart/ , https://wattcalcs.com/tables/appliance-wattage/ ; AC input power per ton https://www.thegreenwatt.com/inverter-size-calculator/ .
 
@@ -127,24 +129,24 @@ Sources for typical wattages: U.S. DOE appliance energy calculator https://www.e
 | electric_stove | Electric cooktop (2 plates) | kitchen | 2500 | 1 | 2500 | 1.0 | 1 |
 | hair_dryer | Hair dryer | appliance | 1500 | 0.2 | 300 | 1.2 | 1 |
 | vacuum | Vacuum cleaner | appliance | 1200 | 0.3 | 360 | 2.0 | 1 |
-| pump_surface_0_5hp | Surface water pump 0.5 HP | pump | 400 | 2 | 800 | 3.0 | 1 |
-| pump_surface_1hp | Surface water pump 1 HP | pump | 750 | 2 | 1500 | 3.0 | 1 |
-| pump_sub_0_5hp | Submersible well pump 0.5 HP | pump | 400 | 3 | 1200 | 5.0 | 1 |
-| pump_sub_1hp | Submersible well pump 1 HP | pump | 750 | 3 | 2250 | 5.0 | 1 |
-| pump_sub_1_5hp | Submersible well pump 1.5 HP | pump | 1100 | 4 | 4400 | 5.0 | 1 |
-| pump_sub_2hp | Submersible well pump 2 HP | pump | 1500 | 4 | 6000 | 5.0 | 1 |
-| pump_sub_3hp_3ph | Submersible well pump 3 HP (3-phase) | pump | 2200 | 5 | 11000 | 5.0 | 3 |
-| pump_sub_5hp_3ph | Submersible well pump 5 HP (3-phase) | pump | 3700 | 6 | 22200 | 5.0 | 3 |
-| pressure_booster | Pressure booster pump 0.75 HP | pump | 550 | 1.5 | 825 | 3.0 | 1 |
-| motor_3ph_5hp | 3-phase induction motor 5 HP | motor | 3700 | 6 | 22200 | 4.0 | 3 |
-| motor_3ph_10hp | 3-phase induction motor 10 HP | motor | 7500 | 6 | 45000 | 4.0 | 3 |
-| motor_3ph_20hp | 3-phase induction motor 20 HP | motor | 15000 | 6 | 90000 | 4.0 | 3 |
-| grain_mill | Grain / flour mill 7.5 HP (3-phase) | agri | 5500 | 4 | 22000 | 4.0 | 3 |
-| milking_machine | Milking machine 1 HP | agri | 750 | 2 | 1500 | 3.0 | 1 |
+| pump_surface_0_5hp | Surface water pump 0.5 HP | pump | 500 | 2 | 1000 | 3.0 | 1 |
+| pump_surface_1hp | Surface water pump 1 HP | pump | 1000 | 2 | 2000 | 3.0 | 1 |
+| pump_sub_0_5hp | Submersible well pump 0.5 HP | pump | 550 | 3 | 1650 | 5.0 | 1 |
+| pump_sub_1hp | Submersible well pump 1 HP | pump | 1050 | 3 | 3150 | 5.0 | 1 |
+| pump_sub_1_5hp | Submersible well pump 1.5 HP | pump | 1500 | 4 | 6000 | 5.0 | 1 |
+| pump_sub_2hp | Submersible well pump 2 HP | pump | 2050 | 4 | 8200 | 5.0 | 1 |
+| pump_sub_3hp_3ph | Submersible well pump 3 HP (3-phase) | pump | 2700 | 5 | 13500 | 5.0 | 3 |
+| pump_sub_5hp_3ph | Submersible well pump 5 HP (3-phase) | pump | 4400 | 6 | 26400 | 5.0 | 3 |
+| pressure_booster | Pressure booster pump 0.75 HP | pump | 750 | 1.5 | 1125 | 3.0 | 1 |
+| motor_3ph_5hp | 3-phase induction motor 5 HP | motor | 4300 | 6 | 25800 | 4.0 | 3 |
+| motor_3ph_10hp | 3-phase induction motor 10 HP | motor | 8400 | 6 | 50400 | 4.0 | 3 |
+| motor_3ph_20hp | 3-phase induction motor 20 HP | motor | 16600 | 6 | 99600 | 4.0 | 3 |
+| grain_mill | Grain / flour mill 7.5 HP (3-phase) | agri | 6400 | 4 | 25600 | 4.0 | 3 |
+| milking_machine | Milking machine 1 HP | agri | 1000 | 2 | 2000 | 3.0 | 1 |
 | incubator | Egg incubator (medium) | agri | 150 | 24 | 3600 | 1.0 | 1 |
-| poultry_fan | Poultry house ventilation fan 1 HP | agri | 750 | 12 | 9000 | 3.0 | 1 |
+| poultry_fan | Poultry house ventilation fan 1 HP | agri | 950 | 12 | 11400 | 3.0 | 1 |
 | welding_machine | Welding machine 200 A inverter | workshop | 5000 | 2 | 10000 | 2.0 | 1 |
-| compressor_2hp | Air compressor 2 HP | workshop | 1500 | 2 | 3000 | 4.0 | 1 |
+| compressor_2hp | Air compressor 2 HP | workshop | 2000 | 2 | 4000 | 4.0 | 1 |
 | angle_grinder | Angle grinder / power tool | workshop | 900 | 1 | 900 | 2.0 | 1 |
 
 The same data as a JSON array is in Appendix A (fields: id, name, category, watts, hoursPerDay, surgeFactor, phase).
@@ -688,6 +690,88 @@ Validation warnings the tool must raise: Voc_cold string > inverter/code limit; 
 
 ---
 
+## 15. ENGINE IMPLEMENTATION (v2, 2026-11-01) — formulas as implemented, defaults and deviations
+
+This section is the contract between this document and `src/engine/` after the November 2026 audit. Where it differs from §1–§14 it states why. Regression tests: `tests/engine-fixes.test.ts`, `tests/engine-review.test.ts`, `tests/samples.test.ts`.
+
+### 15.1 Input guards (`computeProject`, first block)
+No NaN/Infinity can leave the engine. Out-of-range inputs are clamped and reported with a check whose `step` names the wizard step that fixes it (`messageAr` carries the Arabic text):
+| Input | Rule | Check |
+|---|---|---|
+| PSH ≤ 0 / not a number | treated as 0 (no production) | `psh` error (site) |
+| soiling, shading outside 0–95 % | clamped to 0–95 % | `losses` error (site) |
+| DoD override outside 10–100 % | ignored (unit DoD used) | `dod` error (design) |
+| autonomy outside 0–10 days | clamped | `autonomy` warn (design) |
+| pvOversize 0.5–3, inverterSafety 1–3, dcAcRatio 0.8–2, cable runs, drop 0.5–10 %, years 1–50, degradation 0–5 % | clamped / default | `design-input` warn |
+| manual coincidence factor outside 0.1–1 | clamped | `df` warn (loads) |
+| load hours > 24, night share outside 0–100 %, negative W/qty | clamped / row ignored | `load-input` warn (loads) |
+| non-USD currency with FX ≤ 0 | FX 1 used | `fx-invalid` error (site) |
+| non-USD currency (except BSD/BMD/PAB) with FX = 1 | — | `fx-unset` error (site) |
+| markup outside 0–1000 %, discount / VAT outside 0–100 % | clamped (also in the quote) | `pricing-input` warn (bom) |
+
+### 15.2 Loads (§1)
+- Coincidence factor: `design.coincidenceAuto === true` (default for new projects) → §1.2 line-count rule: ≤ 5 lines 1.0, 6–15 lines 0.8, > 15 lines 0.7 (applied separately to the critical subset). Otherwise the manual `coincidenceFactor`. `Results.coincidenceFactor` reports the value used.
+- `P_peak = max(P_sum × DF, largest single unit W)` — the design peak never falls below the largest running appliance (farm sample: 2,110 W, not 1,248 W).
+- Night share floor (§1.4): a load running h > 12 h/day has `nightShare ≥ (h − 12)/h` (24 h → 50 %). Applied when an appliance is added (`nightShareFor`) and again in the engine for edited rows.
+- Three-phase systems: single-phase units are allocated largest-first to the least-loaded phase (qty split evenly in thirds first), three-phase loads W/3 per phase → `Results.phaseLoadsW`, `phaseMaxW`. Off-grid / hybrid inverter requirement = `max(P_peak × safety, 3 × max(P_phase_max × DF, largest single-phase unit) × safety)`; `phase-unbalance` warns when the phase term exceeds the balanced term by > 10 %.
+- Hybrid with any load flagged critical: battery energy, inverter peak, surge, backup hours and the generator all use the critical subset (`Results.sizingPeakW` / `sizingSurgeW`; `peakW` / `surgeW` stay the whole-site values). Critical loads with no night energy → no bank is sized (`no-batt` warns and says why) — the non-critical night load is never borrowed.
+
+### 15.3 PV, irradiance and tilt (§3, §9)
+- Monthly PSH profile is scaled so its mean equals the annual PSH input (`monthlyPsh_used = monthlyPsh × PSH / mean(monthlyPsh)`), so editing the annual PSH changes sizing and production consistently. `Results.monthlyPshUsed`.
+- Plane-of-array gain (`src/engine/irradiance.ts`): monthly ratio R_m from the isotropic-sky monthly method (Liu–Jordan / Klein, beam ratio integrated hourly so azimuth is handled; Erbs monthly diffuse fraction; albedo 0.2; southern hemisphere mirrored; azimuth = degrees away from facing the equator). The user's `tiltGainFactor` is the annual gain at the reference geometry (location optimal tilt, equator-facing): `g_m = R_m(tilt, az) × c^s`, `c = tiltGainFactor / G_model(ref)`, `s = min(1, tilt / refTilt)` (a flat array gets exactly 1.0). Sizing uses `PSH × G_eff` with `G_eff = Σ H_m g_m d_m / Σ H_m d_m` (`Results.tiltGainUsed`); production uses `g_m` per month (`Results.monthlyTiltGain`). Riyadh 21°: model annual 1.06, June 0.90, December 1.33 — the monthly chart no longer shows a flat +11 %. Without a latitude (custom site without `site.lat`) the gain is flat (legacy).
+- Warnings: tilt < 10° (`tilt-low`, self-cleaning, §9); azimuth > 45° off the equator (`azimuth`, with the modelled annual loss).
+- Derate: unchanged component list, plus **η_cc 0.97** (§3.2) when the PV is DC-coupled through a separate MPPT controller. (Deviation kept: wiring 0.97 / mismatch+nameplate 0.97 / availability 0.98 and a fixed inverter 0.96 are about 2 % more optimistic than the §3.2 component list; the datasheet efficiency is not yet used.)
+
+### 15.4 Battery (§4)
+- Energy basis `E_batt_daily`: off-grid = E_day; hybrid = night energy of the backed-up loads (critical subset when flagged). `C_usable_needed = E_batt_daily × autonomy / 0.95`; requirement in nominal kWh = usable / DoD (override > unit DoD > chemistry default).
+- Auto-pick (`recommendBattery`): every LiFePO4 unit that fits the bus **and the inverter** (15.6) is costed as `modules × (unit price + $40 BOS)` with `modules = series × ceil(usable / DoD_unit / (kWh_unit × series))`; cheapest wins (ties → fewer modules), preferring configurations within the unit's parallel limit that can also deliver the design discharge current (`P_peak × safety / (V × 0.94)`). Riyadh 24.2 kWh → 5 × 5.12 kWh rack ($3,450) instead of the old "fewest modules" rule.
+- A manual battery with a quantity override (design field or BOM qty) is honoured even when the requirement is 0. Off-grid with 0 autonomy and no battery → `daytime-only` warning instead of the `no-batt` error.
+- `Results.autonomyDays = C_usable × 0.95 / E_batt_daily` (§4.2 "Autonomy_actual"); `batteryDailyWh` is the basis. `batteryHoursBackup` is kept for compatibility: hybrid = hours at the average night load of the backed-up loads (= sizing basis); off-grid keeps the old night-load meaning — show `autonomyDays` for off-grid.
+- Lead-acid: `lead-crate` warns above 0.2 C (charge or discharge); `lead-autonomy` warns below 2 days off-grid (§14).
+
+### 15.5 Inverter (§5)
+- Grid-tied: `P_inv = PV_target / DC_AC_target` (design `dcAcRatio`, default 1.2; PV_target = the required kWp, or the overridden array). Candidates are grid-tie string inverters first (hybrids only if none fits the phase), units side by side (no parallel limit, no surge filter — the grid starts motors), Isc ≤ 1.25 × MPPT limit; the cheapest adequate configuration wins (+5 % penalty when Imp exceeds the MPPT operating current). Checks: DC/AC > 1.3 warn, < 0.7 warn; no `inv-small` / `inv-surge` for grid-tied. `Results.inverterSizingBasis = 'array'`, `dcAcRatio`.
+- Off-grid / hybrid: unchanged single-unit-first rule (kW, surge, PV input, MPPT current), then stacking the largest unit within `parallelMax` (qty also covers surge and array); if nothing stacks, the biggest unit is returned and `inv-parallel` raises an error. Missing datasheet surge → 2 × rated (§5).
+- Bus voltage guidance (§4.2): `lv-bus` warns above 1 kW on 12 V, 3 kW on 24 V, 15 kW on 48 V. `inv-type` flags grid-tie units on battery systems (error) and off-grid units on hybrids (warn).
+
+### 15.6 Battery ↔ inverter compatibility (§4.2)
+`batteryCompatibility(battery, inverter, bus)`: the unit must fit the bus (`fitsSystemVoltage`); numeric inverter battery voltage must equal the bus; a string window "min–max" requires an HV bus and the bank voltage (HV stacks are single strings) inside the window; brand-locked interfaces are checked by brand (`Inverter.batteryBrands`, e.g. Huawei → LUNA2000 / LG RESU; `Battery.inverterBrands`, e.g. LUNA2000 → Huawei only) instead of the window. Errors: `batt-voltage`, `batt-inverter`. The inverter is resolved before the battery so the auto-pick only considers compatible units. Catalogue correction: Growatt MOD 10KTL3-XH battery input 100–550 V / 25 A (was 600–950 V).
+
+### 15.7 Strings and controllers (§6, §7)
+- `N_series_max = floor(min(V_dc_max,inverter × 0.97, V_module_max_system, V_code_limit) / Voc_cold)` with `V_code_limit` = 1000 V on buildings (all roof types) and 1500 V for ground mounts; modules carry `maxSystemVoltage` (1000 V for the 12 V and poly modules, 1500 V otherwise). A single module above the limit is reported and `ok = false`. `StringDesign.maxSystemVoltageV` reports the limit used; `stringsPerMppt = ceil(strings / MPPTs)`.
+- A user-fixed panel count (design or BOM override) strongly prefers zero-spare layouts; if none exists the design notes the nearest equal layout and `strings-count` warns.
+- Separate controller path: whenever `useSeparateController` is on (or the inverter has no MPPT), strings are designed against the controller(s) that are quoted (virtual MPPT inputs = controllers; MPPT min = 1.2 × V_bus + 5 V), selected once with one re-selection after string rounding; `cc-voltage` errors when the controller does not list the bus voltage (HV has none), `cc-pwm` warns for PWM, `cc-small` when a manual controller is too small. `StringDesign.viaController`.
+
+### 15.8 Cables and protection (§8)
+- Ampacity tables per circuit (`standards.ts AMPACITY`): PV = EN 50618 free air; battery = method F; AC = method C 2-loaded (1-ph) / 3-loaded (3-ph); 150–240 mm² extrapolated with the IEC progression; × k_amb 0.87 (40 °C, fixed — the site ambient is not yet used).
+- Device first, then conductor (IEC 60364-4-43 I_B ≤ I_n ≤ I_z): `I_n = nextStd(I_B × 1.56)` (PV) or `× 1.25` (battery, AC); conductor = smallest size with `I_z ≥ max(I_n, I_B × factor)` that meets the drop target and the practical minimum (PV 4 mm², 6 mm² for runs > 25 m; battery 10 / 16 (≥ 3 kW) / 25 mm² (≥ 5 kW), HV 6 mm²; AC 2.5 mm²). If one 240 mm² conductor is not enough, n equal parallel conductors are used (`CableResult.parallelRuns`, informational check `cable-parallel-*`); if the device is above the largest standard rating, `deviceStd = false` and `breaker-range-*` is an error.
+- Standard lists: AC breakers 6 … 400 A extended with MCCB frames 500–1600 A; battery fuses 20 … 800 A incl. 175 and 225 A; PV string fuses 10–40 A; combiner-output gPV NH fuses 40–630 A.
+- Battery current: `I = P_inv / (V_bus × 0.94)` per inverter (§8.3 η 0.94; the C-rate check uses the same constant). HV banks: V = bank voltage, DC fuse / DC MCCB rated 1000 V DC. Drop target for battery leads 1 % (§8.1). `batt-charge-limit` warns when the inverter's max charge current exceeds the battery fuse (set the inverter limit).
+- Circuits (`Results.cableSchedule`; `Results.cables` keeps one entry per use for compatibility): `pv-string` (×strings); `pv-array` combiner → inverter (when ≥ 3 strings share an MPPT input: `I = n × Isc`, fuse nextStd(1.56 × n × Isc), 3 m lead); `battery` (per inverter); `cc-battery` (per controller, `I = controller max charge A`); `ac` (inverter output, or the combined feeder when several inverters run in parallel); `ac-inverter` (each unit → AC combiner, 3 m, per-unit breaker); `ac-grid` (hybrid grid input, same rating as `ac`); `ac-generator` (generator kVA / V).
+- `Results.protection`: string fuse and array fuse only when fuses are required; DC isolator voltage class = nextStd(string Voc_cold, [600, 1000, 1200, 1500]) and current class = nextStd(1.25 × Isc × strings per input); DC SPD class U_cpv ≥ string Voc_cold. *Deviation:* §8.3 says U_c ≥ 1.2 × Voc_cold; IEC 61643-31/62548 apply the 1.2 factor to Voc_STC as an estimate of the cold Voc, and the engine already computes the cold Voc, so 1.2 is not applied twice (fixture (c): 984 V → 1000 V class). RCCB 30 mA ≥ main breaker on off-grid / hybrid outputs (earth-leakage relay above 100 A); manual changeover ≥ main breaker for hybrids; ATS ≥ max(main, generator breaker) when a generator is present.
+
+### 15.9 Generator (§11)
+As §11, with the generator sized on the backed-up peak in hybrids, and the +10 % hot-ambient derate applied when the design ambient high exceeds 40 °C before rounding to the standard size (fixture (b): 14.4 kVA → 15.9 → 20 kVA). Above 500 kVA → `gen-range` warning.
+
+### 15.10 Bill of materials (§12)
+- One catalogue item per standard rating (`src/data/items.ts`): `dc-cable-<mm²>`, `batt-cable-<mm²>`, `ac-cable-<mm²>`, `pv-fuse-<A>[-1500v]`, `pv-array-fuse-<A>[-1500v]`, `dc-isolator-<V>v-<A>a`, `spd-dc-<V>v`, `batt-fuse-<A>` (LV) / `batt-fuse-hv-<A>`, `ac-mcb-<A>` (≤ 125 A) / `ac-mccb-<A>` (≥ 160 A), `rcd-<A>` / `rcd-relay`, `changeover-<A>`, `ats-<A>`. Every BOM line therefore carries exactly the designed rating; an unknown id becomes a $0 line plus a `bom-missing-*` warning. Items and equipment lines carry `nameAr` / `specAr`.
+- Quantities: discrete units (pcs, pair, kit, lot) are whole numbers (ceil); continuous quantities are rounded up to 0.01 without float overshoot (1.1 kWp stays 1.1). Battery leads `2 × run × runs × inverters + 0.6 m × modules`; lugs `4 × modules + 4 × runs × inverters`; one battery fuse per inverter (+ one per controller). AC: inverter-output run(s) + hybrid grid-input run + generator run, each `run × cores` (3 or 5); breakers: one per inverter output, + grid input (hybrid) / point of connection (grid-tied) / main incomer (off-grid with parallel units), + generator input. One CT meter per grid-connected system; isolator + SPD per PV input (inverter or controller), doubled at the array end when the DC run exceeds 10 m. New lines: module earth clips (1 per panel), BMS cable (1 per LV lithium rack or wall module), busbar kit (≥ 2 parallel strings or several inverters on one non-rack bank), module clamps on ground mounts.
+- Generator: one line, `<kVA> kVA, silent canopy, ATS-ready`, indicative `kVA × (280 ≤ 10 kVA, 220 ≤ 30, 170 ≤ 100, 140 above) USD`.
+- Overrides: a qty override ≥ 1 on the panel, inverter, battery or controller line is applied to the **design** (strings, mounting, labour, production all follow); an override of 0 keeps the line at qty 0 (not quoted, e.g. client-supplied) and leaves the design unchanged. A qty override also adds an item that the rule left out (e.g. lightning arrestor on a small array).
+- Money: line totals are rounded in the display currency (`round(qty × round(unit × fx))`, ISO 4217 minor units: KWD/BHD/OMR/JOD 3, IQD 0, others 2) and `Results` money fields are derived from `buildQuote` (÷ fx), so `Results.totalUsd × fx = quote.total` exactly. Markup is applied on cost and spread into the line sell prices (gross margin = markup / sell is reported by the quote).
+
+### 15.11 Economics (§10, §4.4)
+- Energy actually used (`Results.usefulEnergyKwh`, year 1): grid-tied (no battery) = min(production, daytime load) — there is no feed-in tariff input, so surplus earns nothing; hybrid = min(production, daytime load + min(night load, usable kWh × 0.95 × 365)); off-grid = min(production, load).
+- Avoided cost per kWh: grid tariff for grid-tied / hybrid; off-grid = `site.dieselCostUsdPerKwh` (default 0.40 USD/kWh ≈ 0.32 L/kWh × ~1.1 USD/L + ~0.05 O&M). `Results.savingsBasis`, `avoidedCostUsdPerKwh`.
+- CO₂ = useful energy × grid factor (diesel 0.85 kg/kWh off-grid).
+- Cash flow, year t = 1…N: `savings_t = useful_t × tariff × (1 + escalation)^(t−1)` (escalation 3 %), minus O&M (1 % of capex per year, flat), minus replacements. Battery life = min(cycles / 365, calendar life: LFP 15, NMC 12, Gel 7, AGM 5, flooded 10 years); inverters (+ controllers) 15 years (`design.inverterLifeYears`). Replacements happen at k × life < N and cost the line price at the quote's sell ratio (total / cost subtotal), today's prices, no residual value. `Results.replacements`, `omUsdPerYear`.
+- `LCOE = (capex + Σ (O&M + replacement_t)/(1+r)^t) / Σ useful_t/(1+r)^t`, r = 6 % (`design.discountRatePct`); doc fixture (c) → 0.0373 $/kWh. `NPV = −capex + Σ (savings_t − O&M − replacement_t)/(1+r)^t` (`Results.npvUsd`). Simple payback = capex / year-1 savings (unchanged). ROI = (cumulative cash flow at year N + capex) / capex − 1.
+
+### 15.12 Not implemented (judgment calls, documented)
+Datasheet inverter efficiency in the derate; LiFePO4 DoD 0.80 planning value (catalogue 90 % kept); lead-acid temperature derate; monthly cell temperature; site-dependent k_amb and AC voltage (120/240 V US sites); evaluating fewer-panel string layouts within 5 % of the target; module spares (> 100 panels), 2–3 % spares, engineering/permits lot, rails priced per stock length, transport/commissioning scaling with system size; feed-in / export tariff.
+
+---
+
 ## Appendix A — Appliance library (JSON)
 ```json
 [
@@ -1118,7 +1202,7 @@ Validation warnings the tool must raise: Voc_cold string > inverter/code limit; 
   "id": "pump_surface_0_5hp",
   "name": "Surface water pump 0.5 HP",
   "category": "pump",
-  "watts": 400,
+  "watts": 500,
   "hoursPerDay": 2,
   "surgeFactor": 3.0,
   "phase": 1
@@ -1127,7 +1211,7 @@ Validation warnings the tool must raise: Voc_cold string > inverter/code limit; 
   "id": "pump_surface_1hp",
   "name": "Surface water pump 1 HP",
   "category": "pump",
-  "watts": 750,
+  "watts": 1000,
   "hoursPerDay": 2,
   "surgeFactor": 3.0,
   "phase": 1
@@ -1136,7 +1220,7 @@ Validation warnings the tool must raise: Voc_cold string > inverter/code limit; 
   "id": "pump_sub_0_5hp",
   "name": "Submersible well pump 0.5 HP",
   "category": "pump",
-  "watts": 400,
+  "watts": 550,
   "hoursPerDay": 3,
   "surgeFactor": 5.0,
   "phase": 1
@@ -1145,7 +1229,7 @@ Validation warnings the tool must raise: Voc_cold string > inverter/code limit; 
   "id": "pump_sub_1hp",
   "name": "Submersible well pump 1 HP",
   "category": "pump",
-  "watts": 750,
+  "watts": 1050,
   "hoursPerDay": 3,
   "surgeFactor": 5.0,
   "phase": 1
@@ -1154,7 +1238,7 @@ Validation warnings the tool must raise: Voc_cold string > inverter/code limit; 
   "id": "pump_sub_1_5hp",
   "name": "Submersible well pump 1.5 HP",
   "category": "pump",
-  "watts": 1100,
+  "watts": 1500,
   "hoursPerDay": 4,
   "surgeFactor": 5.0,
   "phase": 1
@@ -1163,7 +1247,7 @@ Validation warnings the tool must raise: Voc_cold string > inverter/code limit; 
   "id": "pump_sub_2hp",
   "name": "Submersible well pump 2 HP",
   "category": "pump",
-  "watts": 1500,
+  "watts": 2050,
   "hoursPerDay": 4,
   "surgeFactor": 5.0,
   "phase": 1
@@ -1172,7 +1256,7 @@ Validation warnings the tool must raise: Voc_cold string > inverter/code limit; 
   "id": "pump_sub_3hp_3ph",
   "name": "Submersible well pump 3 HP (3-phase)",
   "category": "pump",
-  "watts": 2200,
+  "watts": 2700,
   "hoursPerDay": 5,
   "surgeFactor": 5.0,
   "phase": 3
@@ -1181,7 +1265,7 @@ Validation warnings the tool must raise: Voc_cold string > inverter/code limit; 
   "id": "pump_sub_5hp_3ph",
   "name": "Submersible well pump 5 HP (3-phase)",
   "category": "pump",
-  "watts": 3700,
+  "watts": 4400,
   "hoursPerDay": 6,
   "surgeFactor": 5.0,
   "phase": 3
@@ -1190,7 +1274,7 @@ Validation warnings the tool must raise: Voc_cold string > inverter/code limit; 
   "id": "pressure_booster",
   "name": "Pressure booster pump 0.75 HP",
   "category": "pump",
-  "watts": 550,
+  "watts": 750,
   "hoursPerDay": 1.5,
   "surgeFactor": 3.0,
   "phase": 1
@@ -1199,7 +1283,7 @@ Validation warnings the tool must raise: Voc_cold string > inverter/code limit; 
   "id": "motor_3ph_5hp",
   "name": "3-phase induction motor 5 HP",
   "category": "motor",
-  "watts": 3700,
+  "watts": 4300,
   "hoursPerDay": 6,
   "surgeFactor": 4.0,
   "phase": 3
@@ -1208,7 +1292,7 @@ Validation warnings the tool must raise: Voc_cold string > inverter/code limit; 
   "id": "motor_3ph_10hp",
   "name": "3-phase induction motor 10 HP",
   "category": "motor",
-  "watts": 7500,
+  "watts": 8400,
   "hoursPerDay": 6,
   "surgeFactor": 4.0,
   "phase": 3
@@ -1217,7 +1301,7 @@ Validation warnings the tool must raise: Voc_cold string > inverter/code limit; 
   "id": "motor_3ph_20hp",
   "name": "3-phase induction motor 20 HP",
   "category": "motor",
-  "watts": 15000,
+  "watts": 16600,
   "hoursPerDay": 6,
   "surgeFactor": 4.0,
   "phase": 3
@@ -1226,7 +1310,7 @@ Validation warnings the tool must raise: Voc_cold string > inverter/code limit; 
   "id": "grain_mill",
   "name": "Grain / flour mill 7.5 HP (3-phase)",
   "category": "agri",
-  "watts": 5500,
+  "watts": 6400,
   "hoursPerDay": 4,
   "surgeFactor": 4.0,
   "phase": 3
@@ -1235,7 +1319,7 @@ Validation warnings the tool must raise: Voc_cold string > inverter/code limit; 
   "id": "milking_machine",
   "name": "Milking machine 1 HP",
   "category": "agri",
-  "watts": 750,
+  "watts": 1000,
   "hoursPerDay": 2,
   "surgeFactor": 3.0,
   "phase": 1
@@ -1253,7 +1337,7 @@ Validation warnings the tool must raise: Voc_cold string > inverter/code limit; 
   "id": "poultry_fan",
   "name": "Poultry house ventilation fan 1 HP",
   "category": "agri",
-  "watts": 750,
+  "watts": 950,
   "hoursPerDay": 12,
   "surgeFactor": 3.0,
   "phase": 1
@@ -1271,7 +1355,7 @@ Validation warnings the tool must raise: Voc_cold string > inverter/code limit; 
   "id": "compressor_2hp",
   "name": "Air compressor 2 HP",
   "category": "workshop",
-  "watts": 1500,
+  "watts": 2000,
   "hoursPerDay": 2,
   "surgeFactor": 4.0,
   "phase": 1

@@ -1,5 +1,5 @@
 // Scenario 1: empty state → load samples → open each → step through all 7 steps (desktop + mobile).
-import { launch, DESKTOP, MOBILE, shot, checkPage, reportErrors, gotoApp, goStep, loadSamples, clearStorage, issue, pass, summary } from './lib.mjs'
+import { launch, DESKTOP, MOBILE, shot, checkPage, reportErrors, gotoApp, goStep, loadSamples, clearStorage, issue, pass, summary, projectCards, openCard } from './lib.mjs'
 
 for (const [vpName, vp] of [['desktop', DESKTOP], ['mobile', MOBILE]]) {
   const { browser, page, errors } = await launch(vp)
@@ -10,7 +10,7 @@ for (const [vpName, vp] of [['desktop', DESKTOP], ['mobile', MOBILE]]) {
   await checkPage(page, `${vpName} empty`)
   await loadSamples(page)
   await shot(page, `01-${vpName}-samples`)
-  const cards = page.locator('.card.flex.flex-col')
+  const cards = projectCards(page)
   const n = await cards.count()
   if (n !== 4) issue(`${vpName}: expected 4 sample cards, got ${n}`); else pass(`${vpName}: 4 sample cards`)
   for (let i = 0; i < n; i++) {
@@ -24,8 +24,7 @@ for (const [vpName, vp] of [['desktop', DESKTOP], ['mobile', MOBILE]]) {
 
   for (let i = 0; i < n; i++) {
     const name = (await cards.nth(i).locator('h3').innerText()).trim()
-    await cards.nth(i).getByRole('button', { name: 'Open' }).click()
-    await page.waitForTimeout(300)
+    await openCard(page, i)
     for (let s = 0; s < 7; s++) {
       await goStep(page, s)
       const label = `${vpName} "${name}" step ${s + 1}`
@@ -34,10 +33,11 @@ for (const [vpName, vp] of [['desktop', DESKTOP], ['mobile', MOBILE]]) {
         const svgs = await page.locator('svg.recharts-surface').count()
         if (svgs < 2) issue(`${label}: expected ≥2 chart svgs, got ${svgs}`)
       }
+      if (await page.evaluate(() => scrollY) !== 0) issue(`${label}: step did not open at the top`)
       await shot(page, `01-${vpName}-p${i + 1}-s${s + 1}`)
       reportErrors(errors, label)
     }
-    await page.getByRole('button', { name: 'Finish' }).click()
+    await page.getByTestId('nav-finish').click()
     await page.waitForTimeout(200)
   }
   await browser.close()

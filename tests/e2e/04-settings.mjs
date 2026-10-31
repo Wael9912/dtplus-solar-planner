@@ -1,6 +1,6 @@
 // Scenario 4: company settings + logo upload, header shows name, proposal PDF still downloads.
 import fs from 'node:fs'; import path from 'node:path'; import zlib from 'node:zlib'
-import { launch, DESKTOP, MOBILE, DL, SHOTS, shot, checkPage, reportErrors, gotoApp, goStep, loadSamples, clearStorage, issue, pass, summary } from './lib.mjs'
+import { launch, DESKTOP, MOBILE, DL, SHOTS, shot, checkPage, reportErrors, gotoApp, goStep, loadSamples, clearStorage, issue, pass, summary, nav, openCard, exportDoc } from './lib.mjs'
 function png(w, h) { // minimal valid RGBA PNG (teal square)
   const crc = (buf) => { let c, t = []; for (let n = 0; n < 256; n++) { c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0 } let r = 0xffffffff; for (const b of buf) r = t[(r ^ b) & 0xff] ^ (r >>> 8); return (r ^ 0xffffffff) >>> 0 }
   const chunk = (type, data) => { const len = Buffer.alloc(4); len.writeUInt32BE(data.length); const td = Buffer.concat([Buffer.from(type), data]); const c = Buffer.alloc(4); c.writeUInt32BE(crc(td)); return Buffer.concat([len, td, c]) }
@@ -12,24 +12,24 @@ const logo = path.join(SHOTS, 'logo.png'); fs.writeFileSync(logo, png(120, 60))
 for (const [vpName, vp] of [['desktop', DESKTOP], ['mobile', MOBILE]]) {
   const { browser, page, errors } = await launch(vp)
   await gotoApp(page); await clearStorage(page); await page.reload({ waitUntil: 'networkidle' })
-  await page.locator('header nav button').nth(1).click(); await page.waitForTimeout(200)
+  await nav(page, 'settings')
   await page.getByLabel('Company name').fill('QA Solar Co')
   await page.getByLabel('Phone').fill('+249 100 000')
   await page.locator('input[type=file]').setInputFiles(logo); await page.waitForTimeout(400)
-  if (!(await page.locator('img[alt=logo]').isVisible())) issue(`${vpName}: logo preview not shown`); else pass(`${vpName}: logo preview shown`)
+  if (!(await page.getByRole('img', { name: 'Logo' }).first().isVisible())) issue(`${vpName}: logo preview not shown`); else pass(`${vpName}: logo preview shown`)
   const hdr = await page.locator('header').innerText()
   if (!/QA Solar Co/.test(hdr)) issue(`${vpName}: header does not show company name`); else pass(`${vpName}: header shows company name`)
   await checkPage(page, `${vpName} settings`); await shot(page, `04-${vpName}-settings`); reportErrors(errors, `${vpName} settings`)
-  await page.locator('header nav button').nth(0).click(); await loadSamples(page)
-  await page.locator('.card.flex.flex-col').nth(0).getByRole('button', { name: 'Open' }).click(); await goStep(page, 6)
+  await nav(page, 'projects'); await loadSamples(page)
+  await openCard(page, 0); await goStep(page, 6)
   const dlp = page.waitForEvent('download', { timeout: 30000 }).catch(() => null)
-  await page.locator('main button.card').nth(0).click()
+  await exportDoc(page, 0)
   const dl = await dlp
   if (!dl) issue(`${vpName}: proposal PDF with logo did not download`)
   else { const out = path.join(DL, `${vpName}-logo-${dl.suggestedFilename()}`); await dl.saveAs(out); const b = fs.readFileSync(out); if (b.subarray(0, 5).toString() !== '%PDF-' || b.length < 20480) issue(`${vpName}: logo PDF invalid (${b.length} bytes)`); else pass(`${vpName}: logo PDF ${b.length} bytes`) }
   await page.waitForTimeout(400); reportErrors(errors, `${vpName} logo pdf`)
   // persistence of settings
-  await page.reload({ waitUntil: 'networkidle' })
+  await page.reload({ waitUntil: 'networkidle' }); await nav(page, 'projects') // phones show the project name (not the brand) inside a project
   if (!/QA Solar Co/.test(await page.locator('header').innerText())) issue(`${vpName}: company name lost after reload`); else pass(`${vpName}: settings persisted`)
   await browser.close()
 }
