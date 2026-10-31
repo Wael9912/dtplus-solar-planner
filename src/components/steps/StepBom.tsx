@@ -71,7 +71,7 @@ export function StepBom({ project: p, results: r, update }: StepProps) {
         </table></div>
       </Section>
 
-      <div className="grid gap-5 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
         <Section title={t.bom.services}>
           <div className="grid gap-4 sm:grid-cols-3">
             <Field label={t.bom.labourPerKw}><NumberInput value={pr.labourPerKwUsd} min={0} onChange={(v) => set({ labourPerKwUsd: v ?? 0 })} /></Field>

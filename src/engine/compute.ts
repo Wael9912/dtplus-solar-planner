@@ -32,10 +32,14 @@ export const getInverter = (id: string | null): Inverter | undefined => (id ? ca
 export const getController = (id: string | null): ChargeController | undefined => (id ? catalog.chargeControllers.find((c) => c.id === id) : undefined)
 const item = (id: string): CatalogItem | undefined => catalog.items.find((i) => i.id === id)
 
-export function cellTemp(ambientC: number, noct: number) {
-  // NOCT method at 800 W/m² reference irradiance; typical result ≈ ambient + 25 °C under full sun
-  return ambientC + (noct - 20) * (1000 / 800)
+/** NOCT cell-temperature model (methodology §3.3): T_cell = T_amb + (NOCT − 20)/800 × G.
+ *  Default G = 800 W/m² (the NOCT reference) → ambient + 25 °C for NOCT 45, which is what the annual-energy derate uses.
+ *  Pass G = 1000 for the hot-extreme string check (ambient + 31 °C ≈ the "T_amb_max + 30" guidance). */
+export function cellTemp(ambientC: number, noct: number, irradianceWm2 = 800) {
+  return ambientC + ((noct - 20) / 800) * irradianceWm2
 }
+/** Inverter efficiency on battery discharge, used for bank sizing and backup-hours (§4.1: 0.95). */
+export const INV_EFF_BATT = 0.95
 
 // ---------------- Auto-selection helpers ----------------
 /** Does a battery unit fit the chosen bus voltage (in series groups)? 48 V bus accepts 12/12.8/24/25.6/48/51.2 V units; 'hv' accepts >60 V units. */
@@ -47,12 +51,13 @@ export function fitsSystemVoltage(b: Battery, sysV: Project['design']['systemVol
 }
 export const PV_CABLE_MIN_MM2 = 4
 export const BATTERY_CABLE_MIN_MM2 = 10
+export const AC_CABLE_MIN_MM2 = 2.5 // §8.2 A_min_practical for AC output
 export const K_AMB = 0.87 // ampacity derating at 40 °C ambient (IEC 60364-5-52)
 
 export function recommendInverter(type: Project['design']['systemType'], phase: 1 | 3, requiredKw: number, surgeKw: number, sysVoltage: Project['design']['systemVoltage']): { inverter: Inverter; qty: number } | null {
   const allowedTypes: Inverter['type'][] = type === 'gridtie' ? ['gridtie', 'hybrid'] : type === 'hybrid' ? ['hybrid'] : ['offgrid', 'hybrid']
   const pool = catalog.inverters
-    .filter((i) => allowedTypes.includes(i.type) && i.phase === phase)
+    .filter((i) => allowedTypes.includes(i.type) && i.phase === phase && (type !== 'gridtie' || i.mpptCount > 0))
     .filter((i) => {
       if (type === 'gridtie') return true
       if (sysVoltage === 'hv') return typeof i.batteryVoltage === 'string'
@@ -94,10 +99,11 @@ export function recommendPanel(targetKwp: number): Panel {
 export function designStrings(panel: Panel, inverter: Inverter, inverterQty: number, totalPanels: number, recordLowC: number, hotAmbientC: number): StringDesign {
   const notes: string[] = []
   const vocCold = panel.voc * (1 + (panel.tempCoeffVocPctPerC / 100) * (recordLowC - 25))
-  const tHot = cellTemp(hotAmbientC, panel.noct)
+  const tHot = cellTemp(hotAmbientC, panel.noct, 1000)
   const vmpHot = panel.vmp * (1 + (panel.tempCoeffPmaxPctPerC / 100) * (tHot - 25))
   const maxSeries = Math.max(1, Math.floor((inverter.maxPvVoltage * 0.97) / vocCold))
-  const mpptMaxSeries = Math.max(1, Math.floor(inverter.mpptMaxV / vmpHot))
+  // MPPT upper limit is checked at STC Vmp (§7: Vmp_STC × N ≤ V_mppt_max), otherwise the tracker clips on cold mornings
+  const mpptMaxSeries = Math.max(1, Math.floor(inverter.mpptMaxV / panel.vmp))
   const minSeries = Math.max(1, Math.ceil(inverter.mpptMinV / vmpHot))
   const hi = Math.min(maxSeries, mpptMaxSeries)
   const stringsPerMppt = Math.max(1, Math.floor(inverter.maxInputCurrentPerMppt / panel.imp))
@@ -111,9 +117,10 @@ export function designStrings(panel: Panel, inverter: Inverter, inverterQty: num
   for (let pps = hi; pps >= Math.max(1, minSeries); pps--) {
     const strings = Math.ceil(totalPanels / pps)
     const waste = strings * pps - totalPanels
-    // Prefer: fits MPPT capacity, equal strings, minimal waste, more panels per string
+    // Prefer: fits MPPT capacity, minimal waste, equal strings per MPPT, and longer strings (§7: "prefer the largest N_series") —
+    // each panel dropped from the string costs 3 points so that e.g. 13 × 17 (1 spare panel) beats 20 × 11 on a 1000 V inverter.
     const fits = strings <= capacityStrings
-    const score = (fits ? 0 : 1000) + waste * 10 + (strings % mpptTotal === 0 ? 0 : 3)
+    const score = (fits ? 0 : 1000) + waste * 10 + (strings % mpptTotal === 0 ? 0 : 3) + (hi - pps) * 3
     if (score < best.waste) best = { pps, strings, waste: score }
   }
   const total = best.pps * best.strings
@@ -132,7 +139,7 @@ export function sizeCable(use: CableResult['use'], currentA: number, lengthM: nu
   const k = threePhase ? Math.sqrt(3) : 2
   let chosen = STD_CABLE_MM2[STD_CABLE_MM2.length - 1]
   let drop = 100
-  const floor = use === 'dc' ? PV_CABLE_MIN_MM2 : use === 'battery' ? BATTERY_CABLE_MIN_MM2 : 1.5
+  const floor = use === 'dc' ? PV_CABLE_MIN_MM2 : use === 'battery' ? BATTERY_CABLE_MIN_MM2 : AC_CABLE_MIN_MM2
   for (const mm2 of STD_CABLE_MM2) {
     if (mm2 < floor) continue
     const amp = CABLE_AMPACITY[mm2] * K_AMB
@@ -165,8 +172,9 @@ export function computeProject(p: Project): Results {
   const tCell = cellTemp(s.ambientAvgC ?? s.ambientHighC - 8, panel.noct)
   const tempFactor = 1 + (panel.tempCoeffPmaxPctPerC / 100) * (tCell - 25)
   const invEff = 0.96
+  // Factors are stored unrounded so that `derate` is exactly the product of the displayed breakdown (UI/PDF/Excel round to 2 dp)
   const breakdown = [
-    { name: 'Temperature', factor: r2(Math.min(1, tempFactor)) },
+    { name: 'Temperature', factor: Math.min(1, tempFactor) },
     { name: 'Soiling', factor: 1 - s.soilingLossPct / 100 },
     { name: 'Shading', factor: 1 - s.shadingLossPct / 100 },
     { name: 'Wiring (DC+AC)', factor: 0.97 },
@@ -179,7 +187,7 @@ export function computeProject(p: Project): Results {
     // Energy that passes through the battery loses round-trip efficiency
     const nightShare = L.dailyWh > 0 ? L.nightWh / L.dailyWh : 0.5
     const battFactor = 1 - nightShare * (1 - rt)
-    breakdown.push({ name: `Battery round-trip (${Math.round(nightShare * 100)}% via battery)`, factor: r2(battFactor) })
+    breakdown.push({ name: `Battery round-trip (${Math.round(nightShare * 100)}% via battery)`, factor: battFactor })
     derate *= battFactor
   }
 
@@ -190,13 +198,17 @@ export function computeProject(p: Project): Results {
 
   // ---- Battery
   let batteryRequiredKwh = 0
-  if (d.systemType === 'offgrid') batteryRequiredKwh = (L.dailyWh * d.autonomyDays) / 1000 / (dod * invEff)
+  if (d.systemType === 'offgrid') batteryRequiredKwh = (L.dailyWh * d.autonomyDays) / 1000 / (dod * INV_EFF_BATT)
   else if (d.systemType === 'hybrid') {
     const base = L.criticalNightWh > 0 ? L.criticalNightWh : L.nightWh
-    batteryRequiredKwh = (base * d.autonomyDays) / 1000 / (dod * invEff)
+    batteryRequiredKwh = (base * d.autonomyDays) / 1000 / (dod * INV_EFF_BATT)
   }
-  let batteryQty = 0, series = 1, parallel = 0
   const batteryResolved = battery ?? (d.batteryId === 'auto' && batteryRequiredKwh > 0 ? recommendBattery(d.systemVoltage, batteryRequiredKwh) ?? undefined : undefined)
+  // Final DoD: user override > selected unit's usable DoD > chemistry default. For an auto-selected unit the requirement is
+  // re-based on that unit's DoD *before* counting modules, so the bank is never smaller than the reported requirement.
+  const dodFinal = d.dodOverridePct != null ? d.dodOverridePct / 100 : batteryResolved ? batteryResolved.usableDodPct / 100 : dod
+  if (batteryResolved && d.dodOverridePct == null && !battery) batteryRequiredKwh = (batteryRequiredKwh * dod) / dodFinal
+  let batteryQty = 0, series = 1, parallel = 0
   if (batteryResolved && batteryRequiredKwh > 0) {
     const battery = batteryResolved
     series = d.systemVoltage === 'hv' ? 1 : Math.max(1, Math.round((d.systemVoltage as number) / battery.nominalVoltage))
@@ -205,33 +217,32 @@ export function computeProject(p: Project): Results {
     batteryQty = series * parallel
     if (parallel > battery.parallelMax) checks.push({ id: 'batt-parallel', level: 'warn', message: `${parallel} batteries in parallel exceeds manufacturer limit of ${battery.parallelMax}; split across inverters or use larger units.` })
   }
-  if (batteryResolved && d.dodOverridePct == null && !battery) {
-    // Auto-selected unit: adopt its usable DoD and recompute the requirement for reporting
-    const dod2 = batteryResolved.usableDodPct / 100
-    batteryRequiredKwh = batteryRequiredKwh * dod / dod2
-  }
-  const dodFinal = d.dodOverridePct != null ? d.dodOverridePct / 100 : batteryResolved ? batteryResolved.usableDodPct / 100 : dod
   const batteryKwh = batteryResolved ? batteryQty * batteryResolved.energyKwh : 0
   const batteryUsableKwh = batteryKwh * dodFinal
   const batteryAh = batteryResolved ? parallel * batteryResolved.capacityAh : 0
   const nightLoadW = L.nightWh > 0 ? L.nightWh / 12 : L.peakW * 0.3
-  const batteryHoursBackup = nightLoadW > 0 ? (batteryUsableKwh * 1000 * invEff) / nightLoadW : 0
+  const batteryHoursBackup = nightLoadW > 0 ? (batteryUsableKwh * 1000 * INV_EFF_BATT) / nightLoadW : 0
 
   // ---- Inverter
   const basePeak = d.systemType === 'hybrid' && L.criticalConnectedW > 0 ? L.criticalConnectedW * d.coincidenceFactor : L.peakW
   const requiredInverterKw = (basePeak * d.inverterSafety) / 1000
+  // Grid-tied auto-selection must also carry the array (DC/AC ≤ 1.3), not just the peak load, otherwise large arrays clip
+  const selectionKw = Math.max(requiredInverterKw, d.systemType === 'gridtie' ? requiredPvKwp / 1.3 : 0)
   const surgeKw = L.surgeW / 1000
   let inverter = getInverter(d.inverterId) ?? null
   let inverterQty = d.inverterQty || 1
   if (!inverter) {
-    const rec = recommendInverter(d.systemType, d.phase, requiredInverterKw, surgeKw, d.systemVoltage)
+    const rec = recommendInverter(d.systemType, d.phase, selectionKw, surgeKw, d.systemVoltage)
     inverter = rec?.inverter ?? null
     inverterQty = rec?.qty ?? 1
   }
   const inverterTotalKw = inverter ? inverter.ratedAcKw * inverterQty : 0
   const inverterOk = !!inverter && inverterTotalKw >= requiredInverterKw * 0.999
+  if (!inverter) checks.push({ id: 'no-inverter', level: 'error', message: `No ${d.systemType} inverter in the catalogue matches ${d.phase}-phase at ${d.systemVoltage === 'hv' ? 'HV' : d.systemVoltage + ' V'} battery voltage; pick one manually or change the bus voltage.` })
   if (inverter && !inverterOk) checks.push({ id: 'inv-small', level: 'error', message: `Inverter capacity ${inverterTotalKw} kW is below required ${r1(requiredInverterKw)} kW.` })
-  if (inverter && (inverter.surgeKw || inverter.ratedAcKw * 2) * inverterQty < surgeKw) checks.push({ id: 'inv-surge', level: 'warn', message: `Motor starting surge ${r1(surgeKw)} kW exceeds inverter peak ${r1(inverter.surgeKw * inverterQty)} kW.` })
+  const inverterSurgeKw = inverter ? (inverter.surgeKw || inverter.ratedAcKw * 2) * inverterQty : 0
+  if (inverter && inverterSurgeKw < surgeKw) checks.push({ id: 'inv-surge', level: 'warn', message: `Motor starting surge ${r1(surgeKw)} kW exceeds inverter peak ${r1(inverterSurgeKw)} kW.` })
+  if (inverter && d.systemType !== 'gridtie' && d.systemVoltage !== 'hv' && inverterTotalKw > 15) checks.push({ id: 'lv-bus', level: 'warn', message: `${inverterTotalKw} kW on a ${d.systemVoltage} V bus means ~${r0((inverterTotalKw * 1000) / ((d.systemVoltage as number) * 0.95))} A of battery current; consider a high-voltage battery system above 15 kW.` })
   if (inverter && inverter.phase !== d.phase) checks.push({ id: 'inv-phase', level: 'error', message: `Selected inverter is ${inverter.phase}-phase but the project is ${d.phase}-phase.` })
   if (p.loads.some((l) => l.phase === 3) && d.phase === 1) checks.push({ id: 'load-phase', level: 'error', message: 'Three-phase loads present but system is single-phase.' })
 
@@ -255,7 +266,10 @@ export function computeProject(p: Project): Results {
     if (d.panelOverrideQty == null) panelQty = strings.totalPanels
     arrayKwp = (panelQty * panel.watts) / 1000
     if (!strings.ok) checks.push({ id: 'strings', level: 'warn', message: strings.notes.join(' ') })
-    if (panel.isc > inverter.maxInputCurrentPerMppt) checks.push({ id: 'isc-mppt', level: 'error', message: `Module Isc ${panel.isc} A exceeds the inverter MPPT input limit of ${inverter.maxInputCurrentPerMppt} A per string (common with 700 W+ 210 mm modules). Choose a smaller module or a different inverter.` })
+    // Datasheets quote an operating current (stored) and a higher Isc limit (typically 1.3–1.5× it). Isc above ~1.25× the operating
+    // limit is a hard stop (210 mm modules on 13 A inputs); Imp above the operating limit only clips a little at peak irradiance.
+    if (panel.isc > inverter.maxInputCurrentPerMppt * 1.25) checks.push({ id: 'isc-mppt', level: 'error', message: `Module Isc ${panel.isc} A exceeds the inverter MPPT input limit of ${inverter.maxInputCurrentPerMppt} A per string (common with 700 W+ 210 mm modules). Choose a smaller module or a different inverter.` })
+    else if (panel.imp > inverter.maxInputCurrentPerMppt) checks.push({ id: 'imp-mppt', level: 'warn', message: `Module Imp ${panel.imp} A is above the MPPT operating limit of ${inverter.maxInputCurrentPerMppt} A; expect slight clipping at peak irradiance (confirm Isc ${panel.isc} A ≤ the inverter's Isc limit).` })
     if (inverter.maxPvInputKw * inverterQty < arrayKwp) checks.push({ id: 'pv-input', level: 'warn', message: `PV array ${r2(arrayKwp)} kWp exceeds inverter max PV input ${r1(inverter.maxPvInputKw * inverterQty)} kW; clipping or over-current risk.` })
     const ratio = inverterTotalKw > 0 ? arrayKwp / inverterTotalKw : 0
     if (ratio > 1.5) checks.push({ id: 'dcac-high', level: 'warn', message: `DC/AC ratio ${r2(ratio)} is high (>1.5). Consider a larger inverter.` })
@@ -266,11 +280,12 @@ export function computeProject(p: Project): Results {
   if (s.availableAreaM2 != null && s.availableAreaM2 > 0 && arrayAreaM2 * 1.15 > s.availableAreaM2)
     checks.push({ id: 'area', level: 'warn', message: `Array needs ~${r0(arrayAreaM2 * 1.15)} m² (incl. spacing) but only ${s.availableAreaM2} m² is available.` })
 
-  const monthlyProductionKwh = s.monthlyPsh.map((psh, m) => arrayKwp * psh * s.tiltGainFactor * derate * DAYS_IN_MONTH[m])
+  const monthlyPsh = s.monthlyPsh?.length === 12 ? s.monthlyPsh : Array<number>(12).fill(s.psh)
+  const monthlyProductionKwh = monthlyPsh.map((psh, m) => arrayKwp * psh * s.tiltGainFactor * derate * DAYS_IN_MONTH[m])
   const annualProductionKwh = sum(monthlyProductionKwh)
   const specificYield = arrayKwp > 0 ? annualProductionKwh / arrayKwp : 0
-  const monthlyNeed = L.dailyWh / 1000
-  const deficitMonths = s.monthlyPsh.map((psh, m) => (arrayKwp * psh * s.tiltGainFactor * derate < monthlyNeed ? m : -1)).filter((m) => m >= 0)
+  const dailyNeedKwh = L.dailyWh / 1000
+  const deficitMonths = monthlyPsh.map((psh, m) => (arrayKwp * psh * s.tiltGainFactor * derate < dailyNeedKwh ? m : -1)).filter((m) => m >= 0)
   if (d.systemType === 'offgrid' && deficitMonths.length) checks.push({ id: 'deficit', level: 'warn', message: `Daily production falls short of demand in ${deficitMonths.length} month(s); consider sizing for the worst month or adding a generator.` })
 
   // ---- Charge controller
@@ -307,12 +322,20 @@ export function computeProject(p: Project): Results {
     const acI = d.phase === 3 ? (inverterTotalKw * 1000) / (Math.sqrt(3) * 400) : (inverterTotalKw * 1000) / 230
     cables.push(sizeCable('ac', acI, d.acCableRunM, d.phase === 3 ? 400 : 230, d.maxVoltageDropPct, d.phase === 3))
   }
+  for (const c of cables) {
+    const limit = c.use === 'battery' ? Math.min(1.5, d.maxVoltageDropPct) : d.maxVoltageDropPct
+    if (c.dropPct > limit + 0.005) checks.push({ id: `vdrop-${c.use}`, level: 'warn', message: `${c.use.toUpperCase()} cable voltage drop ${c.dropPct}% exceeds the ${limit}% target even at ${c.sizeMm2} mm²; shorten the run or parallel conductors.` })
+  }
 
-  // ---- Generator
+  // ---- Generator (§11): peak load + battery recharge at a gentle C-rate (0.2 C LiFePO4/NMC, 0.1 C lead-acid, capped by the
+  // inverter charger), charger efficiency 0.95, 10 % margin, PF 0.8, and never below 1.5 × inverter kVA (Victron FAQ)
   let generatorKva: number | null = null
   if (d.generatorBackup) {
-    const chargeKw = inverter && batteryResolved ? Math.min(inverter.maxChargeA * inverterQty * sysV, batteryResolved.maxChargeA * parallel * sysV) / 1000 : 0
-    const kva = ((L.peakW / 1000) * 1.25 + chargeKw) / 0.8
+    const cRate = batteryResolved && (batteryResolved.chemistry === 'LiFePO4' || batteryResolved.chemistry === 'NMC') ? 0.2 : 0.1
+    const chargerKw = inverter ? (inverter.maxChargeA * inverterQty * sysV) / 1000 : Infinity
+    const chargeKw = batteryResolved ? Math.min(batteryKwh * cRate, chargerKw) : 0
+    const genKw = (L.peakW / 1000 + chargeKw / 0.95) * 1.1
+    const kva = Math.max(genKw / 0.8, 1.5 * inverterTotalKw)
     generatorKva = d.generatorKva ?? roundUpStd(kva, STD_GENERATOR_KVA)
   }
 
@@ -408,8 +431,9 @@ function buildBom(p: Project, c: BomCtx): BomLine[] {
     const dcId = dcCable.sizeMm2 <= 4 ? 'dc-cable-4' : dcCable.sizeMm2 <= 6 ? 'dc-cable-6' : 'dc-cable-10'
     addItem(dcId, strings * d.dcCableRunM * 2)
     addItem('mc4-pair', strings * 2 + 2)
-    const mppts = c.inverter ? c.inverter.mpptCount * c.inverterQty : 1
-    if (strings > mppts) {
+    // String fuses + combiner only when ≥ 3 strings share one MPPT input (§7/§12: reverse current from 2 strings stays below the module fuse rating)
+    const mppts = c.inverter && c.inverter.mpptCount > 0 ? c.inverter.mpptCount * c.inverterQty : Math.max(1, c.controllerQty)
+    if (Math.ceil(strings / mppts) > 2) {
       addItem('combiner-box', Math.ceil(strings / 6))
       addItem(dcCable.breakerA <= 15 ? 'pv-fuse-15' : dcCable.breakerA <= 20 ? 'pv-fuse-20' : 'pv-fuse-30', strings * 2)
     }
@@ -430,7 +454,7 @@ function buildBom(p: Project, c: BomCtx): BomLine[] {
   if (ac && c.inverter) {
     const sz = ac.sizeMm2
     const acId = sz <= 2.5 ? 'ac-cable-2.5' : sz <= 4 ? 'ac-cable-4' : sz <= 6 ? 'ac-cable-6' : sz <= 10 ? 'ac-cable-10' : sz <= 16 ? 'ac-cable-16' : sz <= 25 ? 'ac-cable-25' : 'ac-cable-35'
-    addItem(acId, d.acCableRunM * (d.phase === 3 ? 5 : 3) / 3 * (d.phase === 3 ? 1 : 1) + (d.phase === 3 ? 0 : 0))
+    addItem(acId, d.acCableRunM * (d.phase === 3 ? 5 : 3)) // priced per core: L+N+PE (1-ph) or 3L+N+PE (3-ph)
     const mcb = ac.breakerA <= 32 ? 'ac-mcb-32' : ac.breakerA <= 63 ? 'ac-mcb-63' : ac.breakerA <= 100 ? 'ac-mcb-100' : 'ac-mccb-160'
     addItem(mcb, c.inverterQty + 1)
     addItem('spd-ac', 1)

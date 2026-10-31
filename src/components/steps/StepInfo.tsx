@@ -13,7 +13,7 @@ export function StepInfo({ project: p, update }: StepProps) {
     return { design: d }
   })
   return (
-    <div className="grid gap-5 lg:grid-cols-5">
+    <div className="grid grid-cols-1 gap-5 lg:grid-cols-5">
       <Section title={t.info.name} className="lg:col-span-3">
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label={t.info.name} className="sm:col-span-2"><input className="input" value={p.name} onChange={(e) => update({ name: e.target.value })} /></Field>

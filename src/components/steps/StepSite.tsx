@@ -23,7 +23,7 @@ export function StepSite({ project: p, update }: StepProps) {
   const chart = s.monthlyPsh.map((v, i) => ({ m: MONTHS[i], psh: Math.round(v * s.tiltGainFactor * 100) / 100 }))
 
   return (
-    <div className="grid gap-5 lg:grid-cols-2">
+    <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
       <Section title={t.site.location}>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label={t.site.location} className="sm:col-span-2">

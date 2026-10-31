@@ -12,10 +12,10 @@ export function StepDesign({ project: p, results: r, update }: StepProps) {
   const hasBattery = d.systemType !== 'gridtie'
   const sysV = d.systemVoltage
   const batteryPool = catalog.batteries.filter((b) => fitsSystemVoltage(b, sysV)).sort((a, b) => a.energyKwh - b.energyKwh)
-  const inverterPool = catalog.inverters.filter((i) => i.phase === d.phase && (d.systemType === 'gridtie' ? true : sysV === 'hv' ? typeof i.batteryVoltage === 'string' : i.batteryVoltage === sysV) && (d.systemType === 'gridtie' ? i.type !== 'offgrid' : i.type !== 'gridtie')).sort((a, b) => a.ratedAcKw - b.ratedAcKw)
+  const inverterPool = catalog.inverters.filter((i) => i.phase === d.phase && (d.systemType === 'gridtie' ? true : sysV === 'hv' ? typeof i.batteryVoltage === 'string' : i.batteryVoltage === sysV) && (d.systemType === 'gridtie' ? i.type !== 'offgrid' && i.mpptCount > 0 : i.type !== 'gridtie')).sort((a, b) => a.ratedAcKw - b.ratedAcKw)
 
   return (
-    <div className="grid gap-5 lg:grid-cols-2">
+    <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
       <Section title={t.results.summary}>
         <div className="grid gap-4 sm:grid-cols-2">
           {hasBattery && <Field label={t.design.voltage}>

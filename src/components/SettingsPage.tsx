@@ -25,7 +25,7 @@ export function SettingsPage() {
           <Field label={t.settings.logo} className="sm:col-span-2">
             <div className="flex items-center gap-3">
               {company.logoDataUrl && <img src={company.logoDataUrl} alt="logo" className="h-14 rounded border border-slate-200 bg-white p-1" />}
-              <input ref={fileRef} type="file" accept="image/png,image/jpeg" hidden onChange={(e) => e.target.files?.[0] && onLogo(e.target.files[0])} />
+              <input ref={fileRef} type="file" accept="image/png,image/jpeg" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) onLogo(f); e.target.value = '' }} />
               <button className="btn-secondary" onClick={() => fileRef.current?.click()}><Upload size={16} />{t.settings.upload}</button>
               {company.logoDataUrl && <button className="btn-ghost" onClick={() => setCompany({ logoDataUrl: null })}><X size={16} />{t.settings.remove}</button>}
             </div>

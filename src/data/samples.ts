@@ -25,6 +25,6 @@ export function sampleProjects(): Project[] {
   shop.site = { ...siteFromLocation('khartoum'), gridTariff: 0.35 }; shop.design = { ...defaultDesign('hybrid'), systemVoltage: 48, autonomyDays: 1 }; shop.loads = loadTemplates[2].build(); shop.pricing = defaultPricing(22, 0)
   const grid = newProject({ name: 'Dubai Warehouse — 100 kW grid-tied', clientName: 'Gulf Logistics LLC', clientAddress: 'Jebel Ali Free Zone', reference: 'Q-2026-0120', status: 'draft' })
   grid.site = { ...siteFromLocation('dubai'), roofType: 'metal-sheet', availableAreaM2: 900 }; grid.design = { ...defaultDesign('gridtie'), phase: 3, coincidenceFactor: 0.9 }
-  grid.loads = pick(A('led_highbay_150w', 60, { hoursPerDay: 10, nightSharePct: 20 }), A('ac_package_10ton_3ph', 4, { hoursPerDay: 10, nightSharePct: 10, phase: 3 }), A('motor_3ph_10hp', 2, { hoursPerDay: 8, nightSharePct: 0, phase: 3 }), A('desktop_pc', 15, { nightSharePct: 5 }), A('server_rack', 1)); grid.pricing = defaultPricing(15, 5)
+  grid.loads = pick(A('led_highbay_150w', 60, { hoursPerDay: 10, nightSharePct: 20 }), A('ac_package_10ton_3ph', 2, { hoursPerDay: 10, nightSharePct: 10, phase: 3 }), A('motor_3ph_10hp', 1, { hoursPerDay: 8, nightSharePct: 0, phase: 3 }), A('desktop_pc', 15, { nightSharePct: 5 }), A('server_rack', 1)); grid.pricing = defaultPricing(15, 5)
   return [fam, off, shop, grid]
 }

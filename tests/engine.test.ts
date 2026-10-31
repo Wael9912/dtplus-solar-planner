@@ -1,7 +1,7 @@
 // Fixtures from docs/sizing-methodology.md §13 (worked examples). Tolerances reflect the documented differences in
 // derate assumptions (fixtures use fixed 0.70 / 0.7616 / 0.80 derates; the engine multiplies component factors).
 import { describe, it, expect } from 'vitest'
-import { computeProject, computeLoads, designStrings, sizeCable, fitsSystemVoltage } from '../src/engine/compute'
+import { computeProject, computeLoads, designStrings, sizeCable, fitsSystemVoltage, recommendInverter } from '../src/engine/compute'
 import { newProject, siteFromLocation, defaultDesign, defaultPricing } from '../src/engine/defaults'
 import type { LoadItem, Panel, Inverter } from '../src/engine/types'
 import { catalog } from '../src/data/catalog'
@@ -166,5 +166,14 @@ describe('catalog sanity', () => {
     p.design = { ...defaultDesign('hybrid'), panelId: 'pnl-cs-720-topbihiku7', inverterId: 'inv-deye-5k-sg03lp1', batteryId: 'auto' }
     p.loads = [L('x', 1000, 1, 10)]
     expect(computeProject(p).checks.some((c) => c.id === 'isc-mppt')).toBe(true)
+  })
+})
+
+describe('grid-tied inverter recommendation', () => {
+  it('never recommends an inverter/charger without PV input for a grid-tied system', () => {
+    const rec = recommendInverter('gridtie', 1, 5, 7, 48)
+    expect(rec).not.toBeNull()
+    expect(rec!.inverter.mpptCount).toBeGreaterThan(0)
+    expect(rec!.inverter.type).not.toBe('offgrid')
   })
 })

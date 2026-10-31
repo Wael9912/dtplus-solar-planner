@@ -27,7 +27,7 @@ export function ProjectsPage() {
         <h1 className="text-2xl font-bold text-slate-900">{t.projects.title}</h1>
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative"><Search size={14} className="pointer-events-none absolute inset-y-0 start-3 my-auto text-slate-400" /><input className="input ps-8 w-56" placeholder={t.projects.search} value={q} onChange={(e) => setQ(e.target.value)} /></div>
-          <input ref={fileRef} type="file" accept="application/json" hidden onChange={(e) => e.target.files?.[0] && onImport(e.target.files[0])} />
+          <input ref={fileRef} type="file" accept="application/json" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) onImport(f); e.target.value = '' }} />
           <button className="btn-secondary" onClick={() => fileRef.current?.click()}><Upload size={16} />{t.projects.import}</button>
           <button className="btn-primary" onClick={() => createProject()}><Plus size={16} />{t.nav.newProject}</button>
         </div>

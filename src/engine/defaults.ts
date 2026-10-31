@@ -18,7 +18,7 @@ export function siteFromLocation(id: string): SiteInput {
 
 export const defaultDesign = (systemType: DesignInput['systemType'] = 'hybrid'): DesignInput => ({
   systemType, phase: 1, autonomyDays: systemType === 'offgrid' ? 1 : 1, dodOverridePct: null, systemVoltage: 48, coincidenceFactor: 0.8,
-  dcAcRatio: 1.2, inverterSafety: 1.25, pvOversize: 1.0,
+  dcAcRatio: 1.2, inverterSafety: 1.25, pvOversize: systemType === 'offgrid' ? 1.2 : 1.0, // §3.1 offGridMargin when sizing on annual PSH
   panelId: 'auto', batteryId: systemType === 'gridtie' ? null : 'auto', inverterId: null, inverterQty: 1, chargeControllerId: null, useSeparateController: false,
   dcCableRunM: 20, batteryCableRunM: 2, acCableRunM: 15, maxVoltageDropPct: 2, generatorBackup: false, generatorKva: null,
   degradationPctPerYear: 0.5, analysisYears: 25, panelOverrideQty: null, batteryOverrideQty: null,

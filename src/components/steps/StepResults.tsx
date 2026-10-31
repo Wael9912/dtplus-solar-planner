@@ -30,7 +30,7 @@ export function StepResults({ project: p, results: r }: StepProps) {
         <Stat tone="brand" label={t.results.total} value={money(r.totalUsd, cur, fx)} sub={`${money(r.costPerWp, cur, fx, 2)} / Wp`} />
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
         <Section title={t.results.pv}>
           <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
             <Row k={t.results.requiredPv} v={`${fmt(r.requiredPvKwp, 2)} kWp`} />
@@ -96,7 +96,7 @@ export function StepResults({ project: p, results: r }: StepProps) {
         </Section>
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
         <Section title={t.results.months}>
           <div className="h-56"><ResponsiveContainer width="100%" height="100%">
             <BarChart data={monthly} margin={{ top: 4, right: 4, left: -10, bottom: 0 }}>
@@ -128,4 +128,4 @@ export function StepResults({ project: p, results: r }: StepProps) {
     </div>
   )
 }
-function Row({ k, v }: { k: string; v: string }) { return <><dt className="text-slate-500">{k}</dt><dd className="font-medium text-slate-800 tabular-nums">{v}</dd></> }
+function Row({ k, v }: { k: string; v: string }) { return <><dt className="text-slate-500">{k}</dt><dd className="min-w-0 wrap-anywhere font-medium text-slate-800 tabular-nums">{v}</dd></> }
