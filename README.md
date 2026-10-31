@@ -30,7 +30,7 @@ npm run build      # production build to dist/
 ```
 
 Deployment: pushing to `main` runs `.github/workflows/deploy.yml` which builds and publishes to GitHub Pages.
-Cloudflare Pages: `npm run deploy:cf` builds with `VITE_BASE=/` and uploads `dist/` with Wrangler (run `npx wrangler login` once first).
+Cloudflare Pages (https://dtplus-solar-planner.pages.dev): `npm run deploy:cf` builds with `VITE_BASE=/` and uploads `dist/` with Wrangler (run `npx wrangler login` once first).
 Any other static host: build with `VITE_BASE=/ npm run build` and upload `dist/` (drop `404.html`, which redirects to the GitHub Pages path).
 
 ## Documentation
