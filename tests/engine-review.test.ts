@@ -29,7 +29,7 @@ const loadsB = [L('AC', 1300, 2, 6, 3, 60), L('Fridge', 200, 1, 10, 4, 60), L('F
 function projectA(): Project {
   const p = newProject({ name: 'a' })
   p.site = site('khartoum', 6.0, 5, 42, 36)
-  p.design = { ...defaultDesign('offgrid'), systemVoltage: 48, autonomyDays: 1, coincidenceFactor: 1, pvOversize: 1.2, panelId: JINKO, batteryId: 'bat-gen-48v100-rack', inverterId: null, generatorBackup: true }
+  p.design = { ...defaultDesign('offgrid'), systemVoltage: 48, autonomyDays: 1, coincidenceFactor: 1, pvOversize: 1.2, panelId: JINKO, batteryId: 'bat-gen-48v100-rack', inverterId: null, generatorBackup: true, useSeparateController: true }
   p.loads = loadsA
   p.pricing = defaultPricing(0, 0)
   return p
@@ -351,8 +351,7 @@ describe('§7 string design', () => {
     expect(r.checks.filter((c) => c.level === 'error')).toHaveLength(0)
   })
   it('inverter/charger without PV input (Victron) is designed against the MPPT controller: 2S1P under 150 V, 150/35 controller', () => {
-    const p = projectA(); p.design = { ...p.design, useSeparateController: true } // charger-only units are auto-picked only with a separate controller
-    const r = computeProject(p)
+    const r = computeProject(projectA()) // fixture (a) uses a separate MPPT controller + 48 V inverter/charger
     expect(r.inverter?.id).toBe('inv-victron-mp2-5000') // smallest 48 V unit in the catalogue
     expect(r.controller?.id).toBe('cc-victron-150-35')
     expect(r.requiredControllerA).toBeCloseTo((1160 * 1.25) / 48, 6) // 30.21 A

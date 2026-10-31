@@ -54,7 +54,7 @@ export const BATTERY_CABLE_MIN_MM2 = 10
 export const AC_CABLE_MIN_MM2 = 2.5 // §8.2 A_min_practical for AC output
 export const K_AMB = 0.87 // ampacity derating at 40 °C ambient (IEC 60364-5-52)
 
-export function recommendInverter(type: Project['design']['systemType'], phase: 1 | 3, requiredKw: number, surgeKw: number, sysVoltage: Project['design']['systemVoltage'], allowChargerOnly = false): { inverter: Inverter; qty: number } | null {
+export function recommendInverter(type: Project['design']['systemType'], phase: 1 | 3, requiredKw: number, surgeKw: number, sysVoltage: Project['design']['systemVoltage'], allowChargerOnly = false, pvKwp = 0, panelImp = 0): { inverter: Inverter; qty: number } | null {
   const allowedTypes: Inverter['type'][] = type === 'gridtie' ? ['gridtie', 'hybrid'] : type === 'hybrid' ? ['hybrid'] : ['offgrid', 'hybrid']
   const pool = catalog.inverters
     // Inverter/chargers without PV input (mpptCount 0) are only auto-picked when the design already uses a separate MPPT controller
@@ -66,12 +66,15 @@ export function recommendInverter(type: Project['design']['systemType'], phase: 
     })
     .sort((a, b) => a.ratedAcKw - b.ratedAcKw)
   if (!pool.length) return null
-  // Single unit first
-  const single = pool.find((i) => i.ratedAcKw >= requiredKw && (i.surgeKw ?? i.ratedAcKw * 1.5) >= surgeKw)
+  // Single unit first: kW, surge, PV input capacity (×1.05 tolerance) and MPPT current ≥ module Imp; relax the PV criteria if nothing fits
+  const fitsPv = (i: Inverter, q = 1) => i.mpptCount === 0 || i.maxPvInputKw * q * 1.05 >= pvKwp
+  const fitsImp = (i: Inverter) => i.mpptCount === 0 || i.maxInputCurrentPerMppt >= panelImp
+  const singles = pool.filter((i) => i.ratedAcKw >= requiredKw && (i.surgeKw ?? i.ratedAcKw * 1.5) >= surgeKw)
+  const single = singles.find((i) => fitsPv(i) && fitsImp(i)) ?? singles.find((i) => fitsPv(i)) ?? singles[0]
   if (single) return { inverter: single, qty: 1 }
-  // Parallel units: pick the largest unit and stack
+  // Parallel units: pick the largest unit and stack (enough units for both load and array)
   for (const inv of [...pool].reverse()) {
-    const qty = Math.ceil(requiredKw / inv.ratedAcKw)
+    const qty = Math.max(Math.ceil(requiredKw / inv.ratedAcKw), inv.mpptCount > 0 && inv.maxPvInputKw > 0 ? Math.ceil(pvKwp / (inv.maxPvInputKw * 1.05)) : 1)
     if (qty <= inv.parallelMax) return { inverter: inv, qty }
   }
   const biggest = pool[pool.length - 1]
@@ -233,7 +236,7 @@ export function computeProject(p: Project): Results {
   let inverter = getInverter(d.inverterId) ?? null
   let inverterQty = d.inverterQty || 1
   if (!inverter) {
-    const rec = recommendInverter(d.systemType, d.phase, selectionKw, surgeKw, d.systemVoltage, d.useSeparateController)
+    const rec = recommendInverter(d.systemType, d.phase, selectionKw, surgeKw, d.systemVoltage, d.useSeparateController, requiredPvKwp, panel.imp)
     inverter = rec?.inverter ?? null
     inverterQty = rec?.qty ?? 1
   }
