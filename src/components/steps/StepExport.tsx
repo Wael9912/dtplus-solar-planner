@@ -4,6 +4,7 @@ import { useT } from '../../i18n'
 import { Section } from '../ui'
 import type { StepProps } from '../Wizard'
 import { useAppStore } from '../../store/useAppStore'
+import { download } from '../../export/download'
 
 export function StepExport({ project: p, results: r }: StepProps) {
   const { t, lang } = useT()
@@ -31,7 +32,4 @@ export function StepExport({ project: p, results: r }: StepProps) {
       </Section>
     </div>
   )
-}
-export function download(blob: Blob, name: string) {
-  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove() }, 1000)
 }

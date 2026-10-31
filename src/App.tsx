@@ -6,6 +6,8 @@ import { ProjectsPage } from './components/ProjectsPage'
 import { SettingsPage } from './components/SettingsPage'
 import { Wizard } from './components/Wizard'
 
+const YEAR = new Date().getFullYear()
+
 export default function App() {
   const { t, lang, dir } = useT()
   const { view, setView, setLang, createProject, company } = useAppStore()
@@ -36,7 +38,7 @@ export default function App() {
         {view === 'wizard' && <Wizard />}
       </main>
       <footer className="border-t border-slate-200 bg-white py-4 text-center text-xs text-slate-500">
-        {t.by} · © {new Date().getFullYear()} DT+ · v{__APP_VERSION__}
+        {t.by} · © {YEAR} DT+ · v{__APP_VERSION__}
       </footer>
     </div>
   )

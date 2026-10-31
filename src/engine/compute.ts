@@ -54,10 +54,11 @@ export const BATTERY_CABLE_MIN_MM2 = 10
 export const AC_CABLE_MIN_MM2 = 2.5 // §8.2 A_min_practical for AC output
 export const K_AMB = 0.87 // ampacity derating at 40 °C ambient (IEC 60364-5-52)
 
-export function recommendInverter(type: Project['design']['systemType'], phase: 1 | 3, requiredKw: number, surgeKw: number, sysVoltage: Project['design']['systemVoltage']): { inverter: Inverter; qty: number } | null {
+export function recommendInverter(type: Project['design']['systemType'], phase: 1 | 3, requiredKw: number, surgeKw: number, sysVoltage: Project['design']['systemVoltage'], allowChargerOnly = false): { inverter: Inverter; qty: number } | null {
   const allowedTypes: Inverter['type'][] = type === 'gridtie' ? ['gridtie', 'hybrid'] : type === 'hybrid' ? ['hybrid'] : ['offgrid', 'hybrid']
   const pool = catalog.inverters
-    .filter((i) => allowedTypes.includes(i.type) && i.phase === phase && (type !== 'gridtie' || i.mpptCount > 0))
+    // Inverter/chargers without PV input (mpptCount 0) are only auto-picked when the design already uses a separate MPPT controller
+    .filter((i) => allowedTypes.includes(i.type) && i.phase === phase && (i.mpptCount > 0 || (allowChargerOnly && type !== 'gridtie')))
     .filter((i) => {
       if (type === 'gridtie') return true
       if (sysVoltage === 'hv') return typeof i.batteryVoltage === 'string'
@@ -232,7 +233,7 @@ export function computeProject(p: Project): Results {
   let inverter = getInverter(d.inverterId) ?? null
   let inverterQty = d.inverterQty || 1
   if (!inverter) {
-    const rec = recommendInverter(d.systemType, d.phase, selectionKw, surgeKw, d.systemVoltage)
+    const rec = recommendInverter(d.systemType, d.phase, selectionKw, surgeKw, d.systemVoltage, d.useSeparateController)
     inverter = rec?.inverter ?? null
     inverterQty = rec?.qty ?? 1
   }

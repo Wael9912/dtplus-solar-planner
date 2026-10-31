@@ -351,7 +351,8 @@ describe('§7 string design', () => {
     expect(r.checks.filter((c) => c.level === 'error')).toHaveLength(0)
   })
   it('inverter/charger without PV input (Victron) is designed against the MPPT controller: 2S1P under 150 V, 150/35 controller', () => {
-    const r = computeProject(projectA())
+    const p = projectA(); p.design = { ...p.design, useSeparateController: true } // charger-only units are auto-picked only with a separate controller
+    const r = computeProject(p)
     expect(r.inverter?.id).toBe('inv-victron-mp2-5000') // smallest 48 V unit in the catalogue
     expect(r.controller?.id).toBe('cc-victron-150-35')
     expect(r.requiredControllerA).toBeCloseTo((1160 * 1.25) / 48, 6) // 30.21 A

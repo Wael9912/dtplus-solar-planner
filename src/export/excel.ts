@@ -1,7 +1,7 @@
 import ExcelJS from 'exceljs'
 import type { Project, Results, CompanySettings } from '../engine/types'
 import { MONTHS, DAYS_IN_MONTH, AWG_EQUIV } from '../engine/standards'
-import { download } from '../components/steps/StepExport'
+import { download } from './download'
 
 const BRAND = 'FF0F766E'
 const hdr = (ws: ExcelJS.Worksheet, row: number, cols: number) => {
