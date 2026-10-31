@@ -20,20 +20,20 @@ body { @apply bg-slate-50 text-slate-800 antialiased; margin: 0; }
 
 @layer components {
   .card { @apply bg-white rounded-xl border border-slate-200 shadow-sm; }
-  .btn { @apply inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition disabled:opacity-50 disabled:cursor-not-allowed; }
-  .btn-primary { @apply btn bg-brand-700 text-white hover:bg-brand-800; }
-  .btn-secondary { @apply btn bg-white border border-slate-300 text-slate-700 hover:bg-slate-50; }
-  .btn-ghost { @apply btn text-slate-600 hover:bg-slate-100; }
-  .btn-danger { @apply btn bg-white border border-red-300 text-red-700 hover:bg-red-50; }
+  .btn, .btn-primary, .btn-secondary, .btn-ghost, .btn-danger { @apply inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition disabled:opacity-50 disabled:cursor-not-allowed; }
+  .btn-primary { @apply bg-brand-700 text-white hover:bg-brand-800; }
+  .btn-secondary { @apply bg-white border border-slate-300 text-slate-700 hover:bg-slate-50; }
+  .btn-ghost { @apply text-slate-600 hover:bg-slate-100; }
+  .btn-danger { @apply bg-white border border-red-300 text-red-700 hover:bg-red-50; }
   .input { @apply w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200; }
   .label { @apply block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1; }
   .stat { @apply rounded-xl border border-slate-200 bg-white p-4; }
   .stat-value { @apply text-2xl font-bold text-slate-900 tabular-nums; }
   .stat-label { @apply text-xs text-slate-500 mt-1; }
-  .badge { @apply inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium; }
-  .badge-ok { @apply badge bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200; }
-  .badge-warn { @apply badge bg-amber-50 text-amber-700 ring-1 ring-amber-200; }
-  .badge-err { @apply badge bg-red-50 text-red-700 ring-1 ring-red-200; }
+  .badge, .badge-ok, .badge-warn, .badge-err { @apply inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium; }
+  .badge-ok { @apply bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200; }
+  .badge-warn { @apply bg-amber-50 text-amber-700 ring-1 ring-amber-200; }
+  .badge-err { @apply bg-red-50 text-red-700 ring-1 ring-red-200; }
   .table { @apply w-full text-sm; }
   .table th { @apply text-start text-xs font-semibold uppercase tracking-wide text-slate-500 border-b border-slate-200 px-3 py-2 bg-slate-50; }
   .table td { @apply border-b border-slate-100 px-3 py-2 align-middle; }

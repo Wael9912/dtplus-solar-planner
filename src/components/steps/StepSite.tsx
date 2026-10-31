@@ -38,6 +38,7 @@ export function StepSite({ project: p, update }: StepProps) {
           <Field label={t.site.tilt}><NumberInput value={s.tiltDeg} min={0} max={60} onChange={(v) => set({ tiltDeg: v ?? 0 })} /></Field>
           <Field label={t.site.azimuth}><NumberInput value={s.azimuthDeg} min={-180} max={180} onChange={(v) => set({ azimuthDeg: v ?? 0 })} /></Field>
           <Field label={t.site.ambient}><NumberInput value={s.ambientHighC} onChange={(v) => set({ ambientHighC: v ?? 35 })} /></Field>
+          <Field label={t.site.ambientAvg}><NumberInput value={s.ambientAvgC} onChange={(v) => set({ ambientAvgC: v ?? 30 })} /></Field>
           <Field label={t.site.recordLow}><NumberInput value={s.recordLowC} onChange={(v) => set({ recordLowC: v ?? 0 })} /></Field>
           <Field label={t.site.shading}><NumberInput value={s.shadingLossPct} min={0} max={50} onChange={(v) => set({ shadingLossPct: v ?? 0 })} /></Field>
           <Field label={t.site.soiling}><NumberInput value={s.soilingLossPct} min={0} max={30} onChange={(v) => set({ soilingLossPct: v ?? 0 })} /></Field>

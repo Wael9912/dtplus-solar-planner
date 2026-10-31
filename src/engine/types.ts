@@ -50,7 +50,7 @@ export interface LoadItem {
 export interface SiteInput {
   locationId: string | 'custom'; customName: string; psh: number; monthlyPsh: number[];
   tiltDeg: number; azimuthDeg: number; tiltGainFactor: number;
-  ambientHighC: number; recordLowC: number; shadingLossPct: number; soilingLossPct: number;
+  ambientHighC: number; ambientAvgC: number; recordLowC: number; shadingLossPct: number; soilingLossPct: number;
   roofType: 'flat-concrete' | 'pitched-tile' | 'metal-sheet' | 'ground';
   availableAreaM2: number | null; gridTariff: number; gridEmission: number; currency: string; fxRateToUsd: number; // 1 local = fxRateToUsd USD? we store local per USD
 }

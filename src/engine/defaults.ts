@@ -10,7 +10,7 @@ export function siteFromLocation(id: string): SiteInput {
   return {
     locationId: loc.id, customName: '', psh: loc.annualPsh, monthlyPsh: [...loc.monthlyPsh],
     tiltDeg: loc.optimalTiltDeg, azimuthDeg: 0, tiltGainFactor: Math.round(tiltGainFor(loc.lat) * 100) / 100,
-    ambientHighC: Math.round(Math.max(...highs)), recordLowC: loc.recordLowTempC, shadingLossPct: 2, soilingLossPct: 3,
+    ambientHighC: Math.round(Math.max(...highs)), ambientAvgC: Math.round(highs.reduce((a, b) => a + b, 0) / highs.length), recordLowC: loc.recordLowTempC, shadingLossPct: 2, soilingLossPct: 3,
     roofType: 'flat-concrete', availableAreaM2: null, gridTariff: loc.typicalTariffUsdPerKwh, gridEmission: loc.gridEmissionKgPerKwh,
     currency: 'USD', fxRateToUsd: 1,
   }

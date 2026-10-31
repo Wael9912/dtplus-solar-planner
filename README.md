@@ -1,32 +1,45 @@
-# React + TypeScript + Vite
+# DT+ Solar Planner
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+Browser-based solar PV design, sizing and quotation tool for solar installation companies.
+Walks the user step by step from appliance loads to a priced bill of materials, with Excel and PDF export.
+Runs entirely in the browser (no backend); projects are saved locally and can be exported/imported as JSON.
 
-Currently, two official plugins are available:
+**Product developed by DT+.**
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Features
 
-## React Compiler
+- 7-step wizard: Project → Loads → Site & sun → System → Sizing → Bill of materials → Export
+- Off-grid, hybrid (grid + battery backup) and grid-tied systems; single- and three-phase
+- Appliance library (72 items, EN/AR) with typical watts, hours, surge factors; quick templates (home, shop, farm pump, clinic)
+- 70 locations with monthly peak-sun-hours from NASA POWER climatology, plus custom location
+- Catalog: 19 panels (100–720 W), 22 batteries (12 V lead-acid to HV LiFePO4), 34 inverters (1–110 kW), 9 MPPT controllers, full balance-of-system items
+- Engine: derate chain (NOCT temperature, soiling, shading, wiring, mismatch, inverter, battery round-trip), PV kWp, string design (Voc cold / Vmp hot / Isc per MPPT, IEC 62548 / NEC 690), battery sizing (autonomy, DoD, series/parallel, C-rate), inverter auto-selection with parallel stacking, cable sizing (voltage drop, ampacity derating), fuse/breaker rounding, generator kVA, roof area, monthly production, savings, payback, LCOE, CO₂
+- Design checks (OK / warning / error) explaining every issue
+- Bill of materials with editable prices and quantities, custom lines, margin, discount, VAT, multi-currency
+- Exports: branded client proposal PDF, technical design PDF, Excel workbook with live formulas, project JSON
+- English / Arabic (RTL) interface; company branding (logo, colour, terms) for quotations
+- Works offline after first load; mobile friendly
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Development
 
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```bash
+npm install
+npm run dev        # http://localhost:5173/dtplus-solar-planner/
+npm test           # vitest – engine tests against worked examples in docs/sizing-methodology.md
+npm run build      # production build to dist/
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+Deployment: pushing to `main` runs `.github/workflows/deploy.yml` which builds and publishes to GitHub Pages.
+To host elsewhere (Cloudflare Pages, Netlify, any static host) build with `VITE_BASE=/ npm run build` and upload `dist/`.
+
+## Documentation
+
+- `docs/sizing-methodology.md` — formulas, standards, appliance table and worked examples the engine implements
+- `docs/catalog-notes.md` — sources and caveats for every catalog entry; indicative pricing basis
+- `docs/irradiance-notes.md` — how location data was derived; tilt conversion
+- `docs/features.md` — competitive review and prioritised feature backlog
+
+## Disclaimer
+
+Catalog prices are indicative international wholesale figures (2025) and must be replaced with supplier quotes.
+Results are a design aid; final designs must be verified by a qualified engineer against local codes.

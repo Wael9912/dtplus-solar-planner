@@ -24,7 +24,7 @@ export const en = {
     templates: 'Quick templates', tplSmallHome: 'Small home', tplFamilyHome: 'Family home with AC', tplShop: 'Shop / office', tplFarm: 'Farm pump', tplClinic: 'Clinic', clear: 'Clear all', criticalHelp: 'Hybrid only: items ticked here are backed up by battery; others run on grid/PV only.',
   },
   site: {
-    location: 'Location', custom: 'Custom location', psh: 'Peak sun hours (kWh/m²/day)', monthly: 'Monthly sun hours', tilt: 'Tilt (°)', azimuth: 'Azimuth (° from south)', tiltGain: 'Tilt gain factor', ambient: 'Design ambient high (°C)', recordLow: 'Record low (°C)',
+    location: 'Location', custom: 'Custom location', psh: 'Peak sun hours (kWh/m²/day)', monthly: 'Monthly sun hours', tilt: 'Tilt (°)', azimuth: 'Azimuth (° from south)', tiltGain: 'Tilt gain factor', ambient: 'Design ambient high (°C)', ambientAvg: 'Average daytime high (°C)', recordLow: 'Record low (°C)',
     shading: 'Shading loss %', soiling: 'Soiling / dust loss %', roof: 'Mounting surface', roofs: { 'flat-concrete': 'Flat concrete roof', 'pitched-tile': 'Pitched tile roof', 'metal-sheet': 'Metal sheet roof', ground: 'Ground mount' },
     area: 'Available area (m²)', tariff: 'Grid / diesel tariff (USD per kWh)', tariffHelp: 'Used for savings and payback. For off-grid sites enter the cost of the diesel alternative (typically 0.40–0.60).', emission: 'Grid CO₂ factor (kg/kWh)', currency: 'Display currency', fx: 'Local units per 1 USD', region: 'Region',
   },

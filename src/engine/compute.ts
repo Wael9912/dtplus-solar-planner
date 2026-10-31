@@ -161,8 +161,8 @@ export function computeProject(p: Project): Results {
   const dod = (d.dodOverridePct ?? (battery ? battery.usableDodPct : DOD_BY_CHEMISTRY[chem] * 100)) / 100
   const rt = ROUNDTRIP_BY_CHEMISTRY[chem] ?? 0.9
 
-  // ---- Derate
-  const tCell = cellTemp(s.ambientHighC, panel.noct)
+  // ---- Derate (energy): use the year-round average daytime high; the hot-day peak is reserved for the Vmp string check
+  const tCell = cellTemp(s.ambientAvgC ?? s.ambientHighC - 8, panel.noct)
   const tempFactor = 1 + (panel.tempCoeffPmaxPctPerC / 100) * (tCell - 25)
   const invEff = 0.96
   const breakdown = [
