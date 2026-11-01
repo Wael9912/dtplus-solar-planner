@@ -9,8 +9,8 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "test": "vitest run",
-    "deploy": "npm run build && gh-pages -d dist",
-    "deploy:cf": "VITE_BASE=/ npm run build && rm -f dist/404.html && wrangler pages deploy dist --project-name dtplus-solar-planner --branch main"
+    "deploy": "npm run build && wrangler pages deploy dist --project-name dtplus-solar-planner --branch main",
+    "deploy:cf": "npm run deploy"
   },
   "dependencies": {
     "exceljs": "^4.4.0",
@@ -28,7 +28,6 @@
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.2",
-    "gh-pages": "^6.3.0",
     "oxlint": "^1.89.0",
     "playwright": "^1.64.1",
     "tailwindcss": "^4.3.3",

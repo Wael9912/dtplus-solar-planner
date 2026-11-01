@@ -2,10 +2,10 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
-// GitHub Pages serves it at /dtplus-solar-planner/; Cloudflare Pages builds with VITE_BASE=/ (npm run deploy:cf)
+// Hosted at the site root on Cloudflare Pages (npm run deploy); set VITE_BASE to serve from a sub-path
 export default defineConfig({
   define: { __APP_VERSION__: JSON.stringify(process.env.npm_package_version ?? '0.1.0') },
   plugins: [react(), tailwindcss()],
-  base: process.env.VITE_BASE ?? '/dtplus-solar-planner/',
+  base: process.env.VITE_BASE ?? '/',
   build: { chunkSizeWarningLimit: 1500 },
 })

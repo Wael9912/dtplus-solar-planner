@@ -24,14 +24,13 @@ Runs entirely in the browser (no backend); projects are saved locally and can be
 
 ```bash
 npm install
-npm run dev        # http://localhost:5173/dtplus-solar-planner/
+npm run dev        # http://localhost:5173/
 npm test           # vitest – engine tests against worked examples in docs/sizing-methodology.md
 npm run build      # production build to dist/
 ```
 
-Deployment: pushing to `main` runs `.github/workflows/deploy.yml` which builds and publishes to GitHub Pages.
-Cloudflare Pages (https://dtplus-solar-planner.pages.dev): `npm run deploy:cf` builds with `VITE_BASE=/` and uploads `dist/` with Wrangler (run `npx wrangler login` once first).
-Any other static host: build with `VITE_BASE=/ npm run build` and upload `dist/` (drop `404.html`, which redirects to the GitHub Pages path).
+Deployment: hosted on Cloudflare Pages at https://dtplus-solar-planner.pages.dev. Run `npm run deploy` to build and upload `dist/` with Wrangler (run `npx wrangler login` once first); pushing to `main` does not deploy.
+Any other static host: `npm run build` and upload `dist/` (routing is hash-based, so no rewrite rules are needed).
 
 ## Documentation
 

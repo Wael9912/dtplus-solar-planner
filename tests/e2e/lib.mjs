@@ -3,7 +3,7 @@ import { chromium } from 'playwright'
 import fs from 'node:fs'
 import path from 'node:path'
 
-export const URL = 'http://localhost:5179/dtplus-solar-planner/'
+export const URL = 'http://localhost:5179/'
 export const SHOTS = '/private/tmp/claude-501/-Users-waelabdalla-PyCharmMiscProject/a199386a-3b48-4985-a705-6ec93c7f1733/scratchpad/e2e'
 export const DL = path.join(SHOTS, 'downloads')
 fs.mkdirSync(DL, { recursive: true })
