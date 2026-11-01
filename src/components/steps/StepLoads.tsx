@@ -151,25 +151,26 @@ export function StepLoads({ project: p, results: r, update }: StepProps) {
               return (
                 <li key={l.id} data-load-id={l.id} data-testid="load-card" className="rounded-xl border border-slate-200 bg-white p-3 transition">
                   <div className="flex items-start gap-3">
+                    {/* Full name (wraps, never cut off); tap opens the editor for the less-used fields */}
                     <button type="button" className="min-w-0 flex-1 rounded-md text-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500" onClick={() => setEditId(l.id)} data-testid="load-card-edit">
-                      <span className="flex items-center gap-1 font-medium text-slate-900"><bdi className="truncate">{nm}</bdi><Pencil size={14} className="shrink-0 text-slate-400" aria-hidden="true" /></span>
+                      <span className="flex items-start gap-1.5"><bdi className="min-w-0 leading-snug font-medium text-slate-900 [overflow-wrap:anywhere]">{nm}</bdi><Pencil size={14} className="mt-1 shrink-0 text-slate-400" aria-hidden="true" /></span>
                       <span className="mt-0.5 block text-xs text-slate-500">
-                        <bdi>{fmt(l.watts)} W</bdi> · <bdi>{t.loads.hoursShort(fmt(l.hoursPerDay, l.hoursPerDay % 1 ? 1 : 0))}</bdi> · <bdi>{t.loads.nightShort(fmt(l.nightSharePct))}</bdi>{l.surgeFactor > 1 && <> · <bdi>{t.loads.surgeShort(fmt(l.surgeFactor, l.surgeFactor % 1 ? 1 : 0))}</bdi></>}
+                        <bdi>{t.loads.nightShort(fmt(l.nightSharePct))}</bdi>{l.surgeFactor > 1 && <> · <bdi>{t.loads.surgeShort(fmt(l.surgeFactor, l.surgeFactor % 1 ? 1 : 0))}</bdi></>}{three && l.phase === 3 && <> · 3φ</>}
                       </span>
                     </button>
                     <div className="shrink-0 text-end leading-tight"><div className="font-semibold text-slate-900 tabular-nums">{fmt(whDay(l))}</div><div className="text-xs text-slate-500">{t.loads.daily}</div></div>
                   </div>
-                  <div className="mt-2 flex items-center gap-1.5">
-                    <NumberInput stepper integer className="w-32 shrink-0" value={l.qty} min={0} onChange={(v) => patch(l.id, { qty: v ?? 0 })} aria-label={`${t.loads.qty} — ${nm}`} />
-                    {isHybrid && (
-                      <label className="inline-flex min-h-11 min-w-0 cursor-pointer items-center gap-2 rounded-lg px-1 text-sm text-slate-700">
-                        <input type="checkbox" className="size-5 shrink-0 accent-brand-700" checked={l.critical} onChange={(e) => patch(l.id, { critical: e.target.checked })} /><span className="truncate">{t.loads.onBattery}</span>
-                      </label>
-                    )}
-                    {three && l.phase === 3 && <span className="badge-info">3φ</span>}
-                    <span className="flex-1" />
+                  <div className="mt-2.5 grid grid-cols-[repeat(3,minmax(0,1fr))_auto] items-end gap-2">
+                    <label className="block min-w-0"><span className="mb-1 block text-xs leading-tight text-slate-500">{t.loads.watts}</span><NumberInput className="[&_input]:px-2" value={l.watts} min={0} onChange={(v) => patch(l.id, { watts: v ?? 0 })} aria-label={`${t.loads.watts} — ${nm}`} /></label>
+                    <label className="block min-w-0"><span className="mb-1 block text-xs leading-tight text-slate-500">{t.loads.hoursCompact}</span><NumberInput className="[&_input]:px-2" value={l.hoursPerDay} min={0} max={24} step={0.5} onChange={(v) => patch(l.id, { hoursPerDay: v ?? 0 })} aria-label={`${t.loads.hours} — ${nm}`} /></label>
+                    <label className="block min-w-0"><span className="mb-1 block text-xs leading-tight text-slate-500">{t.loads.qty}</span><NumberInput className="[&_input]:px-2" integer value={l.qty} min={0} onChange={(v) => patch(l.id, { qty: v ?? 0 })} aria-label={`${t.loads.qty} — ${nm}`} /></label>
                     <IconButton label={`${t.common.delete} — ${nm}`} className="btn-ghost text-slate-500 hover:text-red-700" onClick={() => remove(l.id)} data-testid="load-delete"><Trash2 size={18} /></IconButton>
                   </div>
+                  {isHybrid && (
+                    <label className="mt-1 -mb-1.5 inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-lg text-sm text-slate-700">
+                      <input type="checkbox" className="size-5 shrink-0 accent-brand-700" checked={l.critical} onChange={(e) => patch(l.id, { critical: e.target.checked })} />{t.loads.onBattery}
+                    </label>
+                  )}
                 </li>
               )
             })}
@@ -239,7 +240,7 @@ function LibrarySheet({ open, onClose, countOf, onAdd, onDec, onTemplate, total 
           return (
             <li key={a.id} className="flex min-h-14 items-center gap-3 py-1.5" data-testid="library-item">
               <button type="button" className="min-w-0 flex-1 rounded-md py-1 text-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500" onClick={() => onAdd(a)}>
-                <span className="block truncate text-sm font-medium text-slate-900"><bdi>{applianceName(a, lang)}</bdi></span>
+                <span className="block text-sm leading-snug font-medium text-slate-900 [overflow-wrap:anywhere]"><bdi>{applianceName(a, lang)}</bdi></span>
                 <span className="block text-xs text-slate-500"><bdi>{fmt(a.watts)} W</bdi> · <bdi>{t.loads.hoursShort(fmt(a.hoursPerDay, a.hoursPerDay % 1 ? 1 : 0))}</bdi> · {catLabel(a.category, t)}</span>
               </button>
               {n > 0 ? (
@@ -281,7 +282,7 @@ function LoadEditor({ load, isNew = false, three, hybrid, onChange, onClose, onA
         <Field label={t.loads.surge}><NumberInput value={load.surgeFactor} min={1} max={10} step={0.5} onChange={(v) => onChange({ surgeFactor: v ?? 1 })} /></Field>
         {three && <Field label={t.loads.phase}><select className="input" value={load.phase} onChange={(e) => onChange({ phase: Number(e.target.value) as 1 | 3 })}><option value={1}>1φ</option><option value={3}>3φ</option></select></Field>}
         {hybrid && <div className="col-span-2"><Switch checked={load.critical} onChange={(v) => onChange({ critical: v })} label={t.loads.onBattery} help={t.loads.criticalHelp} /></div>}
-        <p className="col-span-2 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">{t.loads.daily}: <bdi className="font-semibold tabular-nums">{fmt(whDay(load))} Wh</bdi></p>
+        <p className="col-span-2 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">{t.loads.totalDaily}: <bdi className="font-semibold tabular-nums">{fmt(whDay(load))} Wh</bdi></p>
       </div>
     </Sheet>
   )

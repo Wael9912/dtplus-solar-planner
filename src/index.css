@@ -161,3 +161,6 @@ body { @apply bg-slate-50 text-slate-700 antialiased; margin: 0; font-family: va
     .input-group.quiet { min-height: 2.25rem; }
   }
 }
+
+/* Arabic UI: an empty dir="auto" field would fall back to LTR and put its placeholder on the wrong side */
+[dir="rtl"] input[dir="auto"]:placeholder-shown, [dir="rtl"] textarea[dir="auto"]:placeholder-shown { direction: rtl; }

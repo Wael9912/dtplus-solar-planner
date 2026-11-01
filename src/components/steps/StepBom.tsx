@@ -24,7 +24,7 @@ export function StepBom({ project: p, results: r, quote, update, goTo }: StepPro
   const desktop = useIsDesktop()
   const clientView = useAppStore((s) => s.clientView)
   const setClientView = useAppStore((s) => s.setClientView)
-  const [showRemoved, setShowRemoved] = useState(false)
+  const [showRemoved, setShowRemoved] = useState(true) // unticked lines stay in the list, greyed, so they can be ticked back on
   const [pricingOpen, setPricingOpen] = useState(false)
   const pr = p.pricing
   const fx = quote.fx
@@ -88,7 +88,7 @@ export function StepBom({ project: p, results: r, quote, update, goTo }: StepPro
       <Segmented label={t.nav.clientView} value={clientView ? 'client' : 'cost'} onChange={(v) => setClientView(v === 'client')} options={[{ value: 'client', label: t.bom.clientPrices, testId: 'view-client' }, { value: 'cost', label: t.bom.costView, testId: 'view-cost' }]} />
       <button type="button" className="btn-secondary" onClick={addCustom} data-testid="bom-add-custom"><Plus size={18} /><span className="hidden sm:inline">{t.bom.addCustom}</span></button>
       <Menu label={t.common.more} testId="bom-menu" items={[
-        { label: showRemoved ? t.bom.hideRemoved : t.bom.showRemoved(pr.excludedIds.length), icon: showRemoved ? <EyeOff size={18} /> : <Eye size={18} />, onClick: () => setShowRemoved((s) => !s), hidden: !pr.excludedIds.length, testId: 'bom-show-removed' },
+        { label: showRemoved ? t.bom.hideRemoved(pr.excludedIds.length) : t.bom.showRemoved(pr.excludedIds.length), icon: showRemoved ? <EyeOff size={18} /> : <Eye size={18} />, onClick: () => setShowRemoved((s) => !s), hidden: !pr.excludedIds.length, testId: 'bom-show-removed' },
         { label: t.bom.reset, icon: <RotateCcw size={18} />, onClick: resetAll, hidden: !nEdited, testId: 'bom-reset' },
         { label: t.bom.addCustom, icon: <Plus size={18} />, onClick: addCustom },
       ]} />
@@ -176,9 +176,9 @@ export function StepBom({ project: p, results: r, quote, update, goTo }: StepPro
                         <p className={`shrink-0 text-end font-semibold text-slate-900 tabular-nums ${ex ? 'opacity-60' : ''}`}><bdi>{m(clientView ? l.totalSell : l.totalCost)}</bdi></p>
                       </div>
                     )}
-                    <div className="mt-2 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] items-end gap-2">
-                      <label className="block min-w-0"><span className="mb-1 block text-xs text-slate-500">{t.bom.qty}</span>{qtyInput(l)}</label>
-                      <label className="block min-w-0"><span className="mb-1 block text-xs text-slate-500">{clientView ? t.bom.unitPrice : t.bom.costIn(cur)}</span>{clientView ? <span className="flex min-h-11 items-center"><bdi className="font-medium tabular-nums">{m(l.unitSell)}</bdi></span> : priceCell(l)}</label>
+                    <div className="mt-2 grid grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_auto] items-end gap-2">
+                      <label className={`block min-w-0 ${ex ? 'opacity-60' : ''}`}><span className="mb-1 block text-xs text-slate-500">{t.bom.qty}</span>{qtyInput(l, "[&_input]:px-2")}</label>
+                      <label className={`block min-w-0 ${ex ? 'opacity-60' : ''}`}><span className="mb-1 block text-xs text-slate-500">{clientView ? t.bom.unitPrice : t.bom.costIn(cur)}</span>{clientView ? <span className="flex min-h-11 items-center"><bdi className="font-medium tabular-nums">{m(l.unitSell)}</bdi></span> : priceCell(l)}</label>
                       <div className="flex items-center">
                         {custom ? <IconButton label={`${t.bom.removeLine} — ${name(l)}`} className="btn-ghost text-slate-500 hover:text-red-700" onClick={() => removeCustom(l.id)}><Trash2 size={18} /></IconButton>
                           : <>

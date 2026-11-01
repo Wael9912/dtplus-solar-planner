@@ -205,8 +205,8 @@ export function Segmented<T extends string>({ options, value, onChange, label, k
         return (
           <button key={o.value} type="button" role={kind} aria-checked={kind === 'radio' ? on : undefined} aria-selected={kind === 'tab' ? on : undefined} tabIndex={on ? 0 : -1} data-testid={o.testId}
             onClick={() => onChange(o.value)} onKeyDown={(e) => arrowNav(e, dir)}
-            className={`inline-flex min-h-10 min-w-0 items-center justify-center gap-1.5 rounded-md px-3 text-sm font-medium whitespace-nowrap transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 ${full ? 'flex-1' : ''} ${on ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-200' : 'text-slate-600 hover:text-slate-900'}`}>
-            {o.icon}<span className="truncate">{o.label}</span>
+            className={`inline-flex min-h-10 min-w-0 items-center justify-center gap-1.5 rounded-md px-3 py-1 text-sm leading-tight font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 ${full ? 'flex-1' : ''} ${on ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-200' : 'text-slate-600 hover:text-slate-900'}`}>
+            {o.icon}<span className="min-w-0 text-center text-balance">{o.label}</span>
           </button>
         )
       })}

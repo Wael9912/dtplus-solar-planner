@@ -1,8 +1,12 @@
+import { Fragment } from 'react'
 import { useT } from '../../i18n'
 import { Field, Section, Choice, Segmented } from '../ui'
 import type { StepProps } from '../Wizard'
 import type { SystemType, Project } from '../../engine/types'
 import { applySystemType } from '../../engine/defaults'
+
+/** Let a label wrap at spaces but not at the hyphen of “Single-phase” (narrow phones would split it there). */
+const nbHyphen = (s: string) => s.split(' ').map((w, i) => <Fragment key={i}>{i > 0 && ' '}{w.includes('-') ? <span className="whitespace-nowrap">{w}</span> : w}</Fragment>)
 
 export function StepInfo({ project: p, update }: StepProps) {
   const { t } = useT()
@@ -35,7 +39,7 @@ export function StepInfo({ project: p, update }: StepProps) {
         </Section>
         <Section title={t.info.phase}>
           <Segmented full label={t.info.phase} value={String(p.design.phase) as '1' | '3'} onChange={(v) => update((prev) => ({ design: { ...prev.design, phase: Number(v) as 1 | 3, inverterId: null } }))} options={[
-            { value: '1', label: t.info.single, testId: 'phase-1' }, { value: '3', label: t.info.three, testId: 'phase-3' },
+            { value: '1', label: nbHyphen(t.info.single), testId: 'phase-1' }, { value: '3', label: nbHyphen(t.info.three), testId: 'phase-3' },
           ]} />
         </Section>
       </div>
