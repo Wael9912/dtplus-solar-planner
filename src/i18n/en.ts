@@ -1,3 +1,8 @@
+import { toolsEn } from './tools'
+import { calcEn } from './calc'
+import { pricesEn } from './prices'
+import { inputsEn } from './inputs'
+import { outputsEn } from './outputs'
 // English UI strings — the type source for every dictionary (`Dict`). ar.ts must have the same keys and function signatures.
 // Units policy: computed values keep Latin SI symbols (W, kW, kWp, kWh, V, A, m², kg) in both languages.
 export const en = {
@@ -8,6 +13,16 @@ export const en = {
     nextTo: (step: string) => `Next: ${step}`, stepOf: (i: number, n: number) => `Step ${i} of ${n}`, steps: 'Project steps', aboutStep: 'About this step',
     clientView: 'Client view', clientViewHelp: 'Hides cost prices and markup so you can show the screen to the client.', savedAuto: 'Saved automatically',
     issues: (n: number) => `${n} ${n === 1 ? 'issue' : 'issues'}`, noIssues: 'No issues', finishHelp: 'Back to all projects',
+    home: 'Home', tools: 'Tools', prices: 'Price list', newMenu: 'Start something new',
+  },
+  /** Project modes and the start menu (home tiles, header "New" menu). */
+  modes: {
+    short: { design: 'Full design', size: 'Known size', items: 'Product quote' },
+    calc: 'Load calculator', calcHelp: 'List the appliances and get the system size and a rough price on one screen.',
+    design: 'Full design', designHelp: 'Client, appliances or bill, site, equipment, pricing and proposal — every step.',
+    size: 'Quote a known size', sizeHelp: 'The client already chose the system (e.g. 5 kW + 10 kWh): price it without a load list.',
+    items: 'Product quote', itemsHelp: 'Counter sale or spare parts: pick products, get a priced quotation.',
+    tools: 'Engineering tools', toolsHelp: 'String checker, battery bank, cable & breaker and generator calculators.',
   },
   steps: { info: 'Client', loads: 'Loads', site: 'Site & sun', design: 'System', results: 'Results', bom: 'Pricing', export: 'Export' },
   stepStatus: { done: 'Done', todo: 'To do', warn: 'Review', error: 'Must fix', current: 'Current step' },
@@ -30,7 +45,7 @@ export const en = {
     offgridShort: 'Off-grid', hybridShort: 'Hybrid', gridtieShort: 'Grid-tied',
     offgridHelp: 'No grid. Batteries carry all night loads; fully independent.', hybridHelp: 'Grid present but unreliable. Solar + battery back up the selected loads.', gridtieHelp: 'Reliable grid. Solar cuts the bill; no batteries.',
     phase: 'Supply phase', single: 'Single-phase 230 V', three: 'Three-phase 400 V', status: 'Status',
-    statuses: { draft: 'Draft', quoted: 'Quoted', approved: 'Approved', installed: 'Installed' },
+    statuses: { draft: 'Draft', quoted: 'Quoted', approved: 'Approved', installed: 'Installed', lost: 'Lost' },
   },
   loads: {
     add: 'Add appliance', library: 'Appliance library', custom: 'Custom appliance', search: 'Search appliances…', name: 'Appliance', namePh: 'e.g. Water heater',
@@ -145,5 +160,6 @@ export const en = {
   },
   months: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
   monthsNarrow: ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'],
+  tools: toolsEn, calc: calcEn, prices: pricesEn, inputs: inputsEn, outputs: outputsEn,
 }
 export type Dict = typeof en

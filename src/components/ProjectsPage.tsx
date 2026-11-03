@@ -15,7 +15,7 @@ import { toast } from '../store/useToast'
 
 type Status = Project['status']
 const STATUSES: Status[] = ['draft', 'quoted', 'approved', 'installed']
-const statusLevel: Record<Status, 'neutral' | 'info' | 'ok'> = { draft: 'neutral', quoted: 'info', approved: 'ok', installed: 'ok' }
+const statusLevel: Record<Status, 'neutral' | 'info' | 'ok'> = { draft: 'neutral', quoted: 'info', approved: 'ok', installed: 'ok', lost: 'neutral' }
 // Arabic display data for the bundled samples (keyed by quote reference)
 const SAMPLE_AR: Record<string, Partial<Project>> = {
   'Q-2026-0112': { name: 'فيلا الرياض — نظام هجين 10 كيلوواط', clientName: 'أحمد الفهد', clientAddress: 'حي الياسمين، الرياض' },

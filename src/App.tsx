@@ -1,12 +1,16 @@
 import { useEffect } from 'react'
-import { Sun, FolderOpen, Settings, Plus, ChevronLeft, ChevronRight, Presentation } from 'lucide-react'
+import { Sun, FolderOpen, Settings, Plus, ChevronLeft, ChevronRight, Presentation, Wrench, Tags } from 'lucide-react'
 import { useAppStore, useCurrentProject, type View } from './store/useAppStore'
 import { useT } from './i18n'
 import { companyTitle, projectTitle } from './i18n/labels'
 import { ProjectsPage } from './components/ProjectsPage'
 import { SettingsPage } from './components/SettingsPage'
 import { Wizard } from './components/Wizard'
+import { ToolsPage } from './components/tools/ToolsPage'
+import { QuickCalc } from './components/QuickCalc'
+import { PriceListPage } from './components/PriceListPage'
 import { Menu, Toaster } from './components/overlay'
+import { useStartActions } from './components/startMenu'
 
 const YEAR = new Date().getFullYear()
 
@@ -26,18 +30,23 @@ export function LangSwitch() {
   )
 }
 
-const hashFor = (s: { view: View; currentId: string | null; step: number }) => (s.view === 'wizard' && s.currentId ? `#/p/${encodeURIComponent(s.currentId)}/${s.step + 1}` : s.view === 'settings' ? '#/settings' : '#/projects')
-function parseHash(h: string): { view: View; currentId?: string; step?: number } | null {
+const hashFor = (s: { view: View; currentId: string | null; step: number; toolId: string | null }) =>
+  s.view === 'wizard' && s.currentId ? `#/p/${encodeURIComponent(s.currentId)}/${s.step + 1}`
+    : s.view === 'tools' ? (s.toolId ? `#/tools/${encodeURIComponent(s.toolId)}` : '#/tools')
+      : s.view === 'settings' || s.view === 'calc' || s.view === 'prices' ? `#/${s.view}` : '#/projects'
+function parseHash(h: string): { view: View; currentId?: string; step?: number; toolId?: string | null } | null {
   const m = /^#\/p\/([^/]+)\/(\d+)$/.exec(h)
   if (m) return { view: 'wizard', currentId: decodeURIComponent(m[1]), step: Math.max(0, Math.min(6, Number(m[2]) - 1)) }
-  return h === '#/settings' ? { view: 'settings' } : h === '#/projects' ? { view: 'projects' } : null
+  const tl = /^#\/tools(?:\/([^/]+))?$/.exec(h)
+  if (tl) return { view: 'tools', toolId: tl[1] ? decodeURIComponent(tl[1]) : null }
+  return h === '#/settings' ? { view: 'settings' } : h === '#/calc' ? { view: 'calc' } : h === '#/prices' ? { view: 'prices' } : h === '#/projects' ? { view: 'projects' } : null
 }
 
 export default function App() {
   const { t, lang, dir } = useT()
   const view = useAppStore((s) => s.view)
   const setView = useAppStore((s) => s.setView)
-  const createProject = useAppStore((s) => s.createProject)
+  const start = useStartActions()
   const company = useAppStore((s) => s.company)
   const clientView = useAppStore((s) => s.clientView)
   const setClientView = useAppStore((s) => s.setClientView)
@@ -58,9 +67,14 @@ export default function App() {
     if (q === 'ar' || q === 'en') { st.setLang(q); url.searchParams.delete('lang') }
     const target = parseHash(location.hash)
     if (target) st.navigate(target)
+    if (useAppStore.getState().view === 'calc' && !useAppStore.getState().calc) useAppStore.getState().startCalc()
     history.replaceState(null, '', url.pathname + url.search + hashFor(useAppStore.getState()))
     const unsub = useAppStore.subscribe((s) => { const h = hashFor(s); if (h !== location.hash) history.pushState(null, '', h) })
-    const onPop = () => { const x = parseHash(location.hash); if (x) useAppStore.getState().navigate(x) }
+    const onPop = () => {
+      const x = parseHash(location.hash); if (!x) return
+      useAppStore.getState().navigate(x)
+      if (x.view === 'calc' && !useAppStore.getState().calc) useAppStore.getState().startCalc()
+    }
     window.addEventListener('popstate', onPop)
     return () => { unsub(); window.removeEventListener('popstate', onPop) }
   }, [])
@@ -93,15 +107,22 @@ export default function App() {
           <div className="hidden flex-1 sm:block" />
           <nav className="hidden items-center gap-1 sm:flex" aria-label={t.nav.menu}>
             <button type="button" data-testid="nav-projects" aria-current={view === 'projects' ? 'page' : undefined} className={`btn-ghost px-3 ${view === 'projects' ? 'bg-slate-100 text-slate-900' : ''}`} title={t.nav.projects} onClick={() => setView('projects')}><FolderOpen size={18} /><span className="hidden lg:inline">{t.nav.projects}</span></button>
+            <button type="button" data-testid="nav-tools" aria-current={view === 'tools' ? 'page' : undefined} className={`btn-ghost px-3 ${view === 'tools' ? 'bg-slate-100 text-slate-900' : ''}`} title={t.nav.tools} onClick={() => setView('tools')}><Wrench size={18} /><span className="hidden lg:inline">{t.nav.tools}</span></button>
+            <button type="button" data-testid="nav-prices" aria-current={view === 'prices' ? 'page' : undefined} className={`btn-ghost px-3 ${view === 'prices' ? 'bg-slate-100 text-slate-900' : ''}`} title={t.nav.prices} onClick={() => setView('prices')}><Tags size={18} /><span className="hidden lg:inline">{t.nav.prices}</span></button>
             <button type="button" data-testid="nav-settings" aria-current={view === 'settings' ? 'page' : undefined} className={`btn-ghost px-3 ${view === 'settings' ? 'bg-slate-100 text-slate-900' : ''}`} title={t.nav.settings} onClick={() => setView('settings')}><Settings size={18} /><span className="hidden lg:inline">{t.nav.settings}</span></button>
           </nav>
           <LangSwitch />
-          <button type="button" data-testid="nav-new" className="btn-primary hidden px-3 sm:inline-flex" title={t.nav.newProject} onClick={() => createProject()}><Plus size={18} /><span className="hidden md:inline">{t.nav.newProject}</span></button>
+          <div className="hidden sm:block">
+            <Menu label={t.nav.newMenu} testId="nav-new" buttonClassName="btn-primary px-3" items={start.map((a) => ({ label: a.label, icon: <a.icon size={18} />, onClick: a.run, testId: `new-${a.key}` }))}>
+              <Plus size={18} /><span className="hidden md:inline">{t.nav.newProject}</span>
+            </Menu>
+          </div>
           <div className="sm:hidden">
             <Menu label={t.nav.menu} testId="nav-menu" items={[
               { label: t.nav.projects, icon: <FolderOpen size={18} />, onClick: () => setView('projects'), testId: 'menu-projects' },
+              ...start.map((a) => ({ label: a.label, icon: <a.icon size={18} />, onClick: a.run, testId: `menu-new-${a.key}` })),
+              { label: t.nav.prices, icon: <Tags size={18} />, onClick: () => setView('prices'), testId: 'menu-prices' },
               { label: t.nav.settings, icon: <Settings size={18} />, onClick: () => setView('settings'), testId: 'menu-settings' },
-              { label: t.nav.newProject, icon: <Plus size={18} />, onClick: () => createProject(), testId: 'menu-new' },
               { label: t.nav.clientView, icon: <Presentation size={18} />, onClick: () => setClientView(!clientView), checked: clientView, hidden: !inWizard, testId: 'menu-client-view' },
             ]} />
           </div>
@@ -111,6 +132,9 @@ export default function App() {
         {view === 'projects' && <ProjectsPage />}
         {view === 'settings' && <SettingsPage />}
         {view === 'wizard' && <Wizard />}
+        {view === 'tools' && <ToolsPage />}
+        {view === 'calc' && <QuickCalc />}
+        {view === 'prices' && <PriceListPage />}
       </main>
       {!inWizard && (
         <footer className="hidden border-t border-slate-200 bg-white py-3 text-center text-xs text-slate-500 sm:block">

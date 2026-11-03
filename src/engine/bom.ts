@@ -1,7 +1,7 @@
 // Bill of materials (methodology §12). Every cable / protective-device line uses exactly the rating designed in the
 // cable schedule (one catalogue item per standard size), so the quote can never contradict the technical report.
 import type { Project, Panel, Battery, Inverter, ChargeController, StringDesign, CableResult, BomLine, CatalogItem, PricingInput, ProtectionSummary } from './types'
-import { catalog } from '../data/catalog'
+import { cat } from './catalogContext'
 import { generatorPriceUsd } from '../data/items'
 import { ceilSafe } from './standards'
 import { currencyDecimals, quoteFx, roundTo } from './quote'
@@ -18,6 +18,8 @@ export interface BomCtx {
   /** PV DC inputs that each get an isolator + SPD (inverters, or charge controllers on the controller path). */
   dcInputs: number
   generatorKva: number | null
+  /** Main equipment already on site (§15.3): counted in the design, deducted from the quoted qty. */
+  existing?: { panels: number; batteries: number; inverters: number }
 }
 export const COMBINER_TO_INVERTER_M = 3 // combiner at the inverter end: short output lead (string home-runs carry the full DC run)
 export const AC_INV_TO_COMBINER_M = 3 // parallel inverters land on an AC combiner next to them; acCableRunM is the combined feeder
@@ -35,9 +37,24 @@ export function mainEquipmentIds(c: Pick<BomCtx, 'panel' | 'inverter' | 'battery
 
 interface Draft { id: string; category: string; name: string; spec: string; nameAr?: string; specAr?: string; unit: string; qty: number; price: number }
 
-export function buildBom(p: Project, pr: PricingInput, c: BomCtx): { lines: BomLine[]; missing: string[] } {
-  const { design: d, site: s } = p
+/** `c` null → product list only (mode 'items'): the custom lines, priced the same way. */
+export function buildBom(p: Project, pr: PricingInput, c: BomCtx | null): { lines: BomLine[]; missing: string[] } {
+  const { site: s } = p
   const fx = quoteFx(s), dec = currencyDecimals(s.currency)
+  const money = (qty: number, price: number) => {
+    const unitL = roundTo(price * fx, dec)
+    return roundTo(qty * unitL, dec) / fx
+  }
+  const custom = (pr.customItems ?? []).filter((ci) => !pr.excludedIds.includes(ci.id)).map((ci): BomLine => {
+    const q = Number.isFinite(ci.qty) && ci.qty >= 0 ? ci.qty : 0, price = Number.isFinite(ci.unitPriceUsd) && ci.unitPriceUsd >= 0 ? ci.unitPriceUsd : 0
+    return { ...ci, qty: q, unitPriceUsd: price, totalUsd: money(q, price), source: 'custom' }
+  })
+  if (!c) return { lines: custom, missing: [] }
+  return buildDesignBom(p, pr, c, money, custom)
+}
+
+function buildDesignBom(p: Project, pr: PricingInput, c: BomCtx, money: (qty: number, price: number) => number, custom: BomLine[]): { lines: BomLine[]; missing: string[] } {
+  const { design: d, site: s } = p
   const drafts = new Map<string, Draft>()
   const missing: string[] = []
   const add = (x: Draft) => {
@@ -46,7 +63,7 @@ export function buildBom(p: Project, pr: PricingInput, c: BomCtx): { lines: BomL
     else drafts.set(x.id, { ...x })
   }
   const addItem = (id: string, qty: number) => {
-    const it: CatalogItem | undefined = catalog.items.find((i) => i.id === id)
+    const it: CatalogItem | undefined = cat().items.find((i) => i.id === id)
     if (!it) { missing.push(id); add({ id, category: 'Accessories', name: id, spec: 'not in catalogue — price manually', unit: 'pcs', qty, price: 0 }); return }
     add({ id: it.id, category: it.category, name: it.name, spec: it.spec ?? '', nameAr: it.nameAr, specAr: it.specAr, unit: it.unit, qty, price: it.approxPriceUsd })
   }
@@ -85,11 +102,13 @@ export function buildBom(p: Project, pr: PricingInput, c: BomCtx): { lines: BomL
     if (!c.hvBattery && (b.chemistry === 'LiFePO4' || b.chemistry === 'NMC') && (b.formFactor === 'rack' || b.formFactor === 'wall')) addItem('bms-cable', c.batteryQty)
   }
 
-  // ---- Mounting (2 rails × panel width per panel, rows of ~10, §9 / §12)
-  const N = c.panelQty, rows = ceilSafe(N / 10)
+  // ---- Mounting (2 rails × panel width per panel, rows of ~10, §9 / §12) — new panels only (existing ones are already mounted)
+  const ex = c.existing ?? { panels: 0, batteries: 0, inverters: 0 }
+  const N = Math.max(0, c.panelQty - ex.panels), rows = ceilSafe(N / 10)
+  const newKwp = (N * pn.watts) / 1000
   const railM = N * (pn.widthMm / 1000) * 2 * 1.05
   if (s.roofType === 'ground') {
-    addItem('ground-structure', c.arrayKwp) // rails/purlins and foundations included; module clamps below
+    addItem('ground-structure', newKwp) // rails/purlins and foundations included; module clamps below
     addItem('mid-clamp', Math.max(0, N * 2 - rows * 2))
     addItem('end-clamp', rows * 4)
   } else {
@@ -165,36 +184,36 @@ export function buildBom(p: Project, pr: PricingInput, c: BomCtx): { lines: BomL
   addItem('earth-rod', c.arrayKwp > 10 ? 2 : 1)
   addItem('earth-cable', 20 + N * 1.2)
   addItem('lightning-arrestor', c.arrayKwp > 20 ? 1 : 0)
-  addItem('conduit', d.dcCableRunM + d.acCableRunM + (c.battery ? d.batteryCableRunM : 0))
+  addItem('conduit', (c.strings ? d.dcCableRunM : 0) + d.acCableRunM + (c.battery ? d.batteryCableRunM : 0))
   addItem('cable-ties-labels', ceilSafe(N / 20) || 1)
   if (c.generatorKva) {
     const kva = c.generatorKva
     add({ id: 'generator', category: 'Generator', name: 'Diesel generator', spec: `${kva} kVA, silent canopy, ATS-ready`, nameAr: 'مولد ديزل',
       specAr: `${kva} kVA، بكاتم صوت، جاهز لمفتاح التحويل الآلي ATS`, unit: 'pcs', qty: 1, price: generatorPriceUsd(kva) })
   }
-  // ---- Services
-  add({ id: 'labour', category: 'Services', name: 'Installation labour', spec: `${roundTo(c.arrayKwp, 2)} kWp`, nameAr: 'أعمال التركيب', specAr: `${roundTo(c.arrayKwp, 2)} kWp`, unit: 'kWp', qty: c.arrayKwp, price: pr.labourPerKwUsd })
+  // ---- Services: labour per new kWp; a system without new panels (backup-only, battery / inverter upgrade) per inverter kW installed
+  const newInvKw = c.inverter ? c.inverter.ratedAcKw * Math.max(0, c.inverterQty - ex.inverters) : 0
+  const labourKw = N > 0 ? newKwp : newInvKw > 0 ? newInvKw : c.batteryQty - ex.batteries > 0 ? 1 : 0
+  const labourUnit = N > 0 ? 'kWp' : 'kW'
+  add({ id: 'labour', category: 'Services', name: 'Installation labour', spec: `${roundTo(labourKw, 2)} ${labourUnit}`, nameAr: 'أعمال التركيب', specAr: `${roundTo(labourKw, 2)} ${labourUnit}`, unit: labourUnit, qty: labourKw, price: pr.labourPerKwUsd })
   add({ id: 'transport', category: 'Services', name: 'Transport & logistics', spec: '', nameAr: 'النقل والترحيل', specAr: '', unit: 'lot', qty: 1, price: pr.transportUsd })
   add({ id: 'commissioning', category: 'Services', name: 'Commissioning, testing & handover', spec: '', nameAr: 'التشغيل والاختبار والتسليم', specAr: '', unit: 'lot', qty: 1, price: pr.commissioningUsd })
 
   // ---- Finalise: exclusions, overrides, sane quantities, display-currency rounding (line total = qty × unit, to the cent)
   const main = mainEquipmentIds(c)
-  const money = (qty: number, price: number) => {
-    const unitL = roundTo(price * fx, dec)
-    return roundTo(qty * unitL, dec) / fx
-  }
+  const exBy = new Map<string, number>([[pn.id, ex.panels], [c.inverter?.id ?? '', ex.inverters], [c.battery?.id ?? '', ex.batteries]].filter(([id, n]) => id && (n as number) > 0) as [string, number][])
   const lines: BomLine[] = []
   for (const x of drafts.values()) {
     if (pr.excludedIds.includes(x.id)) continue
     const ov = pr.qtyOverrides[x.id]
     const hasOv = ov != null && Number.isFinite(ov) && ov >= 0
     // Main equipment: computeProject already applied overrides ≥ 1 to the design; an override of 0 keeps the line at 0 (not quoted)
-    const computed = DISCRETE.has(x.unit) ? ceilSafe(x.qty) : Math.ceil(Math.round(x.qty * 1e6) / 1e4) / 100
+    const existingQty = exBy.get(x.id) ?? 0
+    const computed = Math.max(0, (DISCRETE.has(x.unit) ? ceilSafe(x.qty) : Math.ceil(Math.round(x.qty * 1e6) / 1e4) / 100) - existingQty)
     const q = hasOv && (!main.has(x.id) || ov === 0) ? ov : computed
     if (!hasOv && !(computed > 0)) continue
     const price = pr.priceOverrides[x.id] ?? x.price
-    lines.push({ id: x.id, category: x.category, name: x.name, spec: x.spec, nameAr: x.nameAr, specAr: x.specAr, unit: x.unit, qty: q, unitPriceUsd: price, totalUsd: money(q, price), source: 'auto' })
+    lines.push({ id: x.id, category: x.category, name: x.name, spec: x.spec, nameAr: x.nameAr, specAr: x.specAr, unit: x.unit, qty: q, unitPriceUsd: price, totalUsd: money(q, price), source: 'auto', ...(existingQty ? { existingQty } : {}) })
   }
-  for (const ci of pr.customItems) lines.push({ ...ci, totalUsd: money(ci.qty, ci.unitPriceUsd), source: 'custom' })
-  return { lines, missing }
+  return { lines: [...lines, ...custom], missing }
 }

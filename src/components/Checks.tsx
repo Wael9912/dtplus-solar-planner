@@ -6,7 +6,7 @@ import { sortChecks } from './wizardModel'
 
 
 /** Design checks with a status icon and a "Fix in …" jump to the step where the user can resolve them. */
-export function ChecksList({ checks, current, onGo, dense = false }: { checks: Check[]; current?: StepKey; onGo: (s: StepKey) => void; dense?: boolean }) {
+export function ChecksList({ checks, current, onGo, dense = false, steps }: { checks: Check[]; current?: StepKey; onGo: (s: StepKey) => void; dense?: boolean; steps?: readonly StepKey[] }) {
   const { t, lang, dir } = useT()
   const Arrow = dir === 'rtl' ? ArrowLeft : ArrowRight
   return (
@@ -21,7 +21,7 @@ export function ChecksList({ checks, current, onGo, dense = false }: { checks: C
             <div className="min-w-0 flex-1">
               <span className="sr-only">{c.level === 'error' ? t.common.error : c.level === 'warn' ? t.common.warn : t.common.ok}: </span>
               <p className="text-sm leading-6 text-slate-800">{checkText(c, lang)}</p>
-              {step && step !== current && c.level !== 'ok' && (
+              {step && step !== current && c.level !== 'ok' && (!steps || steps.includes(step)) && (
                 <button type="button" className="btn-link mt-0.5 min-h-8" onClick={() => onGo(step)} data-testid={`fix-${c.id}`}>{t.results.fixIn(t.steps[step])}<Arrow size={14} /></button>
               )}
             </div>

@@ -66,6 +66,8 @@ export interface SiteInput {
   dieselCostUsdPerKwh?: number;
   /** Site latitude (°, + north) — needed for the monthly tilt model on custom sites (catalogue sites use the location record). */
   lat?: number;
+  /** Hybrid: average grid outage hours per day. The solar energy used during outages is valued at the diesel cost instead of the grid tariff. Missing → 0. */
+  outageHoursPerDay?: number;
 }
 
 export interface DesignInput {
@@ -90,16 +92,61 @@ export interface PricingInput {
   customItems: BomLine[];
 }
 
+/**
+ * How a project is built (the wizard shows only the steps a mode needs):
+ * - 'design': full design from the client's demand (appliance list or electricity bill) — every step;
+ * - 'size': the client already knows the system size (kWp / kWh / kW targets), no load list needed;
+ * - 'items': a priced list of products only (counter sale, spare parts) — no design.
+ */
+export type ProjectMode = 'design' | 'size' | 'items'
+/** Where the daily demand comes from: the appliance list, or the electricity bill (monthly kWh). */
+export type DemandSource = 'loads' | 'bill'
+export type BillProfile = 'residential' | 'commercial' | 'daytime'
+export interface BillInput {
+  /** Average monthly consumption (kWh/month) from the electricity bills. */
+  monthlyKwh: number
+  /** Usage pattern → night share and peak/average ratio (residential 45 % night, commercial 25 %, daytime-only 5 %). */
+  profile: BillProfile
+  /** Measured or contracted peak demand (kW); null → estimated from the average load and the profile. */
+  peakKw: number | null
+  /** Largest motor that starts on the system (kW) — sets the starting surge; null → no large motor. */
+  largestMotorKw: number | null
+}
+/** Sizes fixed by the user. null = size it automatically; pvKwp 0 = no panels (battery backup only); batteryKwh 0 = no battery. */
+export interface SizeTargets { pvKwp: number | null; batteryKwh: number | null; inverterKw: number | null }
+/** Equipment already on site (expansion / upgrade): counted in the design, not quoted. Same models as the design's panel / battery / inverter. */
+export interface ExistingEquipment { panels: number; batteries: number; inverters: number }
+export interface SizingInput { demand: DemandSource; bill: BillInput; targets: SizeTargets; existing: ExistingEquipment }
+
 export interface Project {
   id: string; name: string; clientName: string; clientPhone: string; clientEmail: string; clientAddress: string;
-  reference: string; notes: string; createdAt: string; updatedAt: string; status: 'draft' | 'quoted' | 'approved' | 'installed';
+  /** `notes` are internal (never printed); `proposalNote` is printed on the client proposal / quotation. */
+  reference: string; notes: string; createdAt: string; updatedAt: string; status: ProjectStatus;
   loads: LoadItem[]; site: SiteInput; design: DesignInput; pricing: PricingInput;
+  /** Missing → 'design' (projects saved before v0.2). */
+  mode?: ProjectMode
+  /** Missing → demand from the load list, nothing fixed, nothing existing. */
+  sizing?: SizingInput
+  proposalNote?: string
+  /** Id of the project this one is a revision of (New revision keeps the reference with -R2, -R3 …). */
+  revisionOf?: string
 }
+export type ProjectStatus = 'draft' | 'quoted' | 'approved' | 'installed' | 'lost'
 
 export interface CompanySettings {
   name: string; tagline: string; phone: string; email: string; website: string; address: string;
   logoDataUrl: string | null; primaryColor: string; quoteValidityDays: number; terms: string; currency: string; fxRateToUsd: number;
 }
+
+// ---------- Company price list ----------
+/** The company's own products (datasheet values entered by the user); ids start with `my-`. */
+export interface CustomProducts { panels: Panel[]; batteries: Battery[]; inverters: Inverter[]; chargeControllers: ChargeController[]; items: CatalogItem[] }
+/**
+ * Company price list, applied to every project: unit cost overrides (USD, by catalogue / item id), products the company
+ * does not stock (never auto-selected; a hidden product picked by hand still works), and the company's own products.
+ * Per-project BOM price overrides still win over this list.
+ */
+export interface PriceBook { prices: Record<string, number>; hidden: string[]; custom: CustomProducts; updatedAt?: string }
 
 // ---------- Results ----------
 export type StepKey = 'info' | 'loads' | 'site' | 'design' | 'results' | 'bom' | 'export'
@@ -108,6 +155,10 @@ export interface Check { id: string; level: 'ok' | 'warn' | 'error'; message: st
 export interface BomLine {
   id: string; category: string; name: string; spec: string; unit: string; qty: number; unitPriceUsd: number; totalUsd: number; source: 'auto' | 'custom'
   nameAr?: string; specAr?: string
+  /** Custom lines added from the catalogue: the catalogue / item id they came from. */
+  ref?: string
+  /** Main equipment already on site (expansion): units counted in the design but not quoted. */
+  existingQty?: number
 }
 export interface StringDesign {
   panelsPerString: number; strings: number; totalPanels: number;
@@ -146,6 +197,8 @@ export interface Replacement { year: number; item: 'battery' | 'inverter'; usd: 
 
 export interface Results {
   panel: Panel;
+  /** Mode and demand source the results were computed for ('none' = no consumption data: size / items modes without loads). */
+  mode: ProjectMode; demand: DemandSource | 'none';
   // loads
   dailyWh: number; dayWh: number; nightWh: number; criticalWh: number; peakW: number; surgeW: number; connectedW: number;
   monthlyKwh: number; annualKwh: number;

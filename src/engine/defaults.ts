@@ -1,7 +1,8 @@
-import type { Project, CompanySettings, LoadItem, SiteInput, DesignInput, PricingInput, Appliance, SystemType } from './types'
+import type { Project, CompanySettings, LoadItem, SiteInput, DesignInput, PricingInput, Appliance, SystemType, ProjectMode } from './types'
 import { getLocation, tiltGainFor } from '../data/locations'
 import { nightShareByCategory } from '../data/appliances'
-import { catalog } from '../data/catalog'
+import { cat } from './catalogContext'
+import { defaultSizing } from './sizing'
 
 export const uid = () => (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : Math.random().toString(36).slice(2) + Date.now().toString(36))
 
@@ -47,7 +48,7 @@ export function applySystemType(design: DesignInput, systemType: SystemType): De
     if (!(d.autonomyDays > 0)) d.autonomyDays = newDefault.autonomyDays
     if (systemType === 'offgrid' && d.autonomyDays < 1) d.autonomyDays = 1
   }
-  const inv = d.inverterId ? catalog.inverters.find((i) => i.id === d.inverterId) : undefined
+  const inv = d.inverterId ? cat().inverters.find((i) => i.id === d.inverterId) : undefined
   if (inv) {
     const ok = systemType === 'gridtie' ? inv.type !== 'offgrid' && inv.mpptCount > 0 : systemType === 'hybrid' ? inv.type === 'hybrid' : inv.type !== 'gridtie'
     if (!ok) { d.inverterId = null; d.inverterQty = 1 }
@@ -64,8 +65,19 @@ export function newProject(partial: Partial<Project> = {}, company?: CompanySett
   return {
     id: uid(), name: 'New solar project', clientName: '', clientPhone: '', clientEmail: '', clientAddress: '', reference: `Q-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 9000) + 1000)}`,
     notes: '', createdAt: now, updatedAt: now, status: 'draft', loads: [], site: siteFromLocation('khartoum'), design: defaultDesign('hybrid'), pricing: defaultPricing(20, company ? 0 : 0),
+    mode: 'design', sizing: defaultSizing(), proposalNote: '',
     ...partial,
   }
+}
+
+/**
+ * Starting point of each project mode: 'size' opens with a typical fixed system (5 kWp · 5 kW · 10 kWh hybrid; grid-tied 5 kWp, no battery)
+ * so the first screen already shows a price; 'items' is an empty product list.
+ */
+export function modeDefaults(mode: ProjectMode, systemType: SystemType = 'hybrid'): Pick<Project, 'mode' | 'sizing'> {
+  const sizing = defaultSizing()
+  if (mode === 'size') sizing.targets = { pvKwp: 5, inverterKw: 5, batteryKwh: systemType === 'gridtie' ? null : 10 }
+  return { mode, sizing }
 }
 
 /**

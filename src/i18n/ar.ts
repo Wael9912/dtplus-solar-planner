@@ -1,4 +1,9 @@
 import type { Dict } from './en'
+import { toolsAr } from './tools'
+import { calcAr } from './calc'
+import { pricesAr } from './prices'
+import { inputsAr } from './inputs'
+import { outputsAr } from './outputs'
 // Arabic UI strings (MSA, solar-trade usage in Sudan and the Gulf). Western digits; Latin SI unit symbols for computed values.
 // \u200E (LRM) after "DT+" keeps the plus sign on the right side of the brand in RTL text.
 /** First-strong isolate: keeps a number + Latin unit/model code in one LTR island inside an Arabic sentence. */
@@ -12,6 +17,15 @@ export const ar: Dict = {
     nextTo: (step: string) => `التالي: ${step}`, stepOf: (i: number, n: number) => `الخطوة ${i} من ${n}`, steps: 'خطوات المشروع', aboutStep: 'عن هذه الخطوة',
     clientView: 'عرض العميل', clientViewHelp: 'يخفي أسعار التكلفة ونسبة الربح لتتمكن من عرض الشاشة على العميل.', savedAuto: 'محفوظ تلقائياً',
     issues: (n: number) => `ملاحظات: ${n}`, noIssues: 'لا توجد ملاحظات', finishHelp: 'العودة إلى كل المشاريع',
+    home: 'الرئيسية', tools: 'الأدوات', prices: 'قائمة الأسعار', newMenu: 'ابدأ عملاً جديداً',
+  },
+  modes: {
+    short: { design: 'تصميم كامل', size: 'حجم محدد', items: 'عرض منتجات' },
+    calc: 'حاسبة الأحمال', calcHelp: 'أدخل الأجهزة واحصل على حجم النظام وسعر تقريبي في شاشة واحدة.',
+    design: 'تصميم كامل', designHelp: 'العميل، الأجهزة أو الفاتورة، الموقع، المعدات، التسعير والعرض — كل الخطوات.',
+    size: 'تسعير نظام محدد الحجم', sizeHelp: 'العميل اختار النظام مسبقاً (مثلاً 5 kW + 10 kWh): سعّره دون قائمة أحمال.',
+    items: 'عرض سعر منتجات', itemsHelp: 'بيع مباشر أو قطع غيار: اختر المنتجات واحصل على عرض سعر.',
+    tools: 'أدوات هندسية', toolsHelp: 'فحص السلاسل، بنك البطاريات، الكابلات والقواطع، والمولد.',
   },
   steps: { info: 'العميل', loads: 'الأحمال', site: 'الموقع والشمس', design: 'النظام', results: 'النتائج', bom: 'التسعير', export: 'التصدير' },
   stepStatus: { done: 'مكتملة', todo: 'لم تبدأ', warn: 'تحتاج مراجعة', error: 'يجب الإصلاح', current: 'الخطوة الحالية' },
@@ -34,7 +48,7 @@ export const ar: Dict = {
     offgridShort: 'منفصل عن الشبكة', hybridShort: 'هجين', gridtieShort: 'متصل بالشبكة',
     offgridHelp: 'لا تتوفر شبكة كهرباء. البطاريات تغذي جميع الأحمال ليلاً، والنظام مستقل بالكامل.', hybridHelp: 'الشبكة متوفرة لكنها غير مستقرة. توفر الألواح والبطاريات طاقة احتياطية للأحمال المختارة.', gridtieHelp: 'الشبكة مستقرة. تخفّض الألواح فاتورة الكهرباء دون بطاريات تخزين.',
     phase: 'نوع التغذية الكهربائية', single: 'أحادي الطور 230 V', three: 'ثلاثي الأطوار 400 V', status: 'الحالة',
-    statuses: { draft: 'مسودة', quoted: 'أُرسل العرض', approved: 'معتمد', installed: 'تم التركيب' },
+    statuses: { draft: 'مسودة', quoted: 'أُرسل العرض', approved: 'معتمد', installed: 'تم التركيب', lost: 'لم يُعتمد' },
   },
   loads: {
     add: 'إضافة جهاز', library: 'مكتبة الأجهزة', custom: 'جهاز مخصص', search: 'ابحث عن جهاز…', name: 'الجهاز', namePh: 'مثال: سخان مياه',
@@ -149,4 +163,5 @@ export const ar: Dict = {
   },
   months: ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'],
   monthsNarrow: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'],
+  tools: toolsAr, calc: calcAr, prices: pricesAr, inputs: inputsAr, outputs: outputsAr,
 }
