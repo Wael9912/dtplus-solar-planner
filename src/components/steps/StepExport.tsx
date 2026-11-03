@@ -1,22 +1,29 @@
 import { useEffect, useMemo, useState, type ComponentType, type ReactNode } from 'react'
-import { FileSpreadsheet, FileText, FileJson, Wrench, Share2, Download, CircleCheck, CircleAlert, TriangleAlert, ArrowLeft, ArrowRight, LoaderCircle, Lock, Users } from 'lucide-react'
+import { FileSpreadsheet, FileText, FileJson, Wrench, Share2, Download, CircleCheck, CircleAlert, TriangleAlert, ArrowLeft, ArrowRight, LoaderCircle, Lock, Users, ReceiptText } from 'lucide-react'
 import { useT } from '../../i18n'
 import type { StepProps } from '../Wizard'
+import type { StepKey } from '../../engine/types'
 import { useAppStore } from '../../store/useAppStore'
 import { fmt } from '../../engine/format'
 import { formatQuoteMoney } from '../../engine/quote'
 import { download, shareFile, canShareFiles, isTouchDevice } from '../../export/download'
 import { exportLabels, type ExportLang } from '../../export/labels'
-import { checkMessage, checkStep, fileStem, isDefaultCompanyName, systemName } from '../../export/common'
+import { checkMessage, checkStep, fileStem, isDefaultCompanyName, systemName, sizeSummary, sizingOf } from '../../export/common'
+import { stepsFor } from '../wizardModel'
 
-type DocKey = 'proposal' | 'tech' | 'excel' | 'json'
+type DocKey = 'proposal' | 'quote' | 'tech' | 'excel' | 'json'
 interface DocState { busy?: 'share' | 'download'; msg?: string; err?: string; pending?: { blob: Blob; name: string }; done?: boolean }
 type Icon = ComponentType<{ size?: number; className?: string }>
 
-/** Export step: readiness checklist, then the client proposal (hero), the internal documents and the project file. */
+/**
+ * Export step: readiness checklist, then the client documents (proposal as the hero, or the quotation for a product quote),
+ * the internal documents and the project file. A product quote gets the quotation, the price workbook and the project file;
+ * a known-size quote and a full design get every document.
+ */
 export function StepExport({ project: p, results: r, quote: q, update, goTo }: StepProps) {
-  const { lang, dir } = useT()
+  const { t, lang, dir } = useT()
   const X = exportLabels[lang].ui
+  const O = t.outputs.export
   const company = useAppStore((s) => s.company)
   const setView = useAppStore((s) => s.setView)
   // Document language follows the UI language unless the user picks another one for this export
@@ -34,16 +41,29 @@ export function StepExport({ project: p, results: r, quote: q, update, goTo }: S
     return () => window.clearTimeout(id)
   }, [])
 
-  // ---- readiness
-  const errors = r.checks.filter((c) => c.level === 'error')
-  const hasLoads = p.loads.length > 0 && r.dailyWh > 0
+  // ---- readiness (per mode: the client name is optional on a quote; the load list or bill only matters for a full design)
+  const mode = r.mode
+  const steps = stepsFor(p)
+  const go = (s: StepKey) => (steps.includes(s) ? () => goTo(s) : undefined)
+  const errors = r.checks.filter((c) => c.level === 'error' && c.id !== 'no-loads' && c.id !== 'no-items')
   const nonUsd = p.site.currency !== 'USD'
   const fxOk = !nonUsd || (p.site.fxRateToUsd > 0 && p.site.fxRateToUsd !== 1)
-  const items: { key: string; ok: boolean; soft?: boolean; label: string; detail: string; fix?: () => void; fixLabel?: string; sub?: { text: string; go: () => void }[] }[] = [
-    { key: 'client', ok: !!p.clientName.trim(), label: X.client, detail: p.clientName.trim() ? X.clientOk(p.clientName.trim()) : X.clientMissing, fix: () => goTo('info') },
-    { key: 'loads', ok: hasLoads, label: X.loads, detail: hasLoads ? X.loadsOk(p.loads.length, fmt(r.dailyWh / 1000, 1)) : X.loadsMissing, fix: () => goTo('loads') },
-    { key: 'checks', ok: errors.length === 0, label: X.checks, detail: errors.length ? X.checksErr(errors.length) : X.checksOk, sub: errors.map((c) => ({ text: checkMessage(c, lang), go: () => goTo(checkStep(c)) })) },
-    ...(nonUsd ? [{ key: 'fx', ok: fxOk, soft: true, label: X.fx, detail: fxOk ? X.fxOk(p.site.currency, fmt(p.site.fxRateToUsd, p.site.fxRateToUsd < 10 ? 4 : 2)) : X.fxMissing(p.site.currency), fix: () => goTo('site') }] : []),
+  const clientName = p.clientName.trim(), clientSoft = mode !== 'design'
+  const bill = sizingOf(p).bill
+  const profile = exportLabels[lang].pdf.profiles[bill.profile] ?? bill.profile
+  const nLines = q.lines.length
+  const demandItem = mode === 'items'
+    ? { key: 'products', ok: nLines > 0, label: O.products, detail: nLines ? O.productsOk(nLines, formatQuoteMoney(q.total, q)) : O.productsMissing, fix: go('bom') }
+    : mode === 'size'
+      ? { key: 'system', ok: !!sizeSummary(r), label: O.system, detail: sizeSummary(r) || O.systemMissing, fix: go('design') }
+      : r.demand === 'bill'
+        ? { key: 'loads', ok: r.dailyWh > 0, label: O.bill, detail: r.dailyWh > 0 ? O.billOk(fmt(bill.monthlyKwh), profile) : O.billMissing, fix: go('loads') }
+        : { key: 'loads', ok: p.loads.length > 0 && r.dailyWh > 0, label: X.loads, detail: p.loads.length > 0 && r.dailyWh > 0 ? X.loadsOk(p.loads.length, fmt(r.dailyWh / 1000, 1)) : X.loadsMissing, fix: go('loads') }
+  const items: { key: string; ok: boolean; soft?: boolean; label: string; detail: string; fix?: () => void; fixLabel?: string; sub?: { text: string; go?: () => void }[] }[] = [
+    { key: 'client', ok: !!clientName, soft: clientSoft, label: X.client, detail: clientName ? X.clientOk(clientName) : clientSoft ? O.clientOptional : X.clientMissing, fix: go('info') },
+    demandItem,
+    { key: 'checks', ok: errors.length === 0, label: X.checks, detail: errors.length ? X.checksErr(errors.length) : X.checksOk, sub: errors.map((c) => ({ text: checkMessage(c, lang), go: go(checkStep(c)) })) },
+    ...(nonUsd ? [{ key: 'fx', ok: fxOk, soft: true, label: X.fx, detail: fxOk ? X.fxOk(p.site.currency, fmt(p.site.fxRateToUsd, p.site.fxRateToUsd < 10 ? 4 : 2)) : X.fxMissing(p.site.currency), fix: go(mode === 'items' ? 'bom' : 'site') }] : []),
     { key: 'company', ok: !isDefaultCompanyName(company), soft: true, label: X.company, detail: isDefaultCompanyName(company) ? X.companyMissing : X.companyOk(company.name), fix: () => setView('settings'), fixLabel: X.settings },
   ]
   const blocking = items.filter((i) => !i.ok && !i.soft).length
@@ -53,6 +73,7 @@ export function StepExport({ project: p, results: r, quote: q, update, goTo }: S
   const stem = `${p.reference ? fileStem(p.reference) + '_' : ''}${fileStem(p.name)}`
   const builders: Record<DocKey, () => Promise<{ blob: Blob; name: string }>> = {
     proposal: async () => ({ blob: await (await import('../../export/pdf')).buildProposalPdf(p, r, company, docLang), name: `${stem}-proposal.pdf` }),
+    quote: async () => ({ blob: await (await import('../../export/pdf')).buildQuotationPdf(p, r, company, docLang), name: `${stem}-quotation.pdf` }),
     tech: async () => ({ blob: await (await import('../../export/pdf')).buildTechnicalPdf(p, r, company, docLang), name: `${stem}-technical.pdf` }),
     excel: async () => ({ blob: await (await import('../../export/excel')).buildExcel(p, r, company, docLang), name: `${stem}.xlsx` }),
     json: async () => ({ blob: new Blob([JSON.stringify(p, null, 2)], { type: 'application/json' }), name: `${stem}.json` }),
@@ -129,7 +150,16 @@ export function StepExport({ project: p, results: r, quote: q, update, goTo }: S
     </section>
   )
 
-  const summary = [p.name, p.clientName, systemName(p, exportLabels[lang]), `${fmt(r.arrayKwp, 2)} kWp`, r.batteryKwh ? `${fmt(r.batteryKwh, 1)} kWh` : '', r.inverter ? `${r.inverterQty} × ${fmt(r.inverter.ratedAcKw, 1)} kW` : '', formatQuoteMoney(q.total, q)].filter((x) => x && String(x).trim())
+  const summary = (mode === 'items'
+    ? [p.name, p.clientName, O.productsOk(nLines, formatQuoteMoney(q.total, q))]
+    : [p.name, p.clientName, systemName(p, exportLabels[lang]), r.arrayKwp > 0 ? `${fmt(r.arrayKwp, 2)} kWp` : '', r.batteryKwh ? `${fmt(r.batteryKwh, 1)} kWh` : '', r.inverter ? `${r.inverterQty} × ${fmt(r.inverter.ratedAcKw, 1)} kW` : '', formatQuoteMoney(q.total, q)]
+  ).filter((x) => x && String(x).trim())
+  const clientBadge = <span className="badge-ok"><Users size={12} aria-hidden="true" />{X.clientSafe}</span>
+  const internalBadge = <span className="badge-neutral"><Lock size={12} aria-hidden="true" />{X.internal}</span>
+  const markQuoted = (k: DocKey) => st[k]?.done && p.status === 'draft' && (
+    <button type="button" className="btn-link min-h-11 self-start" onClick={() => update({ status: 'quoted' })} data-testid="export-mark-quoted">{X.markQuoted}</button>
+  )
+  const notReady = blocking > 0 && <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">{X.proposalNotReady}</p>
 
   return (
     <div className="space-y-4" data-testid="export-step">
@@ -160,7 +190,7 @@ export function StepExport({ project: p, results: r, quote: q, update, goTo }: S
                     {it.sub.map((s, i) => (
                       <li key={i} className="flex items-start justify-between gap-2">
                         <span className="min-w-0 py-2 text-sm text-slate-700">{s.text}</span>
-                        <button type="button" className="btn-ghost min-h-11 shrink-0 px-3 text-brand-700" onClick={s.go} data-testid={`ready-check-fix-${i}`}>{X.fix}<Arrow size={16} aria-hidden="true" /></button>
+                        {s.go && <button type="button" className="btn-ghost min-h-11 shrink-0 px-3 text-brand-700" onClick={s.go} data-testid={`ready-check-fix-${i}`}>{X.fix}<Arrow size={16} aria-hidden="true" /></button>}
                       </li>
                     ))}
                   </ul>
@@ -184,21 +214,20 @@ export function StepExport({ project: p, results: r, quote: q, update, goTo }: S
         </div>
       </div>
 
-      {docCard({
-        k: 'proposal', hero: true, icon: FileText, title: X.proposal, help: X.proposalHelp, badge: <span className="badge-ok"><Users size={12} aria-hidden="true" />{X.clientSafe}</span>,
-        children: <>
-          {blocking > 0 && <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">{X.proposalNotReady}</p>}
-          {st.proposal?.done && p.status === 'draft' && (
-            <button type="button" className="btn-link min-h-11 self-start" onClick={() => update({ status: 'quoted' })} data-testid="export-mark-quoted">{X.markQuoted}</button>
-          )}
-        </>,
-      })}
-
-      <h3 className="eyebrow pt-2">{X.team}</h3>
-      <div className="grid gap-3 sm:grid-cols-2">
-        {docCard({ k: 'tech', icon: Wrench, title: X.tech, help: X.techHelp, badge: <span className="badge-neutral"><Lock size={12} aria-hidden="true" />{X.internal}</span> })}
-        {docCard({ k: 'excel', icon: FileSpreadsheet, title: X.excel, help: X.excelHelp, badge: <span className="badge-neutral"><Lock size={12} aria-hidden="true" />{X.internal}</span> })}
-      </div>
+      {mode === 'items' ? <>
+        {docCard({ k: 'quote', hero: true, icon: ReceiptText, title: O.quotation, help: O.quotationHelp, badge: clientBadge, children: <>{notReady}{markQuoted('quote')}</> })}
+        <h3 className="eyebrow pt-2">{X.team}</h3>
+        {docCard({ k: 'excel', icon: FileSpreadsheet, title: O.excelItems, help: O.excelItemsHelp, badge: internalBadge })}
+      </> : <>
+        {docCard({ k: 'proposal', hero: true, icon: FileText, title: X.proposal, help: mode === 'size' ? O.proposalHelpSize : X.proposalHelp, badge: clientBadge, children: <>{notReady}{markQuoted('proposal')}</> })}
+        <h3 className="eyebrow pt-2">{O.alsoForClient}</h3>
+        {docCard({ k: 'quote', icon: ReceiptText, title: O.quotation, help: O.quotationHelp, badge: clientBadge, children: !st.proposal?.done ? markQuoted('quote') : undefined })}
+        <h3 className="eyebrow pt-2">{X.team}</h3>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {docCard({ k: 'tech', icon: Wrench, title: X.tech, help: X.techHelp, badge: internalBadge })}
+          {docCard({ k: 'excel', icon: FileSpreadsheet, title: X.excel, help: X.excelHelp, badge: internalBadge })}
+        </div>
+      </>}
       {docCard({ k: 'json', icon: FileJson, title: X.json, help: X.jsonHelp, badge: <span className="badge-neutral">{X.backup}</span> })}
 
       <p className="text-sm text-slate-600"><span className="font-medium text-slate-700">{X.summary}: </span>{summary.map((s, i) => <span key={i}>{i > 0 && ' · '}<bdi>{s}</bdi></span>)}</p>
