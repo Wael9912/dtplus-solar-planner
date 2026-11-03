@@ -13,7 +13,7 @@ for (const [vpName, vp] of [['desktop', DESKTOP], ['mobile', MOBILE]]) {
   const { browser, page, errors } = await launch(vp)
   await gotoApp(page); await clearStorage(page); await page.reload({ waitUntil: 'networkidle' })
   await nav(page, 'settings')
-  await page.getByLabel('Company name').fill('QA Solar Co')
+  await page.getByTestId('settings-name').fill('QA Solar Co')
   await page.getByLabel('Phone').fill('+249 100 000')
   await page.locator('input[type=file][accept^="image"]').setInputFiles(logo); await page.waitForTimeout(400)
   if (!(await page.getByRole('img', { name: 'Logo' }).first().isVisible())) issue(`${vpName}: logo preview not shown`); else pass(`${vpName}: logo preview shown`)

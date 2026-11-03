@@ -39,7 +39,7 @@ npm test           # vitest – engine tests against worked examples in docs/siz
 npm run build      # production build to dist/
 ```
 
-Deployment: hosted on Cloudflare Pages at https://dtplus-solar-planner.pages.dev. Run `npm run deploy` to build and upload `dist/` with Wrangler (run `npx wrangler login` once first); pushing to `main` does not deploy.
+Deployment: hosted on Cloudflare Pages at https://dtplus-solar-planner.pages.dev. Run `npm run deploy` to build and upload `dist/` with Wrangler (run `npx wrangler login` once first); pushing to `main` does not deploy. Open copies of the app (phones keep tabs for days) pick up a deploy by themselves: they check `version.json`, reload when the user is between tasks, and show what changed. For a release, bump `version` in `package.json` and add its notes in `src/i18n/updates.ts`.
 Any other static host: `npm run build` and upload `dist/` (routing is hash-based, so no rewrite rules are needed).
 
 ## Documentation

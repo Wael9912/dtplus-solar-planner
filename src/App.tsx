@@ -12,6 +12,7 @@ import { PriceListPage } from './components/PriceListPage'
 import { Menu, Toaster } from './components/overlay'
 import { useStartActions } from './components/startMenu'
 import { useMediaQuery } from './components/hooks'
+import { UpdateBanner, UpdateNotices } from './components/UpdateNotice'
 
 const YEAR = new Date().getFullYear()
 
@@ -130,6 +131,7 @@ export default function App() {
             ]} />
           </div>
         </div>
+        <UpdateBanner />
       </header>
       <main className={`mx-auto w-full max-w-7xl flex-1 ps-[max(1rem,env(safe-area-inset-left))] pe-[max(1rem,env(safe-area-inset-right))] pt-4 sm:px-6 sm:pt-6 ${inWizard ? 'pb-28' : 'pb-24 sm:pb-10'}`}>
         {view === 'projects' && <ProjectsPage />}
@@ -145,6 +147,7 @@ export default function App() {
         </footer>
       )}
       <Toaster raised={inWizard || calcBar} />
+      <UpdateNotices />
     </div>
   )
 }

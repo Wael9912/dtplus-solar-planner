@@ -3,6 +3,7 @@ import { calcEn } from './calc'
 import { pricesEn } from './prices'
 import { inputsEn } from './inputs'
 import { outputsEn } from './outputs'
+import { updatesEn } from './updates'
 // English UI strings — the type source for every dictionary (`Dict`). ar.ts must have the same keys and function signatures.
 // Units policy: computed values keep Latin SI symbols (W, kW, kWp, kWh, V, A, m², kg) in both languages.
 export const en = {
@@ -161,6 +162,6 @@ export const en = {
   },
   months: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
   monthsNarrow: ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'],
-  tools: toolsEn, calc: calcEn, prices: pricesEn, inputs: inputsEn, outputs: outputsEn,
+  tools: toolsEn, calc: calcEn, prices: pricesEn, inputs: inputsEn, outputs: outputsEn, updates: updatesEn,
 }
 export type Dict = typeof en

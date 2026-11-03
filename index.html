@@ -21,6 +21,8 @@
           document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr'
           if (lang === 'ar') document.title = 'مخطط DT+‎ للطاقة الشمسية'
           window.__DT_LANG__ = lang
+          // A device that used the app before (for the "what's new" message after an update, src/updates.ts)
+          window.__DT_HAD_DATA__ = !!s
         } catch (e) { /* ignore */ }
       })()
     </script>

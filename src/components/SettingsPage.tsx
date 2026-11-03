@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState, type ReactNode } from 'react'
-import { Upload, X, Sun, CloudCheck, Tags, ChevronRight, ChevronLeft, FileDown, FileUp, DatabaseBackup, ArchiveRestore } from 'lucide-react'
+import { Upload, X, Sun, CloudCheck, Tags, ChevronRight, ChevronLeft, FileDown, FileUp, DatabaseBackup, ArchiveRestore, RefreshCw } from 'lucide-react'
 import { useAppStore, type Backup, type CompanyBundle } from '../store/useAppStore'
 import { useT } from '../i18n'
 import { Field, NumberInput, Section, Segmented } from './ui'
@@ -14,6 +14,7 @@ import { normalizePriceBook, resolveCatalog } from '../engine/catalogContext'
 import { fxOf, money } from '../engine/format'
 import { download } from '../export/download'
 import { toast } from '../store/useToast'
+import { checkForUpdate } from '../updates'
 import type { PriceBook, Phase, SystemType } from '../engine/types'
 
 /** Edited prices (catalogue products), not-stocked products and own products of a price list. */
@@ -39,6 +40,7 @@ export function SettingsPage() {
   const companyFileRef = useRef<HTMLInputElement>(null)
   const backupFileRef = useRef<HTMLInputElement>(null)
   const [pending, setPending] = useState<Pending | null>(null)
+  const [checking, setChecking] = useState(false)
   const counts = useMemo(() => bookCounts(company.priceBook), [company.priceBook])
   const fx = fxOf(company)
   const localHint = (usd: number) => (company.currency && company.currency !== 'USD' ? tp.approx(money(usd, company.currency, fx)) : undefined)
@@ -230,6 +232,16 @@ export function SettingsPage() {
       <Section title={t.settings.about}>
         <p className="text-sm text-slate-600"><bdi>{t.appName}</bdi> · <bdi>{t.settings.version(__APP_VERSION__)}</bdi></p>
         <p className="mt-1 text-sm text-slate-600"><bdi>{t.by}</bdi></p>
+        <button type="button" className="btn-secondary mt-3" data-testid="check-updates" disabled={checking}
+          onClick={async () => {
+            setChecking(true)
+            const r = await checkForUpdate('manual')
+            setChecking(false)
+            if (r === 'latest') toast({ message: t.updates.latest, tone: 'ok' })
+            else if (r === 'offline') toast({ message: t.updates.offline, tone: 'err' })
+          }}>
+          <RefreshCw size={18} className={checking ? 'animate-spin' : ''} />{t.updates.check}
+        </button>
       </Section>
     </div>
   )

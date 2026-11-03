@@ -1,0 +1,3 @@
+# Open copies of the app fetch this to learn that a new version was published (src/updates.ts)
+/version.json
+  Cache-Control: no-store

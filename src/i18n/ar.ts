@@ -4,6 +4,7 @@ import { calcAr } from './calc'
 import { pricesAr } from './prices'
 import { inputsAr } from './inputs'
 import { outputsAr } from './outputs'
+import { updatesAr } from './updates'
 // Arabic UI strings (MSA, solar-trade usage in Sudan and the Gulf). Western digits; Latin SI unit symbols for computed values.
 // \u200E (LRM) after "DT+" keeps the plus sign on the right side of the brand in RTL text.
 /** First-strong isolate: keeps a number + Latin unit/model code in one LTR island inside an Arabic sentence. */
@@ -164,5 +165,5 @@ export const ar: Dict = {
   },
   months: ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'],
   monthsNarrow: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'],
-  tools: toolsAr, calc: calcAr, prices: pricesAr, inputs: inputsAr, outputs: outputsAr,
+  tools: toolsAr, calc: calcAr, prices: pricesAr, inputs: inputsAr, outputs: outputsAr, updates: updatesAr,
 }
