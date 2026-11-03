@@ -347,7 +347,8 @@ function checkCase(c: Case, r: Results, q: Quote, V: Violations) {
     const ov = pr.qtyOverrides[id]
     const line = r.bom.find((b) => b.id === id)
     const want = ov === 0 ? 0 : Math.max(0, design - Math.min(exN, design))
-    V.check((line?.qty ?? 0) === want && (want > 0 || ov != null || !line), 'main-qty', () => `${tag} ${id} design ${design} existing ${exN} → quoted ${line?.qty} (want ${want})`)
+    // fully existing equipment stays listed at qty 0 with its existingQty (shown as "already on site")
+    V.check((line?.qty ?? 0) === want && (want > 0 || ov != null || !line || (line.existingQty ?? 0) > 0), 'main-qty', () => `${tag} ${id} design ${design} existing ${exN} → quoted ${line?.qty} (want ${want})`)
     if (line) V.check((line.existingQty ?? 0) === Math.min(exN, design), 'main-qty', () => `${tag} ${id} existingQty ${line.existingQty}`)
   }
   V.check((ex.panels + ex.batteries + ex.inverters > 0) === !!checkOf(r, 'existing'), 'existing-note', () => `${tag} existing note`)

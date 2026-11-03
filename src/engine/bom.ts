@@ -219,7 +219,7 @@ function buildDesignBom(p: Project, pr: PricingInput, c: BomCtx, money: (qty: nu
     const existingQty = exBy.get(x.id) ?? 0
     const computed = Math.max(0, (DISCRETE.has(x.unit) ? ceilSafe(x.qty) : Math.ceil(Math.round(x.qty * 1e6) / 1e4) / 100) - existingQty)
     const q = hasOv && (!main.has(x.id) || ov === 0) ? Math.min(DISCRETE.has(x.unit) && ov > 0 ? ceilSafe(ov) : ov, MAX_QTY) : computed
-    if (!hasOv && !(computed > 0)) continue
+    if (!hasOv && !(computed > 0) && !existingQty) continue // fully existing equipment stays listed (qty 0, "already on site")
     const ovp = pr.priceOverrides[x.id]
     const price = Math.min(ovp != null && Number.isFinite(ovp) && ovp >= 0 ? ovp : Number.isFinite(x.price) && x.price >= 0 ? x.price : 0, MAX_PRICE_USD)
     lines.push({ id: x.id, category: x.category, name: x.name, spec: x.spec, nameAr: x.nameAr, specAr: x.specAr, unit: x.unit, qty: q, unitPriceUsd: price, totalUsd: money(q, price), source: 'auto', ...(existingQty ? { existingQty } : {}) })

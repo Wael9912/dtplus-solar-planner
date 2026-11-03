@@ -115,7 +115,7 @@ body { @apply bg-slate-50 text-slate-700 antialiased; margin: 0; font-family: va
   .badge-neutral { @apply bg-slate-100 text-slate-700 ring-slate-200; }
   .badge-info { @apply bg-sky-50 text-sky-800 ring-sky-200; }
 
-  .chip { @apply inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-full border border-slate-300 bg-white px-3 text-sm font-medium whitespace-nowrap text-slate-700 hover:bg-slate-50
+  .chip { @apply inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-full border border-slate-300 bg-white px-3 text-sm font-medium whitespace-nowrap text-slate-700 hover:bg-slate-50
       focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 aria-pressed:border-slate-900 aria-pressed:bg-slate-900 aria-pressed:text-white; }
 
   .disclosure > summary { @apply flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 text-sm font-medium text-slate-700 select-none hover:text-slate-900; }

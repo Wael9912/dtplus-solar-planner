@@ -172,8 +172,12 @@ function recommendGridTieInverter(phase: 1 | 3, requiredKw: number, pvKwp: numbe
       // a module Imp above the MPPT operating current only clips slightly: small price penalty, not a hard filter
       return { i, qty, score: qty * i.approxPriceUsd * (i.maxInputCurrentPerMppt >= panelImp ? 1 : 1.05) }
     })
-    cands.sort((a, b) => a.score - b.score || a.qty - b.qty || a.i.ratedAcKw - b.i.ratedAcKw)
-    return { inverter: cands[0].i, qty: cands[0].qty }
+    // Never pick an inverter the design would then flag as oversized (dcac-low < 0.7): prefer DC:AC ≥ 0.8 when any candidate reaches it
+    const ratio = (c: { i: Inverter; qty: number }) => (pvKwp > 0 ? pvKwp / (c.i.ratedAcKw * c.qty) : 1)
+    const sane = cands.filter((c) => ratio(c) >= 0.8)
+    const list = sane.length ? sane : cands
+    list.sort((a, b) => a.score - b.score || a.qty - b.qty || a.i.ratedAcKw - b.i.ratedAcKw)
+    return { inverter: list[0].i, qty: list[0].qty }
   }
   return null
 }
@@ -647,7 +651,9 @@ function computeCore(p: Project): Results {
   if (isGT && inverter) {
     // §3.4/§14: grid-tied DC:AC 1.1–1.3; off-grid / hybrid inverters are sized for the load, so a low ratio is normal there
     if (dcAcRatio > 1.3) checks.push(mk('dcac-high', 'warn', 'design', `DC/AC ratio ${r2(dcAcRatio)} is high (>1.3); expect clipping — consider a larger inverter.`, `نسبة DC/AC ‏${r2(dcAcRatio)} مرتفعة (أكبر من 1.3)؛ يُتوقع قص في القدرة — يُنصح بإنفرتر أكبر.`))
-    if (dcAcRatio > 0 && dcAcRatio < 0.7) checks.push(mk('dcac-low', 'warn', 'design', `DC/AC ratio ${r2(dcAcRatio)} is low (<0.7); inverter is oversized for the array.`, `نسبة DC/AC ‏${r2(dcAcRatio)} منخفضة (أقل من 0.7)؛ الإنفرتر أكبر من اللازم بالنسبة للمصفوفة.`))
+    // shown rounded down so the figure never reads as the threshold itself ("0.70 is below 0.7")
+    const lowShown = (Math.floor(dcAcRatio * 100) / 100).toFixed(2)
+    if (dcAcRatio > 0 && dcAcRatio < 0.7) checks.push(mk('dcac-low', 'warn', 'design', `DC/AC ratio ${lowShown} is low (<0.7); inverter is oversized for the array.`, `نسبة DC/AC ‏${lowShown} منخفضة (أقل من 0.7)؛ الإنفرتر أكبر من اللازم بالنسبة للمصفوفة.`))
   }
   const inverterOk = !!inverter && (isGT ? dcAcRatio <= 1.3 + 1e-9 && (inverter.maxPvInputKw * inverterQty * 1.05 >= arrayKwp || inverter.maxPvInputKw === 0) : inverterTotalKw >= requiredInverterKw * 0.999)
 

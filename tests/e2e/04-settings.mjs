@@ -15,7 +15,7 @@ for (const [vpName, vp] of [['desktop', DESKTOP], ['mobile', MOBILE]]) {
   await nav(page, 'settings')
   await page.getByLabel('Company name').fill('QA Solar Co')
   await page.getByLabel('Phone').fill('+249 100 000')
-  await page.locator('input[type=file]').setInputFiles(logo); await page.waitForTimeout(400)
+  await page.locator('input[type=file][accept^="image"]').setInputFiles(logo); await page.waitForTimeout(400)
   if (!(await page.getByRole('img', { name: 'Logo' }).first().isVisible())) issue(`${vpName}: logo preview not shown`); else pass(`${vpName}: logo preview shown`)
   const hdr = await page.locator('header').innerText()
   if (!/QA Solar Co/.test(hdr)) issue(`${vpName}: header does not show company name`); else pass(`${vpName}: header shows company name`)

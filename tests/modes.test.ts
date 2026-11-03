@@ -91,6 +91,13 @@ describe('demand from the electricity bill', () => {
     expect(r.arrayKwp).toBeGreaterThan(2.5); expect(r.arrayKwp).toBeLessThan(5)
     expect(check(r, 'no-loads')).toBeUndefined(); expect(r.annualSavingsUsd).toBeGreaterThan(0)
   })
+  it('auto grid-tie pick never trips its own oversized-inverter warning (450 kWh/month home)', () => {
+    const p = newProject({ name: 'bill-gt' })
+    p.design = defaultDesign('gridtie'); p.site = siteFromLocation('khartoum')
+    p.sizing = { ...defaultSizing(), demand: 'bill', bill: { monthlyKwh: 450, profile: 'residential', peakKw: null, largestMotorKw: null } }
+    const r = computeProject(p)
+    expect(check(r, 'dcac-low')).toBeUndefined(); expect(r.dcAcRatio).toBeGreaterThanOrEqual(0.8)
+  })
   it('bill demand with 0 kWh asks for the consumption', () => {
     const p = newProject({ name: 'bill0' })
     p.sizing = { ...defaultSizing(), demand: 'bill' }
@@ -133,7 +140,8 @@ describe('equipment already on site (expansion)', () => {
     expect(r.batteryQty).toBe(base.batteryQty); expect(r.panelQty).toBe(base.panelQty)
     expect(bomQty(r, r.battery!.id)).toBe(base.batteryQty - 1)
     expect(bomQty(r, r.panel.id)).toBe(base.panelQty - 4)
-    expect(bomQty(r, r.inverter!.id)).toBeUndefined() // the only inverter is existing
+    expect(bomQty(r, r.inverter!.id)).toBe(0) // the only inverter is existing: listed, not quoted
+    expect(r.bom.find((b) => b.id === r.inverter!.id)).toMatchObject({ existingQty: 1, totalUsd: 0 })
     expect(r.bom.find((b) => b.id === r.battery!.id)?.existingQty).toBe(1)
     expect(r.totalUsd).toBeLessThan(base.totalUsd)
     expect(bomQty(r, 'end-clamp')).toBeLessThanOrEqual(bomQty(base, 'end-clamp')!)
@@ -142,7 +150,7 @@ describe('equipment already on site (expansion)', () => {
     const p = sized('hybrid', {}, (q) => { q.sizing = { ...q.sizing!, existing: { panels: 0, batteries: 99, inverters: 0 } } })
     const r = computeProject(p)
     expect(check(r, 'existing-batteries')?.level).toBe('warn')
-    expect(bomQty(r, r.battery!.id)).toBeUndefined()
+    expect(bomQty(r, r.battery!.id)).toBe(0); expect(r.bom.find((b) => b.id === r.battery!.id)?.existingQty).toBe(r.batteryQty)
   })
 })
 
