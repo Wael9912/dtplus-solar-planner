@@ -65,6 +65,17 @@ const en = {
     terms: 'Terms & conditions', notes: 'Notes', accepted: 'Accepted by client', forCompany: (c: string) => `For ${c}`, signature: 'Signature', name: 'Name',
     page: (i: number, n: number) => `Page ${i} of ${n}`,
     defaultTerms: '',
+    // Modes: known size (no consumption data), battery backup only (no panels), demand from the electricity bill, product quote
+    profiles: { residential: 'residential', commercial: 'commercial', daytime: 'daytime-only' } as Record<string, string>,
+    energyBill: (kwh: string, profile: string, pct: string) => `${kwh} kWh/month from the electricity bill (${profile} use) · solar covers ${pct}% over the year`,
+    energyNone: (prod: string) => `System size chosen by the client · about ${prod} kWh of solar energy on an average day`,
+    energyBackup: 'System size chosen by the client · battery backup without solar panels',
+    selfUseNote: ' No consumption data: savings assume all the solar energy is used on site.',
+    backupAt: (h: string, kw: string) => `${h} h at ${kw} kW`, backupAbout: (list: string) => `backup of about ${list}`,
+    tileBackup: 'Backup time', tileUsable: (kwh: string) => `${kwh} kWh usable`, atLoad: (kw: string) => `at a ${kw} kW load`, hours: (h: string) => `${h} h`,
+    existingIncl: (n: string) => `incl. ${n} already on site`, existingLine: (n: string) => `+${n} already on site, not quoted`,
+    details: 'Quotation details', refN: (r: string) => `Reference ${r}`, dateN: (d: string) => `Date ${d}`,
+    systemShort: (type: string, size: string) => `${type} · ${size}`,
   },
 
   tech: {
@@ -102,6 +113,17 @@ const en = {
       margin: 'Gross margin', discount: (p: string) => `Discount ${p}%`, vat: (p: string) => `VAT ${p}%`, total: 'Total to client',
     },
     costedBom: 'Costed bill of materials', costCols: ['#', 'Item', 'Qty', 'Unit', 'Unit cost', 'Cost', 'Unit price', 'Price'],
+    bill: 'Demand from the electricity bill', billRows: {
+      monthly: 'Monthly consumption', daily: 'Daily energy', profile: 'Usage profile', night: 'Night share', peak: 'Peak demand', motor: 'Largest motor', surge: 'Starting surge',
+    }, given: 'measured / contracted', estimated: 'estimated from the profile', noMotor: 'none', whPerDay: (v: string) => `${v} Wh/day`,
+    billNote: 'No appliance list: the daily energy, night share and peak come from the monthly bill and the usage profile.',
+    basisTitle: 'Sizing basis', noDemand: (sizes: string) => `No consumption data: the client chose the system size (${sizes}).`, assumeSelfUse: ' Savings assume all the solar energy is used on site.',
+    noPv: 'No PV array: battery backup only.',
+    fixedPv: (kwp: string) => `fixed at ${kwp} kWp by the client`, pvFromInv: (kw: string, r: string) => `inverter ${kw} kW × DC/AC ${r}`,
+    fixedInv: (kw: string) => `fixed at ${kw} kW by the client`, invFromPv: (kwp: string, r: string) => `PV ${kwp} kWp ÷ DC/AC ${r}`,
+    fixedBatt: (kwh: string) => `fixed at ${kwh} kWh nominal by the client`,
+    existing: 'Already on site', existingVal: (parts: string) => `${parts} (counted in the design, not quoted)`,
+    existingParts: { panels: (n: number) => `${n} panels`, batteries: (n: number) => `${n} batteries`, inverters: (n: number) => `${n} inverters` },
   },
 
   xl: {
@@ -138,6 +160,14 @@ const en = {
     markupCell: 'Markup on cost (input)', planner: (v: string) => `Planner: ${v}`, discountIn: 'Discount (input %)', vatIn: 'VAT (input %)', costSubtotal: 'Cost subtotal', sellSubtotal: 'Subtotal (selling)', markup: 'Markup', grossMargin: 'Gross margin', discount: (p: string) => `Discount ${p}%`, vat: (p: string) => `VAT ${p}%`, grandTotal: 'GRAND TOTAL',
     ecoTitle: (n: number) => `Cash flow (${n} years)`, ecoSub: (tariff: string, esc: string, deg: string, diesel?: boolean) => `${diesel ? 'Diesel generation cost' : 'Grid tariff'} ${tariff}/kWh, ${esc}% escalation, ${deg}%/yr degradation; net of O&M and replacements`,
     ecoCols: (cur: string) => ['Year', 'Production (kWh)', `Net cash flow (${cur})`, `Cumulative (${cur})`],
+    quoteSheet: 'Quotation', quoteSub: (who: string) => `${who} · cost, markup and selling prices. Edit a quantity, cost or the markup cell: totals recalculate.`,
+    demandBasis: 'Demand basis', basis: { loads: 'Appliance list', bill: 'Electricity bill', none: 'System size chosen by the client' } as Record<string, string>,
+    billTitle: 'Demand from the electricity bill', billSub: 'No appliance list: edit the monthly consumption (yellow) and the daily energy recalculates',
+    billRows: { monthly: 'Monthly consumption', daily: 'Daily energy', profile: 'Usage profile', night: 'Night share', nightKwh: 'Night energy', peak: 'Peak demand', motor: 'Largest motor', surge: 'Starting surge' },
+    given: 'measured / contracted', estimated: 'estimated from the profile',
+    fromBill: 'From the electricity bill (Loads sheet)', noData: 'No consumption data', fixed: 'Fixed by the client', noPv: 'No PV array: battery backup only',
+    prodColsNoDemand: ['Month', 'PSH (horizontal)', 'Tilt gain', 'Days', 'Production (kWh)'],
+    existingSpec: (n: string) => `+${n} already on site, not quoted`,
   },
 
   ui: {
@@ -225,6 +255,16 @@ const ar: ExportLabels = {
     subtotal: 'المجموع الفرعي', discount: (pct) => `الخصم ${pct}%`, vat: (pct) => `ضريبة القيمة المضافة ${pct}%`, total: 'الإجمالي', totalInclVat: 'الإجمالي شامل الضريبة',
     terms: 'الشروط والأحكام', notes: 'ملاحظات', accepted: 'موافقة العميل', forCompany: (c) => `عن ${c}`, signature: 'التوقيع', name: 'الاسم',
     page: (i, n) => `صفحة ${i} من ${n}`,
+    profiles: { residential: 'سكني', commercial: 'تجاري', daytime: 'نهاري فقط' },
+    energyBill: (kwh, profile, pct) => `${kwh} kWh شهريا من فاتورة الكهرباء، استهلاك ${profile} · تغطي الطاقة الشمسية ${pct}% على مدار السنة`,
+    energyNone: (prod) => `حجم النظام حدده العميل · نحو ${prod} kWh من الطاقة الشمسية في اليوم المتوسط`,
+    energyBackup: 'حجم النظام حدده العميل · نظام احتياطي بالبطاريات دون ألواح شمسية',
+    selfUseNote: ' لا توجد بيانات استهلاك: يفترض التوفير استخدام كامل الطاقة الشمسية في الموقع.',
+    backupAt: (h, kw) => `${h} ساعة عند ${kw} kW`, backupAbout: (list) => `مدة احتياط نحو ${list}`,
+    tileBackup: 'مدة الاحتياط', tileUsable: (kwh) => `المتاح ${kwh} kWh`, atLoad: (kw) => `عند حمل ${kw} kW`, hours: (h) => `${h} ساعة`,
+    existingIncl: (n) => `منها ${n} موجودة في الموقع`, existingLine: (n) => `+${n} موجود في الموقع، غير مسعر`,
+    details: 'بيانات العرض', refN: (r) => `المرجع ${r}`, dateN: (d) => `التاريخ ${d}`,
+    systemShort: (type, size) => `${type} · ${size}`,
     defaultTerms: 'الأسعار صالحة للمدة المذكورة وتخضع لتوفر المخزون. دفعة مقدمة 50% عند الطلب والباقي عند التشغيل. ضمانات المعدات حسب الشركة المصنعة. ضمان أعمال التركيب سنتان. الأعمال المدنية ورسوم توصيل الشبكة والتصاريح غير مشمولة ما لم يذكر خلاف ذلك.',
   },
 
@@ -262,6 +302,17 @@ const ar: ExportLabels = {
       margin: 'هامش الربح الإجمالي', discount: (p) => `الخصم ${p}%`, vat: (p) => `ضريبة القيمة المضافة ${p}%`, total: 'الإجمالي للعميل',
     },
     costedBom: 'قائمة المواد بالتكلفة والبيع', costCols: ['#', 'البند', 'الكمية', 'الوحدة', 'تكلفة الوحدة', 'التكلفة', 'سعر الوحدة', 'السعر'],
+    bill: 'الطلب من فاتورة الكهرباء', billRows: {
+      monthly: 'الاستهلاك الشهري', daily: 'الطاقة اليومية', profile: 'نمط الاستهلاك', night: 'نسبة الاستهلاك الليلي', peak: 'الطلب الأقصى', motor: 'أكبر محرك', surge: 'قدرة البدء',
+    }, given: 'مقاس أو متعاقد عليه', estimated: 'مقدر من نمط الاستهلاك', noMotor: 'لا يوجد', whPerDay: (v) => `${v} Wh يوميا`,
+    billNote: 'لا توجد قائمة أجهزة: الطاقة اليومية والنسبة الليلية والطلب الأقصى محسوبة من الفاتورة الشهرية ونمط الاستهلاك.',
+    basisTitle: 'أساس التحجيم', noDemand: (sizes) => `لا توجد بيانات استهلاك: حدد العميل حجم النظام (${sizes}).`, assumeSelfUse: ' يفترض التوفير استخدام كامل الطاقة الشمسية في الموقع.',
+    noPv: 'لا توجد مصفوفة ألواح: احتياطي بالبطاريات فقط.',
+    fixedPv: (kwp) => `محدد بقدرة ${kwp} kWp من العميل`, pvFromInv: (kw, r) => `الإنفرتر ${kw} kW × نسبة DC/AC ${r}`,
+    fixedInv: (kw) => `محدد بقدرة ${kw} kW من العميل`, invFromPv: (kwp, r) => `الألواح ${kwp} kWp ÷ نسبة DC/AC ${r}`,
+    fixedBatt: (kwh) => `محدد بسعة اسمية ${kwh} kWh من العميل`,
+    existing: 'موجود في الموقع', existingVal: (parts) => `${parts}، محسوبة في التصميم وغير مسعرة`,
+    existingParts: { panels: (n) => `${n} ألواح`, batteries: (n) => `${n} بطاريات`, inverters: (n) => `${n} إنفرتر` },
   },
 
   xl: {
@@ -298,6 +349,14 @@ const ar: ExportLabels = {
     markupCell: 'الإضافة على التكلفة (إدخال)', planner: (v) => `قيمة المخطط: ${v}`, discountIn: 'الخصم (إدخال %)', vatIn: 'الضريبة (إدخال %)', costSubtotal: 'إجمالي التكلفة', sellSubtotal: 'المجموع الفرعي بسعر البيع', markup: 'قيمة الإضافة', grossMargin: 'هامش الربح الإجمالي', discount: (p) => `الخصم ${p}%`, vat: (p) => `ضريبة القيمة المضافة ${p}%`, grandTotal: 'الإجمالي النهائي',
     ecoTitle: (n) => `التدفق النقدي خلال ${n} سنة`, ecoSub: (tariff, esc, deg, diesel) => `${diesel ? 'تكلفة توليد الديزل' : 'تعرفة الشبكة'} ${tariff} لكل kWh، زيادة ${esc}% سنويا، تدهور ${deg}% سنويا، بعد خصم التشغيل والصيانة والاستبدال`,
     ecoCols: (cur) => ['السنة', 'الإنتاج kWh', `صافي التدفق ${cur}`, `التراكمي ${cur}`],
+    quoteSheet: 'عرض السعر', quoteSub: (who) => `${who} · التكلفة والإضافة وأسعار البيع. عدل الكمية أو التكلفة أو خلية الإضافة وستحدث المجاميع.`,
+    demandBasis: 'أساس الطلب', basis: { loads: 'قائمة الأجهزة', bill: 'فاتورة الكهرباء', none: 'حجم النظام حدده العميل' },
+    billTitle: 'الطلب من فاتورة الكهرباء', billSub: 'لا توجد قائمة أجهزة: عدل الاستهلاك الشهري في الخلية الصفراء وستحدث الطاقة اليومية',
+    billRows: { monthly: 'الاستهلاك الشهري', daily: 'الطاقة اليومية', profile: 'نمط الاستهلاك', night: 'نسبة الاستهلاك الليلي', nightKwh: 'الطاقة الليلية', peak: 'الطلب الأقصى', motor: 'أكبر محرك', surge: 'قدرة البدء' },
+    given: 'مقاس أو متعاقد عليه', estimated: 'مقدر من نمط الاستهلاك',
+    fromBill: 'من فاتورة الكهرباء، ورقة الأحمال', noData: 'لا توجد بيانات استهلاك', fixed: 'محدد من العميل', noPv: 'لا توجد مصفوفة ألواح: احتياطي بالبطاريات فقط',
+    prodColsNoDemand: ['الشهر', 'ساعات الذروة', 'كسب الميل', 'الأيام', 'الإنتاج kWh'],
+    existingSpec: (n) => `+${n} موجود في الموقع، غير مسعر`,
   },
 
   ui: {

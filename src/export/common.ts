@@ -4,6 +4,7 @@ import { fmt } from '../engine/format'
 import { AWG_EQUIV } from '../engine/standards'
 import { formatQuoteMoney, type Quote } from '../engine/quote'
 import { getBattery, INV_EFF_BATT } from '../engine/compute'
+import { resolveSizing } from '../engine/sizing'
 import { getLocation } from '../data/locations'
 import { appliances } from '../data/appliances'
 import { defaultCompany } from '../engine/defaults'
@@ -61,7 +62,8 @@ export const categoryName = (c: string, L: ExportLabels) => L.cats[c] ?? c
 
 type NamedLine = Pick<BomLine, 'id' | 'name' | 'spec' | 'source'> & { nameAr?: string; specAr?: string }
 export function lineName(l: NamedLine, lang: ExportLang, L: ExportLabels) {
-  if (l.source === 'custom') return l.name?.trim() || '—'
+  // Custom lines added from the catalogue carry the product's Arabic name; typed lines print as typed
+  if (l.source === 'custom') return ((lang === 'ar' && l.nameAr?.trim()) || l.name?.trim()) || '—'
   if (L.services[l.id]) return L.services[l.id]
   return (lang === 'ar' && l.nameAr) || l.name
 }
@@ -111,6 +113,28 @@ export function solarCoveragePct(r: Results) {
   const useful = r.usefulEnergyKwh > 0 ? r.usefulEnergyKwh : Math.min(r.annualProductionKwh, r.annualKwh)
   return Math.min(100, (useful / r.annualKwh) * 100)
 }
+// ---- project modes (known size, battery backup only, electricity bill, product quote)
+/** Sizes the user fixed, the bill and the existing equipment, with defaults filled (projects saved before v0.2 have none). */
+export const sizingOf = (p: Project) => resolveSizing(p)
+/** Battery backup without solar panels (fixed PV size 0). */
+export const isBackupOnly = (r: Results) => r.mode !== 'items' && !(r.arrayKwp > 0)
+/** Hours the usable storage covers a constant AC load of `kw` (after the battery→AC inverter efficiency). */
+export const backupHoursAt = (r: Results, kw: number) => (kw > 0 && r.batteryUsableKwh > 0 ? (r.batteryUsableKwh * INV_EFF_BATT) / kw : 0)
+/** Reference loads for a backup-time table when there is no consumption data: 0.5, 1 and 2 kW up to the inverter rating, then the rating. */
+export function backupLoads(r: Results): number[] {
+  const cap = r.inverterTotalKw > 0 ? r.inverterTotalKw : 0
+  const xs = [0.5, 1, 2].filter((x) => !cap || x < cap)
+  if (cap) xs.push(Math.round(cap * 100) / 100)
+  return xs
+}
+/** "5.04 kWp · 10.24 kWh · 5 kW" (parts that exist). */
+export function sizeSummary(r: Results) {
+  return [r.arrayKwp > 0 ? `${fmt(r.arrayKwp, 2)} kWp` : '', r.batteryKwh > 0 ? `${fmt(r.batteryKwh, 1)} kWh` : '', r.inverterTotalKw > 0 ? `${num(r.inverterTotalKw, 1)} kW` : '']
+    .filter(Boolean).join(' · ')
+}
+/** Units of a BOM line already on site (expansion projects), 0 when none. */
+export const existingQtyOf = (r: Results, id: string) => r.bom.find((b) => b.id === id)?.existingQty ?? 0
+
 /** Roof / ground area to reserve (with row spacing when the engine reports the footprint). */
 export const footprintM2 = (r: Results) => (r.footprintM2 > 0 ? r.footprintM2 : r.arrayAreaM2 * 1.15)
 
