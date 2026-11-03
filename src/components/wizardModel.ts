@@ -21,14 +21,15 @@ export type StepStatus = 'done' | 'todo' | 'warn' | 'error'
 export const hasDemand = (p: Project, r: Results) => (r.mode === 'design' ? r.dailyWh > 0 : r.mode === 'items' ? (p.pricing.customItems?.length ?? 0) > 0 : true)
 
 /** Real per-step status: done when the step's inputs are complete, warn/error when a design check that is fixed on that step fails. */
-export function stepStatuses(p: Project, r: Results, q: Quote): Record<StepKey, StepStatus> {
+export function stepStatuses(p: Project, r: Results, q: Quote, reached = Infinity): Record<StepKey, StepStatus> {
   const ok = hasDemand(p, r)
   const st: Record<StepKey, StepStatus> = {
     info: p.clientName.trim() ? 'done' : 'todo', loads: ok ? 'done' : 'todo', site: ok ? 'done' : 'todo', design: ok && (r.inverter || p.design.systemType === 'gridtie') ? 'done' : 'todo',
     results: ok ? 'done' : 'todo', bom: ok && q.total > 0 ? 'done' : 'todo', export: p.status !== 'draft' ? 'done' : 'todo',
   }
-  if (!ok) return st // nothing to review until there is a load list
   const steps = stepsFor(p)
+  steps.forEach((k, i) => { if (i > reached && st[k] === 'done') st[k] = 'todo' })
+  if (!ok) return st // nothing to review until there is a load list
   for (const c of r.checks) {
     if (c.level === 'ok' || c.id === 'no-loads' || c.id === 'no-items') continue
     const s = checkStep(c); if (!s || !steps.includes(s)) continue

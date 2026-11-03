@@ -15,6 +15,7 @@ import { buildQuoteFromBom, quoteFx, effectivePercents } from './quote'
 import { computeEconomics } from './economics'
 import { DEFAULT_DIESEL_USD_PER_KWH } from './defaults'
 import { demandFromBill, projectMode, resolveSizing } from './sizing'
+import { MAX_FX } from './format'
 
 const sum = (a: number[]) => a.reduce((x, y) => x + y, 0)
 const mk = (id: string, level: Check['level'], step: StepKey, message: string, messageAr: string): Check => ({ id, level, message, messageAr, step })
@@ -25,10 +26,11 @@ export const autoCoincidence = (lines: number) => (lines <= 5 ? 1 : lines <= 15 
 /** A load running more than ~12 h/day cannot fit in daylight: night share ≥ (h − 12) / h (§1.4). */
 export const nightShareFloorPct = (hoursPerDay: number) => (hoursPerDay > 12 ? ((hoursPerDay - 12) / hoursPerDay) * 100 : 0)
 const sanitize = (loads: LoadItem[]) => loads
-  .filter((l) => l.qty > 0 && l.watts > 0 && Number.isFinite(l.qty) && Number.isFinite(l.watts))
+  .filter((l) => !!l && l.qty > 0 && l.watts > 0 && Number.isFinite(l.qty) && Number.isFinite(l.watts))
   .map((l) => {
-    const h = clamp(l.hoursPerDay, 0, 24)
-    return { ...l, hoursPerDay: h, nightSharePct: clamp(Math.max(Number.isFinite(l.nightSharePct) ? l.nightSharePct : 0, nightShareFloorPct(h)), 0, 100), surgeFactor: Math.max(1, Number.isFinite(l.surgeFactor) ? l.surgeFactor : 1) }
+    const h = clamp(Number.isFinite(l.hoursPerDay) ? l.hoursPerDay : 0, 0, 24)
+    // Physical ceilings keep hostile inputs finite: 100 MW per unit, 100,000 units per line
+    return { ...l, watts: Math.min(l.watts, 1e8), qty: Math.min(l.qty, 1e5), hoursPerDay: h, nightSharePct: clamp(Math.max(Number.isFinite(l.nightSharePct) ? l.nightSharePct : 0, nightShareFloorPct(h)), 0, 100), surgeFactor: clamp(Number.isFinite(l.surgeFactor) ? l.surgeFactor : 1, 1, 10) }
   })
 
 /**
@@ -323,7 +325,8 @@ const PEGGED_1_TO_1 = new Set(['USD', 'BSD', 'BMD', 'PAB'])
  * Mode 'items' is a priced product list only; 'size' and 'design' run the full engine (§16: demand, fixed sizes, existing kit).
  */
 export function computeProject(p: Project, book?: PriceBook | null): Results {
-  return withPriceBook(book, () => (projectMode(p) === 'items' ? computeItems(p) : computeCore(p)))
+  // A quote that left Draft keeps the price list it was quoted with
+  return withPriceBook(p.lockedPrices ?? book, () => (projectMode(p) === 'items' ? computeItems(p) : computeCore(p)))
 }
 
 function computeCore(p: Project): Results {
@@ -336,21 +339,24 @@ function computeCore(p: Project): Results {
   // 'size' mode prices a system the client already chose: no consumption data, whatever the load list holds
   const demand: Results['demand'] = mode === 'size' ? 'none' : sz.demand
   const loadsIn = demand === 'loads' ? p.loads : []
-  const qo = (id: string | undefined) => { const v = id ? pr.qtyOverrides?.[id] : undefined; return v != null && Number.isFinite(v) && v >= 1 ? Math.round(v) : null }
+  const qo = (id: string | undefined) => { const v = id ? pr.qtyOverrides?.[id] : undefined; return v != null && Number.isFinite(v) && v >= 1 ? Math.round(Math.min(v, 1e5)) : null }
 
   // ---- Input guards (no NaN / Infinity can leave the engine)
-  if (!(s.psh > 0)) { checks.push(mk('psh', 'error', 'site', 'Peak sun hours must be greater than 0 — enter the site irradiation.', 'يجب أن تكون ساعات الذروة الشمسية أكبر من صفر — أدخل قيمة الإشعاع الشمسي للموقع.')); s.psh = 0 }
+  if (s.psh > 24) s.psh = 24 // physical ceiling (hostile / mistyped input; real sites are 2–8 h)
+  if (!(s.psh >= 0.5)) { checks.push(mk('psh', 'error', 'site', 'Peak sun hours must be at least 0.5 h — enter the site irradiation.', 'يجب ألا تقل ساعات الذروة الشمسية عن 0.5 ساعة — أدخل قيمة الإشعاع الشمسي للموقع.')); s.psh = 0 }
   if (!(s.soilingLossPct >= 0 && s.soilingLossPct <= 95) || !(s.shadingLossPct >= 0 && s.shadingLossPct <= 95)) {
     checks.push(mk('losses', 'error', 'site', `Soiling ${s.soilingLossPct}% / shading ${s.shadingLossPct}% must each be between 0 and 95 % — values were limited.`,
       `يجب أن تكون خسائر الأتربة (${s.soilingLossPct}%) والتظليل (${s.shadingLossPct}%) بين 0 و95% لكلٍّ منهما — تم حصر القيم.`))
     s.soilingLossPct = clamp(s.soilingLossPct, 0, 95); s.shadingLossPct = clamp(s.shadingLossPct, 0, 95)
   }
   const siteFixes: string[] = []
-  if (!Number.isFinite(s.ambientHighC)) { s.ambientHighC = 40; siteFixes.push('ambientHighC') }
-  if (!Number.isFinite(s.ambientAvgC)) { s.ambientAvgC = s.ambientHighC - 8; siteFixes.push('ambientAvgC') }
-  if (!Number.isFinite(s.recordLowC)) { s.recordLowC = 0; siteFixes.push('recordLowC') }
+  if (!(s.ambientHighC >= -40 && s.ambientHighC <= 65)) { s.ambientHighC = Number.isFinite(s.ambientHighC) ? clamp(s.ambientHighC, -40, 65) : 40; siteFixes.push('ambientHighC') }
+  if (!(s.ambientAvgC >= -40 && s.ambientAvgC <= 60)) { s.ambientAvgC = Number.isFinite(s.ambientAvgC) ? clamp(s.ambientAvgC, -40, 60) : s.ambientHighC - 8; siteFixes.push('ambientAvgC') }
+  if (!(s.recordLowC >= -60 && s.recordLowC <= 40)) { s.recordLowC = Number.isFinite(s.recordLowC) ? clamp(s.recordLowC, -60, 40) : 0; siteFixes.push('recordLowC') }
+  for (const k of ['gridTariff', 'gridEmission', 'dieselCostUsdPerKwh'] as const) if (s[k] != null && !(Number(s[k]) >= 0 && Number(s[k]) <= 100)) { s[k] = Number.isFinite(s[k]) ? clamp(Number(s[k]), 0, 100) : 0; siteFixes.push(k) }
   if (!Number.isFinite(s.tiltDeg) || s.tiltDeg < 0 || s.tiltDeg > 90) { s.tiltDeg = clamp(s.tiltDeg, 0, 90); siteFixes.push('tiltDeg') }
   if (!Number.isFinite(s.azimuthDeg)) { s.azimuthDeg = 0; siteFixes.push('azimuthDeg') }
+  if (!(s.tiltGainFactor >= 0.5 && s.tiltGainFactor <= 2)) { s.tiltGainFactor = Number.isFinite(s.tiltGainFactor) ? clamp(s.tiltGainFactor, 0.5, 2) : 1; siteFixes.push('tiltGainFactor') }
   if (siteFixes.length) checks.push(mk('site-input', 'warn', 'site', `Invalid site inputs were replaced: ${siteFixes.join(', ')}.`, `تم استبدال مدخلات موقع غير صالحة: ${siteFixes.join('، ')}.`))
   let dodOverride: number | null = null
   if (d.dodOverridePct != null) {
@@ -371,8 +377,14 @@ function computeCore(p: Project): Results {
   guard('pvOversize', 0.5, 3, 1); guard('inverterSafety', 1, 3, 1.25); guard('dcAcRatio', 0.8, 2, 1.2)
   guard('dcCableRunM', 0.5, 10000, 20); guard('batteryCableRunM', 0.3, 500, 2); guard('acCableRunM', 0.5, 10000, 15); guard('maxVoltageDropPct', 0.5, 10, 2)
   guard('analysisYears', 1, 50, 25)
+  // Economics and count inputs: physical / financial ceilings so a hostile file can never overflow to Infinity
+  const cap = (k: keyof DesignInput, lo: number, hi: number) => { const v = d[k] as number | null | undefined; if (v != null && !(v >= lo && v <= hi)) { fixes.push(String(k)); (d as unknown as Record<string, number | undefined>)[k] = Number.isFinite(v) ? clamp(v, lo, hi) : undefined } }
+  cap('discountRatePct', 0, 50); cap('omPctPerYear', 0, 20); cap('tariffEscalationPct', -20, 30); cap('inverterLifeYears', 5, 30)
+  if (d.panelOverrideQty != null && !(d.panelOverrideQty <= 1e5)) { fixes.push('panelOverrideQty'); d.panelOverrideQty = Number.isFinite(d.panelOverrideQty) ? 1e5 : null }
+  if (d.batteryOverrideQty != null && !(d.batteryOverrideQty <= 1e5)) { fixes.push('batteryOverrideQty'); d.batteryOverrideQty = Number.isFinite(d.batteryOverrideQty) ? 1e5 : null }
+  if (!(d.inverterQty >= 1 && d.inverterQty <= 1000)) d.inverterQty = Number.isFinite(d.inverterQty) ? clamp(d.inverterQty, 1, 1000) : 1
   if (!(d.degradationPctPerYear >= 0 && d.degradationPctPerYear <= 5)) { fixes.push('degradationPctPerYear'); d.degradationPctPerYear = clamp(d.degradationPctPerYear, 0, 5) }
-  if (!d.coincidenceAuto && !(d.coincidenceFactor > 0 && d.coincidenceFactor <= 1)) {
+  if (demand === 'loads' && !d.coincidenceAuto && !(d.coincidenceFactor > 0 && d.coincidenceFactor <= 1)) {
     checks.push(mk('df', 'warn', 'loads', `Coincidence factor ${d.coincidenceFactor} must be between 0.1 and 1; ${r2(clamp(d.coincidenceFactor, 0.1, 1))} was used.`,
       `يجب أن يكون معامل التزامن (${d.coincidenceFactor}) بين 0.1 و1؛ تم استخدام ${r2(clamp(d.coincidenceFactor, 0.1, 1))}.`))
   }
@@ -381,7 +393,7 @@ function computeCore(p: Project): Results {
     checks.push(mk('load-input', 'warn', 'loads', 'Some load rows have hours above 24, a night share outside 0–100 % or negative values; they were limited.',
       'بعض صفوف الأحمال تحتوي على ساعات تشغيل أكثر من 24 أو نسبة ليلية خارج 0–100% أو قيم سالبة؛ تم حصرها.'))
   const cur = s.currency || 'USD'
-  if (cur !== 'USD' && !(s.fxRateToUsd > 0 && Number.isFinite(s.fxRateToUsd))) checks.push(mk('fx-invalid', 'error', 'site', `Exchange rate must be greater than 0 ${cur} per USD; 1 was used.`, `يجب أن يكون سعر الصرف أكبر من صفر (${cur} لكل دولار)؛ تم استخدام 1.`))
+  if (cur !== 'USD' && !(s.fxRateToUsd > 0 && s.fxRateToUsd <= MAX_FX)) checks.push(mk('fx-invalid', 'error', 'site', `Exchange rate must be greater than 0 ${cur} per USD; 1 was used.`, `يجب أن يكون سعر الصرف أكبر من صفر (${cur} لكل دولار)؛ تم استخدام 1.`))
   else if (!PEGGED_1_TO_1.has(cur) && s.fxRateToUsd === 1) checks.push(mk('fx-unset', 'error', 'site', `Exchange rate is 1 ${cur} per USD — enter the current rate on the Site step before quoting.`, `سعر الصرف مضبوط على 1 ${cur} لكل دولار — أدخل سعر الصرف الحالي في خطوة الموقع قبل إصدار العرض.`))
   const pc = effectivePercents(pr)
   if (pc.markupPct !== pr.marginPct || pc.discountPct !== pr.discountPct || pc.vatPct !== pr.vatPct)
@@ -402,7 +414,7 @@ function computeCore(p: Project): Results {
   const sizingSurgeW = hybridCritical ? L.criticalSurgeW : L.surgeW
 
   // ---- Irradiance: monthly profile scaled to the annual PSH input (M9), monthly tilt gain from the site geometry
-  const mpRaw = Array.isArray(s.monthlyPsh) && s.monthlyPsh.length === 12 && s.monthlyPsh.every((x) => Number.isFinite(x) && x >= 0) ? s.monthlyPsh : Array<number>(12).fill(s.psh)
+  const mpRaw = Array.isArray(s.monthlyPsh) && s.monthlyPsh.length === 12 && s.monthlyPsh.every((x) => Number.isFinite(x) && x >= 0 && x <= 24) ? s.monthlyPsh : Array<number>(12).fill(s.psh)
   const mpMean = sum(mpRaw) / 12
   const kPsh = s.psh > 0 && mpMean > 0 ? s.psh / mpMean : 0
   const monthlyPshUsed = kPsh > 0 ? (Math.abs(kPsh - 1) < 1e-9 ? [...mpRaw] : mpRaw.map((x) => x * kPsh)) : Array<number>(12).fill(s.psh)
@@ -425,8 +437,8 @@ function computeCore(p: Project): Results {
   // No consumption data and no PV size: the array follows the inverter (DC:AC target), else nothing
   const pvAuto = demand === 'none' ? (invTarget ?? 0) * d.dcAcRatio : null
   const roughKwp = pvTarget ?? pvAuto ?? (L.dailyWh / 1000) / Math.max(1, s.psh * tiltGainUsed * 0.7)
-  const unknown = (what: string, whatAr: string, id: string) => checks.push(mk(`unknown-${what}`, 'error', 'design', `The selected ${what} "${id}" is not in the catalogue or your price list (deleted product?); the planner picked one automatically — choose it again.`,
-    `${whatAr} المختار "${id}" غير موجود في الكتالوج أو قائمة أسعارك (منتج محذوف؟)؛ اختار المخطط بديلاً تلقائياً — اختره من جديد.`))
+  const unknown = (what: string, whatAr: string, id: string) => checks.push(mk(`unknown-${what}`, 'error', 'design', `The selected ${what} "${id}" is no longer in the catalogue or your price list (deleted product?). The design uses the automatic choice until you select one again.`,
+    `${whatAr} المختار "${id}" لم يعد موجوداً في الكتالوج أو قائمة أسعارك (منتج محذوف؟). يستخدم التصميم الاختيار التلقائي إلى أن تختار بديلاً.`))
   const panelPick = d.panelId === 'auto' ? undefined : getPanel(d.panelId)
   if (d.panelId !== 'auto' && !panelPick) unknown('panel', 'اللوح', d.panelId)
   const panel = panelPick ?? recommendPanel(roughKwp)
@@ -525,7 +537,8 @@ function computeCore(p: Project): Results {
   const battDailyWh = d.systemType === 'offgrid' ? L.dailyWh : d.systemType === 'hybrid' ? (hybridCritical ? L.criticalNightWh : L.nightWh) : 0
   const usableNeedKwh = (battDailyWh * d.autonomyDays) / INV_EFF_BATT / 1000
   const chemDod = DOD_BY_CHEMISTRY[chem] ?? 0.9
-  const battery: Battery | null = isGT || battTarget === 0 ? null : manualBattery ?? (d.batteryId === 'auto' && (battTarget ?? usableNeedKwh) > 0
+  const battAuto = d.batteryId === 'auto' || (!!d.batteryId && !manualBattery) // a deleted product is replaced automatically (unknown-battery error raised)
+  const battery: Battery | null = isGT || battTarget === 0 ? null : manualBattery ?? (battAuto && (battTarget ?? usableNeedKwh) > 0
     ? recommendBattery(sysV, battTarget ?? usableNeedKwh / (dodOverride ?? chemDod), 'LiFePO4', { inverter, dodOverride, minDischargeA: (sizingPeakW * d.inverterSafety) / (sysVnum * INV_EFF_DC) }) : null)
   // Final DoD: user override > unit's usable DoD > chemistry default; the requirement is quoted at that DoD
   const dodFinal = dodOverride ?? (battery ? battery.usableDodPct / 100 : chemDod)
@@ -785,11 +798,11 @@ function computeCore(p: Project): Results {
   if (ex.panels + ex.batteries + ex.inverters > 0) checks.push(mk('existing', 'ok', 'design', 'Equipment already on site is part of the design but not of the price; savings and payback are shown for the whole system.',
     'المعدات الموجودة في الموقع جزء من التصميم وليست ضمن السعر؛ تُعرض الوفورات وفترة الاسترداد للنظام بالكامل.'))
   const hiddenIds = cat().hidden
-  for (const x of [panelPick, manualInverter, manualBattery].filter((y): y is Panel | Inverter | Battery => !!y && hiddenIds.has(y.id)))
+  for (const x of [panelPick, manualInverter, manualBattery, getController(d.chargeControllerId)].filter((y): y is Panel | Inverter | Battery | ChargeController => !!y && hiddenIds.has(y.id)))
     checks.push(mk(`not-stocked-${x.id}`, 'warn', 'design', `${x.brand} ${x.model} is marked "not stocked" in your price list — confirm availability before quoting.`,
       `${x.brand} ${x.model} مُعلَّم "غير متوفر" في قائمة أسعارك — تأكّد من توفره قبل إصدار العرض.`))
 
-  const { lines: bom, missing } = buildBom(p, pr, {
+  const { lines: bom, missing } = buildBom({ ...p, site: s, design: d }, pr, {
     panel, panelQty, arrayKwp, inverter, inverterQty, battery: batteryQty > 0 ? battery : null, batteryQty, batteryParallel: parallel, hvBattery,
     controller, controllerQty, strings, schedule, protection, combiners, combinerOutputs,
     dcInputs: viaController ? Math.max(1, controllerQty) : inverterQty, generatorKva,
@@ -860,9 +873,12 @@ function computeItems(p: Project): Results {
   const { lines: bom } = buildBom(p, pr, null)
   const q = buildQuoteFromBom(pr, s, bom)
   const cur = s.currency || 'USD'
-  if (cur !== 'USD' && !(s.fxRateToUsd > 0 && Number.isFinite(s.fxRateToUsd))) checks.push(mk('fx-invalid', 'error', 'bom', `Exchange rate must be greater than 0 ${cur} per USD; 1 was used.`, `يجب أن يكون سعر الصرف أكبر من صفر (${cur} لكل دولار)؛ تم استخدام 1.`))
+  if (cur !== 'USD' && !(s.fxRateToUsd > 0 && s.fxRateToUsd <= MAX_FX)) checks.push(mk('fx-invalid', 'error', 'bom', `Exchange rate must be greater than 0 ${cur} per USD; 1 was used.`, `يجب أن يكون سعر الصرف أكبر من صفر (${cur} لكل دولار)؛ تم استخدام 1.`))
   else if (!PEGGED_1_TO_1.has(cur) && s.fxRateToUsd === 1) checks.push(mk('fx-unset', 'error', 'bom', `Exchange rate is 1 ${cur} per USD — enter the current rate before quoting.`, `سعر الصرف مضبوط على 1 ${cur} لكل دولار — أدخل سعر الصرف الحالي قبل إصدار العرض.`))
   if (!lines.length) checks.push(mk('no-items', 'error', 'bom', 'Add the products to quote.', 'أضف المنتجات المطلوب تسعيرها.'))
+  const pc = effectivePercents(pr)
+  if (pc.markupPct !== pr.marginPct || pc.discountPct !== pr.discountPct || pc.vatPct !== pr.vatPct)
+    checks.push(mk('pricing-input', 'warn', 'bom', 'Markup (0–1000 %), discount (0–100 %) or VAT (0–100 %) was out of range and has been limited.', 'كانت نسبة الإضافة (0–1000%) أو الخصم (0–100%) أو ضريبة القيمة المضافة (0–100%) خارج النطاق وتم حصرها.'))
   const zero12 = Array<number>(12).fill(0)
   const panel = cat().panels[0]
   return {

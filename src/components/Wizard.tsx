@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
-import { ChevronLeft, ChevronRight, ChevronDown, Check, PlugZap, CloudCheck, Info } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ChevronDown, Check, PlugZap, CloudCheck, Info, Lock } from 'lucide-react'
 import { useAppStore, useCurrentProject } from '../store/useAppStore'
 import { useT } from '../i18n'
 import { formatQuoteMoney, type Quote } from '../engine/quote'
 import { fmt } from '../engine/format'
-import { projectTitle } from '../i18n/labels'
+import { fmtDate, projectTitle } from '../i18n/labels'
 import { StepInfo } from './steps/StepInfo'
 import { StepLoads } from './steps/StepLoads'
 import { StepSite } from './steps/StepSite'
@@ -40,7 +40,9 @@ export function Wizard() {
   const setView = useAppStore((s) => s.setView)
   const clientView = useAppStore((s) => s.clientView)
   const setClientView = useAppStore((s) => s.setClientView)
-  const { results, quote } = useComputed(project)
+  const { results, quote, book: companyBook } = useComputed(project)
+  const maxStep = useAppStore((s) => s.maxStep)
+  const applyCurrentPrices = useAppStore((s) => s.applyCurrentPrices)
   const [sheet, setSheet] = useState<'steps' | 'issues' | null>(null)
   const tiny = useMediaQuery('(max-width: 399px)')
   const heading = useRef<HTMLHeadingElement>(null)
@@ -60,7 +62,8 @@ export function Wizard() {
   const update: StepProps['update'] = (patch) => updateProject(project.id, patch)
   const goTo = (s: StepKey) => { setSheet(null); const i = STEPS.indexOf(s); if (i >= 0) setStep(i) }
   const props: StepProps = { project, results, quote, update, goTo }
-  const status = stepStatuses(project, results, quote)
+  const status = stepStatuses(project, results, quote, Math.max(cur, maxStep[project.id] ?? 0))
+  const lockedStale = !!project.lockedPrices && JSON.stringify(project.lockedPrices) !== JSON.stringify(companyBook)
   const hasLoads = hasDemand(project, results)
   const issues = hasLoads ? realIssues(results.checks).filter((c) => c.id !== 'no-loads' && c.id !== 'no-items') : []
   const BackIc = dir === 'rtl' ? ChevronRight : ChevronLeft
@@ -130,6 +133,14 @@ export function Wizard() {
         <h2 ref={heading} tabIndex={-1} className="sr-only text-title text-slate-900 outline-none sm:not-sr-only">{t.steps[key]}</h2>
         <p className="mt-0.5 hidden max-w-3xl text-sm text-slate-600 sm:block">{t.stepHelp[key]}</p>
       </div>
+
+      {lockedStale && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900" role="status" data-testid="prices-locked">
+          <Lock size={18} className="shrink-0" aria-hidden="true" />
+          <span className="min-w-0 flex-1">{t.nav.pricesLocked(project.lockedAt ? fmtDate(project.lockedAt) : '')}</span>
+          <button type="button" className="btn-secondary min-h-10" data-testid="apply-current-prices" onClick={() => applyCurrentPrices(project.id)}>{t.nav.useCurrentPrices}</button>
+        </div>
+      )}
 
       {needsLoads ? (
         <EmptyState icon={PlugZap} title={t.empty.needLoadsTitle} body={t.empty.needLoadsBody}>

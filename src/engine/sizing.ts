@@ -23,7 +23,7 @@ export const BILL_PROFILES: Record<BillProfile, { nightPct: number; peakFactor: 
 export const BILL_MOTOR_START_FACTOR = 3
 
 const num = (x: unknown, fallback: number | null): number | null => (typeof x === 'number' && Number.isFinite(x) ? x : fallback)
-const pos = (x: unknown): number | null => { const v = num(x, null); return v != null && v >= 0 ? v : null }
+const pos = (x: unknown, max = 1e6): number | null => { const v = num(x, null); return v != null && v >= 0 ? Math.min(v, max) : null }
 
 /** Sizing input with defaults filled and impossible values dropped (negative → unset). */
 export function resolveSizing(p: Pick<Project, 'sizing'>): SizingInput {
@@ -33,15 +33,16 @@ export function resolveSizing(p: Pick<Project, 'sizing'>): SizingInput {
   const b = (s.bill ?? {}) as Partial<BillInput>
   const t = (s.targets ?? {}) as Partial<SizingInput['targets']>
   const e = (s.existing ?? {}) as Partial<SizingInput['existing']>
-  const cnt = (x: unknown) => Math.max(0, Math.round(num(x, 0) ?? 0))
+  const cnt = (x: unknown) => Math.min(1e5, Math.max(0, Math.round(num(x, 0) ?? 0)))
   return {
     demand: s.demand === 'bill' ? 'bill' : 'loads',
     bill: {
-      monthlyKwh: Math.max(0, num(b.monthlyKwh, 0) ?? 0),
-      profile: b.profile && b.profile in BILL_PROFILES ? b.profile : 'residential',
+      monthlyKwh: pos(b.monthlyKwh, 1e8) ?? 0,
+      profile: typeof b.profile === 'string' && Object.hasOwn(BILL_PROFILES, b.profile) ? b.profile : 'residential',
       peakKw: pos(b.peakKw) || null, largestMotorKw: pos(b.largestMotorKw) || null,
     },
-    targets: { pvKwp: pos(t.pvKwp), batteryKwh: pos(t.batteryKwh), inverterKw: pos(t.inverterKw) || null },
+    // Ceilings far above any real job (100 MWp / 1 GWh / 100 MW) keep hostile inputs finite
+    targets: { pvKwp: pos(t.pvKwp, 1e5), batteryKwh: pos(t.batteryKwh), inverterKw: pos(t.inverterKw, 1e5) || null },
     existing: { panels: cnt(e.panels), batteries: cnt(e.batteries), inverters: cnt(e.inverters) },
   }
 }

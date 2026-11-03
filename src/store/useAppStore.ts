@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { Project, CompanySettings, PriceBook, ProjectMode, SystemType, Phase, CustomProducts } from '../engine/types'
+import type { Project, CompanySettings, PriceBook, ProjectMode, SystemType, Phase, CustomProducts, LoadItem, BomLine } from '../engine/types'
 import { defaultCompany, newProject, uid, siteFromLocation, modeDefaults, defaultDesign, defaultPricing } from '../engine/defaults'
 import { emptyPriceBook, normalizePriceBook } from '../engine/catalogContext'
 import { defaultSizing, projectMode } from '../engine/sizing'
@@ -37,6 +37,8 @@ interface AppState {
   /** Client-safe presentation: hide cost prices and markup everywhere. */
   clientView: boolean
   lastStep: Record<string, number>
+  /** Furthest wizard step reached per project — later steps are shown as "to do" until visited. */
+  maxStep: Record<string, number>
   /** Engineering calculator shown in the tools view (null = the tools list). */
   toolId: string | null
   /** Saved inputs of each engineering calculator, by tool id (the calculators own their shapes). */
@@ -54,6 +56,8 @@ interface AppState {
   duplicateProject: (id: string) => Project | null
   /** Copy as the next revision: same client and name, reference <base>-R<n>, status draft, current company exchange rate. */
   newRevision: (id: string) => Project | null
+  /** Re-price a locked (sent) quote with the current company price list. */
+  applyCurrentPrices: (id: string) => void
   importProject: (p: unknown) => Project | null; importMany: (ps: Project[]) => void
   setCompany: (c: Partial<Company>) => void
   // load calculator
@@ -76,27 +80,66 @@ interface AppState {
 
 const isObj = (x: unknown): x is Record<string, unknown> => !!x && typeof x === 'object' && !Array.isArray(x)
 export const STATUSES: Project['status'][] = ['draft', 'quoted', 'approved', 'installed', 'lost']
-/** Validate an imported JSON file and fill fields added in newer versions. Returns null when it is not a project. */
+const UNSAFE = new Set(['__proto__', 'constructor', 'prototype'])
+const finite = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v)
+/** Fields whose default is null but that hold a product / location id (string) rather than a number. */
+const ID_FIELDS = new Set(['inverterId', 'chargeControllerId', 'batteryId', 'panelId', 'locationId'])
+/**
+ * Copy `x` onto `base` keeping only values of the type the base expects (finite numbers for numbers, ids or numbers for
+ * null defaults, plain objects of finite numbers for maps). Unknown keys are kept only when they are finite numbers.
+ */
+function coerce<T extends object>(base: T, x: unknown): T {
+  const out = { ...base } as Record<string, unknown>
+  if (!isObj(x)) return out as T
+  for (const [k, v] of Object.entries(x)) {
+    if (UNSAFE.has(k)) continue
+    const b = (base as Record<string, unknown>)[k]
+    if (b === null || b === undefined) {
+      if (v === null || finite(v) || (ID_FIELDS.has(k) && typeof v === 'string') || (b === undefined && typeof v === 'boolean')) out[k] = v
+    } else if (typeof b === 'number') { if (finite(v)) out[k] = v }
+    else if (typeof b === 'string' || typeof b === 'boolean') { if (typeof v === typeof b) out[k] = v }
+    else if (Array.isArray(b)) { if (Array.isArray(v)) out[k] = v }
+    else if (isObj(b) && isObj(v)) out[k] = v
+  }
+  return out as T
+}
+const numMap = (x: unknown, min = 0) => Object.fromEntries(Object.entries(isObj(x) ? x : {}).filter(([k, v]) => !UNSAFE.has(k) && finite(v) && v >= min)) as Record<string, number>
+const LOAD_BASE: LoadItem = { id: '', name: '', category: 'other', watts: 0, qty: 0, hoursPerDay: 0, surgeFactor: 1, nightSharePct: 0, phase: 1, critical: true }
+const LINE_BASE: BomLine = { id: '', category: 'Custom', name: '', spec: '', unit: 'pcs', qty: 0, unitPriceUsd: 0, totalUsd: 0, source: 'custom' }
+
+/** Validate an imported / stored project field by field and fill fields added in newer versions. Returns null when it is not a project. */
 export function normalizeProject(x: unknown): Project | null {
   if (!isObj(x) || !isObj(x.design) || !isObj(x.site)) return null
   const mode = projectMode(x as Pick<Project, 'mode'>)
   if (mode === 'design' && !Array.isArray(x.loads)) return null
   const base = newProject()
-  const p = x as unknown as Project
-  const pricing = { ...base.pricing, ...(isObj(p.pricing) ? p.pricing : {}) }
-  const sz = isObj(p.sizing) ? (p.sizing as unknown as Record<string, unknown>) : {}
+  const top = coerce(base, x)
+  const site = coerce(base.site, x.site)
+  if (!(Array.isArray(site.monthlyPsh) && site.monthlyPsh.length === 12 && site.monthlyPsh.every((v) => finite(v) && v >= 0))) site.monthlyPsh = [...base.site.monthlyPsh]
+  if (!site.currency) site.currency = 'USD'
+  const design = coerce(base.design, x.design)
+  if (![12, 24, 48, 'hv'].includes(design.systemVoltage)) design.systemVoltage = base.design.systemVoltage
+  if (!['offgrid', 'hybrid', 'gridtie'].includes(design.systemType)) design.systemType = base.design.systemType
+  if (design.phase !== 1 && design.phase !== 3) design.phase = 1
+  const pr = isObj(x.pricing) ? x.pricing : {}
+  const pricing = coerce(base.pricing, pr)
+  for (const k of ['labourPerKwUsd', 'transportUsd', 'commissioningUsd'] as const) if (!(pricing[k] >= 0)) pricing[k] = base.pricing[k]
+  pricing.priceOverrides = numMap(pr.priceOverrides); pricing.qtyOverrides = numMap(pr.qtyOverrides)
+  pricing.excludedIds = (Array.isArray(pr.excludedIds) ? pr.excludedIds : []).filter((s): s is string => typeof s === 'string')
+  pricing.customItems = (Array.isArray(pr.customItems) ? pr.customItems : []).filter(isObj).map((l) => ({ ...coerce(LINE_BASE, l), id: typeof l.id === 'string' && l.id ? l.id : uid(), source: 'custom' as const }))
+  const loads = (Array.isArray(x.loads) ? x.loads : []).filter(isObj).map((l) => ({ ...coerce(LOAD_BASE, l), id: typeof l.id === 'string' && l.id ? l.id : uid() }))
+  for (const l of loads) if (l.phase !== 1 && l.phase !== 3) l.phase = 1
+  const sz = isObj(x.sizing) ? x.sizing : {}
   const def = defaultSizing()
+  const status = STATUSES.includes(x.status as Project['status']) ? (x.status as Project['status']) : 'draft'
   return {
-    ...base, ...p,
-    id: typeof p.id === 'string' && p.id ? p.id : base.id,
-    name: typeof p.name === 'string' ? p.name : base.name,
-    loads: Array.isArray(p.loads) ? p.loads : [],
-    site: { ...base.site, ...p.site }, design: { ...base.design, ...p.design },
-    pricing: { ...pricing, customItems: Array.isArray(pricing.customItems) ? pricing.customItems : [], excludedIds: Array.isArray(pricing.excludedIds) ? pricing.excludedIds : [],
-      priceOverrides: isObj(pricing.priceOverrides) ? pricing.priceOverrides : {}, qtyOverrides: isObj(pricing.qtyOverrides) ? pricing.qtyOverrides : {} },
-    mode,
-    sizing: { ...def, ...sz, bill: { ...def.bill, ...(isObj(sz.bill) ? sz.bill : {}) }, targets: { ...def.targets, ...(isObj(sz.targets) ? sz.targets : {}) }, existing: { ...def.existing, ...(isObj(sz.existing) ? sz.existing : {}) } } as Project['sizing'],
-    status: STATUSES.includes(p.status) ? p.status : 'draft',
+    ...top,
+    id: typeof x.id === 'string' && x.id ? x.id : base.id,
+    loads, site, design, pricing, mode, status,
+    sizing: { demand: sz.demand === 'bill' ? 'bill' : 'loads', bill: coerce(def.bill, sz.bill), targets: coerce(def.targets, sz.targets), existing: coerce(def.existing, sz.existing) },
+    proposalNote: typeof x.proposalNote === 'string' ? x.proposalNote : '',
+    revisionOf: typeof x.revisionOf === 'string' ? x.revisionOf : undefined,
+    ...(isObj(x.lockedPrices) ? { lockedPrices: normalizePriceBook(x.lockedPrices), lockedAt: typeof x.lockedAt === 'string' ? x.lockedAt : undefined } : {}),
   }
 }
 
@@ -111,7 +154,7 @@ export function normalizeCompany(x: unknown, current: Company): Company | null {
     if (typeof v === typeof x[k] && (typeof v !== 'number' || Number.isFinite(x[k]))) o[k] = x[k]
   }
   if ('logoDataUrl' in x) out.logoDataUrl = isLogo(x.logoDataUrl) ? (x.logoDataUrl as string) : null
-  if ('priceBook' in x) out.priceBook = normalizePriceBook(x.priceBook)
+  if (isObj(x.priceBook)) out.priceBook = normalizePriceBook(x.priceBook)
   if (!['offgrid', 'hybrid', 'gridtie'].includes(out.defaultSystemType)) out.defaultSystemType = current.defaultSystemType
   if (out.defaultPhase !== 1 && out.defaultPhase !== 3) out.defaultPhase = current.defaultPhase
   return out
@@ -134,11 +177,15 @@ function freshProject(c: Company, lang: Lang, partial: Partial<Project> = {}, mo
   return p
 }
 const revBase = (ref: string) => ref.replace(/-R\d+$/, '')
+const unlocked = (p: Project): Project => { const c = { ...p }; delete c.lockedPrices; delete c.lockedAt; return c }
+/** Quotes that left Draft freeze the company price list they were priced with; back to Draft follows the current list again. */
+const withLock = (p: Project, book: PriceBook): Project =>
+  p.status === 'draft' ? (p.lockedPrices ? unlocked(p) : p) : p.lockedPrices ? p : { ...p, lockedPrices: book, lockedAt: new Date().toISOString() }
 
 export const useAppStore = create<AppState>()(
   persist(
     (set, get) => ({
-      lang: initialLang(), view: 'projects', step: 0, projects: [], currentId: null, company: initialCompany, clientView: true, lastStep: {}, toolId: null, tools: {}, calc: null,
+      lang: initialLang(), view: 'projects', step: 0, projects: [], currentId: null, company: initialCompany, clientView: true, lastStep: {}, maxStep: {}, toolId: null, tools: {}, calc: null,
       setLang: (lang) => set((s) => {
         // Untouched default texts follow the UI language (so the Arabic quote doesn't print English boilerplate)
         const from = lang === 'ar' ? en : ar, to = lang === 'ar' ? ar : en
@@ -154,7 +201,9 @@ export const useAppStore = create<AppState>()(
       setView: (view) => set(view === 'tools' ? { view, toolId: null } : { view }),
       openTool: (toolId) => set({ view: 'tools', toolId }),
       setTool: (id, state) => set((s) => ({ tools: { ...s.tools, [id]: state } })),
-      setStep: (step) => set((s) => ({ step, lastStep: s.currentId ? { ...s.lastStep, [s.currentId]: step } : s.lastStep })),
+      setStep: (step) => set((s) => (s.currentId
+        ? { step, lastStep: { ...s.lastStep, [s.currentId]: step }, maxStep: { ...s.maxStep, [s.currentId]: Math.max(step, s.maxStep[s.currentId] ?? 0) } }
+        : { step })),
       setClientView: (clientView) => set({ clientView }),
       navigate: ({ view, currentId, step, toolId }) => set((s) => {
         if (view === 'wizard' && currentId && s.projects.some((p) => p.id === currentId)) return { view, currentId, step: step ?? s.lastStep[currentId] ?? 0 }
@@ -168,7 +217,10 @@ export const useAppStore = create<AppState>()(
       },
       openProject: (id, step) => set((s) => ({ currentId: id, view: 'wizard', step: step ?? s.lastStep[id] ?? 0 })),
       updateProject: (id, patch) => set((s) => ({
-        projects: s.projects.map((p) => (p.id === id ? { ...p, ...(typeof patch === 'function' ? patch(p) : patch), updatedAt: new Date().toISOString() } : p)),
+        projects: s.projects.map((p) => (p.id === id ? withLock({ ...p, ...(typeof patch === 'function' ? patch(p) : patch), updatedAt: new Date().toISOString() }, s.company.priceBook) : p)),
+      })),
+      applyCurrentPrices: (id) => set((s) => ({
+        projects: s.projects.map((p) => (p.id === id && p.lockedPrices ? { ...p, lockedPrices: s.company.priceBook, lockedAt: new Date().toISOString(), updatedAt: new Date().toISOString() } : p)),
       })),
       deleteProject: (id) => {
         const s = get(); const index = s.projects.findIndex((p) => p.id === id)
@@ -186,8 +238,8 @@ export const useAppStore = create<AppState>()(
         const s = get(); const src = s.projects.find((p) => p.id === id); if (!src) return null
         const d = s.lang === 'ar' ? ar : en
         const now = new Date().toISOString()
-        const copy: Project = { ...structuredClone(src), id: uid(), name: `${src.name} ${d.projects.copySuffix}`, createdAt: now, updatedAt: now, status: 'draft', revisionOf: undefined }
-        set({ projects: [copy, ...s.projects] })
+        const copy: Project = { ...unlocked(structuredClone(src)), id: uid(), name: `${src.name} ${d.projects.copySuffix}`, createdAt: now, updatedAt: now, status: 'draft', revisionOf: undefined }
+        set({ projects: [copy, ...s.projects], maxStep: { ...s.maxStep, [copy.id]: s.maxStep[src.id] ?? 6 } })
         return copy
       },
       newRevision: (id) => {
@@ -198,17 +250,21 @@ export const useAppStore = create<AppState>()(
         const c = s.company
         const site = { ...src.site }
         if (site.currency === c.currency && site.currency !== 'USD' && c.fxRateToUsd > 0) site.fxRateToUsd = c.fxRateToUsd
-        const copy: Project = { ...structuredClone(src), site, id: uid(), reference: base ? `${base}-R${n}` : src.reference, createdAt: now, updatedAt: now, status: 'draft', revisionOf: src.id }
-        set({ projects: [copy, ...s.projects] })
+        const copy: Project = { ...unlocked(structuredClone(src)), site, id: uid(), reference: base ? `${base}-R${n}` : src.reference, createdAt: now, updatedAt: now, status: 'draft', revisionOf: src.id }
+        set({ projects: [copy, ...s.projects], maxStep: { ...s.maxStep, [copy.id]: s.maxStep[src.id] ?? 6 } })
         return copy
       },
       importProject: (x) => {
-        const p = normalizeProject(x); if (!p) return null
-        const s = get(); const fixed = { ...p, id: s.projects.some((q) => q.id === p.id) ? uid() : p.id }
-        set({ projects: [fixed, ...s.projects] })
+        const n = normalizeProject(x); if (!n) return null
+        const s = get(); const p = withLock(n, s.company.priceBook)
+        const fixed = { ...p, id: s.projects.some((q) => q.id === p.id) ? uid() : p.id }
+        set({ projects: [fixed, ...s.projects], maxStep: { ...s.maxStep, [fixed.id]: 6 } })
         return fixed
       },
-      importMany: (ps) => set((s) => ({ projects: [...ps.map((p) => ({ ...p, id: s.projects.some((q) => q.id === p.id) ? uid() : p.id })), ...s.projects] })),
+      importMany: (ps) => set((s) => {
+        const added = ps.map((p) => ({ ...withLock(p, s.company.priceBook), id: s.projects.some((q) => q.id === p.id) ? uid() : p.id }))
+        return { projects: [...added, ...s.projects], maxStep: { ...s.maxStep, ...Object.fromEntries(added.map((p) => [p.id, 6])) } }
+      }),
       setCompany: (c) => set((s) => ({ company: { ...s.company, ...c } })),
 
       startCalc: (fresh = false) => {
@@ -223,7 +279,7 @@ export const useAppStore = create<AppState>()(
         const s = get(); const c = s.calc; if (!c) return null
         const now = new Date().toISOString()
         const p: Project = { ...structuredClone(c), id: uid(), mode: 'design', createdAt: now, updatedAt: now, status: 'draft' }
-        set((st) => ({ projects: [p, ...st.projects], calc: null, currentId: p.id, view: 'wizard', step: 0, lastStep: { ...st.lastStep, [p.id]: 0 } }))
+        set((st) => ({ projects: [p, ...st.projects], calc: null, currentId: p.id, view: 'wizard', step: 0, lastStep: { ...st.lastStep, [p.id]: 0 }, maxStep: { ...st.maxStep, [p.id]: 1 } }))
         return p
       },
 
@@ -273,7 +329,9 @@ export const useAppStore = create<AppState>()(
           st = {
             ...st, tools: {}, toolId: null, calc: null,
             company: { ...initialCompany, ...(st.company ?? {}), priceBook: normalizePriceBook(st.company?.priceBook) },
-            projects: (st.projects ?? []).map((p) => normalizeProject(p)).filter((p): p is Project => !!p),
+            // Quotes already sent keep the prices they were quoted with (catalogue prices for v0.1 projects)
+            projects: (Array.isArray(st.projects) ? st.projects : []).map((p) => normalizeProject(p)).filter((p): p is Project => !!p)
+              .map((p) => (p.status !== 'draft' && !p.lockedPrices ? { ...p, lockedPrices: emptyPriceBook(), lockedAt: new Date().toISOString() } : p)),
           }
         }
         return st as AppState
@@ -282,7 +340,9 @@ export const useAppStore = create<AppState>()(
         const p = (persisted ?? {}) as Partial<AppState>
         const company = { ...current.company, ...(p.company ?? {}) }
         company.priceBook = normalizePriceBook(company.priceBook)
-        return { ...current, ...p, company, lastStep: { ...(p.lastStep ?? {}) }, tools: { ...(p.tools ?? {}) }, calc: p.calc ? normalizeProject(p.calc) : null }
+        // Projects saved before maxStep existed count as fully visited
+        const maxStep = isObj(p.maxStep) ? (p.maxStep as Record<string, number>) : Object.fromEntries((Array.isArray(p.projects) ? p.projects : []).map((x) => [x.id, 6]))
+        return { ...current, ...p, company, lastStep: { ...(p.lastStep ?? {}) }, maxStep, tools: { ...(p.tools ?? {}) }, calc: p.calc ? normalizeProject(p.calc) : null }
       },
     },
   ),

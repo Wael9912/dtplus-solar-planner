@@ -65,8 +65,8 @@ export function computeEconomics(e: EconomicsInput): EconomicsResult {
   }
   return {
     annualSavingsUsd: savings1,
-    paybackYears: savings1 > 0 ? capex / savings1 : null,
-    lcoeUsdPerKwh: pvEnergy > 0 ? pvCost / pvEnergy : 0,
+    paybackYears: savings1 > 0 && Number.isFinite(capex / savings1) ? capex / savings1 : null,
+    lcoeUsdPerKwh: pvEnergy > 0 && Number.isFinite(pvCost / pvEnergy) ? pvCost / pvEnergy : 0,
     co2TonsPerYear: (useful1 * ef) / 1000,
     lifetimeProductionKwh: lifetime, lifetimeUsefulKwh: lifetimeUseful, usefulEnergyKwh: useful1,
     roiPct: capex > 0 ? ((cumulativeCashflow[years] + capex) / capex - 1) * 100 : null,

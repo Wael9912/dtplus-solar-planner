@@ -67,24 +67,25 @@ export interface StringCheck {
 
 export function validateStrings(x: StringCheckInput): StringField[] {
   const m = x.module, p = x.mppt, bad: StringField[] = []
-  if (!pos(m.watts)) bad.push('watts')
-  if (!pos(m.voc)) bad.push('voc')
-  if (!pos(m.vmp) || (pos(m.voc) && m.vmp >= m.voc)) bad.push('vmp')
-  if (!pos(m.isc)) bad.push('isc')
-  if (!pos(m.imp) || (pos(m.isc) && m.imp > m.isc)) bad.push('imp')
+  // Physical ranges with headroom (modules 1 W–5 kW, 1–2000 V, 0.1–100 A): absurd magnitudes are rejected, never overflow
+  if (!within(m.watts, 1, 5000)) bad.push('watts')
+  if (!within(m.voc, 1, 2000)) bad.push('voc')
+  if (!within(m.vmp, 0.5, 2000) || (pos(m.voc) && m.vmp >= m.voc)) bad.push('vmp')
+  if (!within(m.isc, 0.1, 100)) bad.push('isc')
+  if (!within(m.imp, 0.05, 100) || (pos(m.isc) && m.imp > m.isc)) bad.push('imp')
   if (!within(m.tempCoeffVocPctPerC, -1, 0)) bad.push('tcVoc')
   if (!within(m.tempCoeffPmaxPctPerC, -1, 0)) bad.push('tcPmax')
   if (!within(m.noct, 20, 70)) bad.push('noct')
-  if (m.maxSystemVoltage != null && !pos(m.maxSystemVoltage)) bad.push('maxSysV')
-  if (m.maxSeriesFuseA != null && !pos(m.maxSeriesFuseA)) bad.push('maxFuse')
-  if (!pos(p.maxPvVoltage)) bad.push('maxPvV')
+  if (m.maxSystemVoltage != null && !within(m.maxSystemVoltage, 1, 3000)) bad.push('maxSysV')
+  if (m.maxSeriesFuseA != null && !within(m.maxSeriesFuseA, 1, 200)) bad.push('maxFuse')
+  if (!within(p.maxPvVoltage, 1, 3000)) bad.push('maxPvV')
   if (!within(p.mpptMinV, 0, 2000)) bad.push('mpptMin')
-  if (!pos(p.mpptMaxV) || (fin(p.mpptMinV) && p.mpptMaxV <= p.mpptMinV)) bad.push('mpptMax')
-  if (!fin(p.mpptCount) || !Number.isInteger(p.mpptCount) || p.mpptCount < 1) bad.push('mpptCount')
-  if (!pos(p.maxInputCurrentPerMppt)) bad.push('maxA')
-  if (p.maxPvInputKw != null && !(fin(p.maxPvInputKw) && p.maxPvInputKw >= 0)) bad.push('maxPvKw')
-  if (!fin(x.units) || !Number.isInteger(x.units) || x.units < 1) bad.push('units')
-  if (x.panelCount != null && (!fin(x.panelCount) || !Number.isInteger(x.panelCount) || x.panelCount < 1)) bad.push('panelCount')
+  if (!within(p.mpptMaxV, 1, 3000) || (fin(p.mpptMinV) && p.mpptMaxV <= p.mpptMinV)) bad.push('mpptMax')
+  if (!fin(p.mpptCount) || !Number.isInteger(p.mpptCount) || p.mpptCount < 1 || p.mpptCount > 100) bad.push('mpptCount')
+  if (!within(p.maxInputCurrentPerMppt, 0.1, 2000)) bad.push('maxA')
+  if (p.maxPvInputKw != null && !within(p.maxPvInputKw, 0, 100000)) bad.push('maxPvKw')
+  if (!fin(x.units) || !Number.isInteger(x.units) || x.units < 1 || x.units > 1000) bad.push('units')
+  if (x.panelCount != null && (!fin(x.panelCount) || !Number.isInteger(x.panelCount) || x.panelCount < 1 || x.panelCount > 100000)) bad.push('panelCount')
   if (!within(x.recordLowC, -50, 40)) bad.push('low')
   if (!within(x.hotAmbientC, -20, 60) || (fin(x.recordLowC) && x.hotAmbientC < x.recordLowC)) bad.push('hot')
   return bad
@@ -232,19 +233,19 @@ export const busVolts = (b: Bus) => (b === 'hv' ? 400 : b)
 export function validateBattery(x: BatteryBankInput): BatteryField[] {
   const m = x.module, bad: BatteryField[] = []
   if (x.basis === 'load') {
-    if (!pos(x.loadW)) bad.push('loadW')
+    if (!within(x.loadW, 0.1, 1e7)) bad.push('loadW')
     if (!within(x.hours, 0.01, 240)) bad.push('hours')
   } else {
     if (!within(x.energyKwh, 0.001, 100000)) bad.push('energy')
-    if (x.loadW != null && !(fin(x.loadW) && x.loadW >= 0)) bad.push('loadW')
+    if (x.loadW != null && !within(x.loadW, 0, 1e7)) bad.push('loadW')
   }
-  if (!pos(m.nominalVoltage)) bad.push('V')
-  if (!pos(m.capacityAh)) bad.push('Ah')
-  if (m.energyKwh != null && !pos(m.energyKwh)) bad.push('kWh')
+  if (!within(m.nominalVoltage, 1, 2000)) bad.push('V')
+  if (!within(m.capacityAh, 0.1, 100000)) bad.push('Ah')
+  if (m.energyKwh != null && !within(m.energyKwh, 0.01, 10000)) bad.push('kWh')
   if (!within(m.usableDodPct, 10, 100)) bad.push('dod')
-  if (m.maxChargeA != null && !pos(m.maxChargeA)) bad.push('maxChargeA')
-  if (m.maxDischargeA != null && !pos(m.maxDischargeA)) bad.push('maxDischargeA')
-  if (m.parallelMax != null && (!fin(m.parallelMax) || m.parallelMax < 1)) bad.push('parallelMax')
+  if (m.maxChargeA != null && !within(m.maxChargeA, 0.1, 100000)) bad.push('maxChargeA')
+  if (m.maxDischargeA != null && !within(m.maxDischargeA, 0.1, 100000)) bad.push('maxDischargeA')
+  if (m.parallelMax != null && !within(m.parallelMax, 1, 1000)) bad.push('parallelMax')
   if (x.dodOverridePct != null && !within(x.dodOverridePct, 10, 100)) bad.push('dodOverride')
   if (!within(x.cableRunM, 0.1, 500)) bad.push('run')
   return bad
@@ -395,9 +396,9 @@ export function validateCable(x: CableToolInput): CableField[] {
   const bad: CableField[] = []
   const byPower = x.by === 'power' && x.circuit !== 'pv'
   if (byPower) {
-    if (!pos(x.powerKw)) bad.push('power')
+    if (!within(x.powerKw, 0.001, 100000)) bad.push('power')
     if (x.circuit !== 'battery' && !within(x.pf, 0.1, 1)) bad.push('pf')
-  } else if (!pos(x.currentA)) bad.push('current')
+  } else if (!within(x.currentA, 0.01, 100000)) bad.push('current')
   if (!within(x.voltage, 1, 1500)) bad.push('voltage')
   if (!within(x.lengthM, 0.1, 10000)) bad.push('length')
   if (!within(x.maxDropPct, 0.1, 20)) bad.push('drop')

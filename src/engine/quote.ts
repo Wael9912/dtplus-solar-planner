@@ -34,7 +34,7 @@ export const roundTo = (n: number, d: number) => {
 const decimalsCache = new Map<string, number>()
 /** ISO 4217 minor units of a currency code (2 when unknown). */
 export function currencyDecimals(code: string): number {
-  const c = (code || 'USD').toUpperCase()
+  const c = (typeof code === 'string' && code ? code : 'USD').toUpperCase()
   const hit = decimalsCache.get(c); if (hit != null) return hit
   let d = 2
   try { d = new Intl.NumberFormat('en', { style: 'currency', currency: c }).resolvedOptions().maximumFractionDigits ?? 2 } catch { d = 2 }
@@ -52,7 +52,7 @@ export const effectivePercents = (pr: Pick<PricingInput, 'marginPct' | 'discount
 
 /** Quote from a BOM (used by computeProject before Results exist). */
 export function buildQuoteFromBom(pricing: Pick<PricingInput, 'marginPct' | 'discountPct' | 'vatPct'>, site: Pick<SiteInput, 'currency' | 'fxRateToUsd'>, bom: BomLine[]): Quote {
-  const currency = site.currency || 'USD'
+  const currency = typeof site.currency === 'string' && site.currency ? site.currency : 'USD'
   const fx = quoteFx(site)
   const decimals = currencyDecimals(currency)
   const rd = (n: number) => roundTo(n, decimals)

@@ -130,6 +130,11 @@ export interface Project {
   proposalNote?: string
   /** Id of the project this one is a revision of (New revision keeps the reference with -R2, -R3 …). */
   revisionOf?: string
+  /**
+   * Company price list frozen when the quote left Draft (§16.6): the engine uses it instead of the current list, so later price
+   * changes never rewrite a quote the client already has. Back to Draft / "Use current prices" / New revision → current list.
+   */
+  lockedPrices?: PriceBook; lockedAt?: string
 }
 export type ProjectStatus = 'draft' | 'quoted' | 'approved' | 'installed' | 'lost'
 

@@ -25,6 +25,8 @@ export const COMBINER_TO_INVERTER_M = 3 // combiner at the inverter end: short o
 export const AC_INV_TO_COMBINER_M = 3 // parallel inverters land on an AC combiner next to them; acCableRunM is the combined feeder
 
 const DISCRETE = new Set(['pcs', 'pair', 'kit', 'lot'])
+/** Ceilings for hand-entered quantities and prices (USD) — far above any real quote, low enough that totals stay finite. */
+const MAX_QTY = 1e7, MAX_PRICE_USD = 1e9
 const TYPE_AR: Record<string, string> = { hybrid: 'هجين', offgrid: 'منفصل عن الشبكة', gridtie: 'متصل بالشبكة' }
 const CHEM_AR: Record<string, string> = { LiFePO4: 'ليثيوم حديد فوسفات (LiFePO4)', NMC: 'ليثيوم NMC', AGM: 'رصاص حمضي AGM', Gel: 'رصاص حمضي جل', Flooded: 'رصاص حمضي سائل' }
 const phaseAr = (ph: number) => (ph === 3 ? 'ثلاثي الأطوار' : 'أحادي الطور')
@@ -42,11 +44,11 @@ export function buildBom(p: Project, pr: PricingInput, c: BomCtx | null): { line
   const { site: s } = p
   const fx = quoteFx(s), dec = currencyDecimals(s.currency)
   const money = (qty: number, price: number) => {
-    const unitL = roundTo(price * fx, dec)
+    const unitL = roundTo(Math.min(price, MAX_PRICE_USD) * fx, dec)
     return roundTo(qty * unitL, dec) / fx
   }
   const custom = (pr.customItems ?? []).filter((ci) => !pr.excludedIds.includes(ci.id)).map((ci): BomLine => {
-    const q = Number.isFinite(ci.qty) && ci.qty >= 0 ? ci.qty : 0, price = Number.isFinite(ci.unitPriceUsd) && ci.unitPriceUsd >= 0 ? ci.unitPriceUsd : 0
+    const q = Number.isFinite(ci.qty) && ci.qty >= 0 ? Math.min(ci.qty, MAX_QTY) : 0, price = Number.isFinite(ci.unitPriceUsd) && ci.unitPriceUsd >= 0 ? Math.min(ci.unitPriceUsd, MAX_PRICE_USD) : 0
     return { ...ci, qty: q, unitPriceUsd: price, totalUsd: money(q, price), source: 'custom' }
   })
   if (!c) return { lines: custom, missing: [] }
@@ -191,10 +193,14 @@ function buildDesignBom(p: Project, pr: PricingInput, c: BomCtx, money: (qty: nu
     add({ id: 'generator', category: 'Generator', name: 'Diesel generator', spec: `${kva} kVA, silent canopy, ATS-ready`, nameAr: 'مولد ديزل',
       specAr: `${kva} kVA، بكاتم صوت، جاهز لمفتاح التحويل الآلي ATS`, unit: 'pcs', qty: 1, price: generatorPriceUsd(kva) })
   }
-  // ---- Services: labour per new kWp; a system without new panels (backup-only, battery / inverter upgrade) per inverter kW installed
+  // ---- Services: labour per new kWp (a complete new system: the whole array, as in §12). When some or all panels are already on
+  // site (upgrade) or there are none (backup-only), a new inverter is charged per kW on top; a battery-only job is one lot (1 kW).
+  // Capped at the complete-system labour, so marking more equipment as existing never raises the price.
+  const invKw = c.inverter ? c.inverter.ratedAcKw * c.inverterQty : 0
   const newInvKw = c.inverter ? c.inverter.ratedAcKw * Math.max(0, c.inverterQty - ex.inverters) : 0
-  const labourKw = N > 0 ? newKwp : newInvKw > 0 ? newInvKw : c.batteryQty - ex.batteries > 0 ? 1 : 0
-  const labourUnit = N > 0 ? 'kWp' : 'kW'
+  const fullKw = c.panelQty > 0 ? c.arrayKwp : Math.max(invKw, c.batteryQty > 0 ? 1 : 0)
+  const labourKw = Math.min(fullKw, newKwp + (ex.panels > 0 || N === 0 ? newInvKw : 0) + (c.batteryQty - ex.batteries > 0 ? 1 : 0))
+  const labourUnit = c.panelQty > 0 && labourKw === fullKw ? 'kWp' : 'kW'
   add({ id: 'labour', category: 'Services', name: 'Installation labour', spec: `${roundTo(labourKw, 2)} ${labourUnit}`, nameAr: 'أعمال التركيب', specAr: `${roundTo(labourKw, 2)} ${labourUnit}`, unit: labourUnit, qty: labourKw, price: pr.labourPerKwUsd })
   add({ id: 'transport', category: 'Services', name: 'Transport & logistics', spec: '', nameAr: 'النقل والترحيل', specAr: '', unit: 'lot', qty: 1, price: pr.transportUsd })
   add({ id: 'commissioning', category: 'Services', name: 'Commissioning, testing & handover', spec: '', nameAr: 'التشغيل والاختبار والتسليم', specAr: '', unit: 'lot', qty: 1, price: pr.commissioningUsd })
@@ -210,9 +216,10 @@ function buildDesignBom(p: Project, pr: PricingInput, c: BomCtx, money: (qty: nu
     // Main equipment: computeProject already applied overrides ≥ 1 to the design; an override of 0 keeps the line at 0 (not quoted)
     const existingQty = exBy.get(x.id) ?? 0
     const computed = Math.max(0, (DISCRETE.has(x.unit) ? ceilSafe(x.qty) : Math.ceil(Math.round(x.qty * 1e6) / 1e4) / 100) - existingQty)
-    const q = hasOv && (!main.has(x.id) || ov === 0) ? ov : computed
+    const q = hasOv && (!main.has(x.id) || ov === 0) ? Math.min(DISCRETE.has(x.unit) && ov > 0 ? ceilSafe(ov) : ov, MAX_QTY) : computed
     if (!hasOv && !(computed > 0)) continue
-    const price = pr.priceOverrides[x.id] ?? x.price
+    const ovp = pr.priceOverrides[x.id]
+    const price = Math.min(ovp != null && Number.isFinite(ovp) && ovp >= 0 ? ovp : Number.isFinite(x.price) && x.price >= 0 ? x.price : 0, MAX_PRICE_USD)
     lines.push({ id: x.id, category: x.category, name: x.name, spec: x.spec, nameAr: x.nameAr, specAr: x.specAr, unit: x.unit, qty: q, unitPriceUsd: price, totalUsd: money(q, price), source: 'auto', ...(existingQty ? { existingQty } : {}) })
   }
   return { lines: [...lines, ...custom], missing }

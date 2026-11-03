@@ -8,12 +8,13 @@ import { outputsEn } from './outputs'
 export const en = {
   appName: 'DT+ Solar Planner', appShort: 'Solar Planner', tagline: 'Step-by-step solar design, sizing & quotation', by: 'Product developed by DT+',
   nav: {
-    projects: 'Projects', settings: 'Company settings', newProject: 'New project', back: 'Back', next: 'Next', finish: 'Finish', save: 'Saved', language: 'العربية',
+    projects: 'Projects', settings: 'Company settings', newProject: 'New project', newShort: 'New', back: 'Back', next: 'Next', finish: 'Finish', save: 'Saved', language: 'العربية',
     languageLabel: 'Language', menu: 'Menu', allProjects: 'All projects',
     nextTo: (step: string) => `Next: ${step}`, stepOf: (i: number, n: number) => `Step ${i} of ${n}`, steps: 'Project steps', aboutStep: 'About this step',
     clientView: 'Client view', clientViewHelp: 'Hides cost prices and markup so you can show the screen to the client.', savedAuto: 'Saved automatically',
     issues: (n: number) => `${n} ${n === 1 ? 'issue' : 'issues'}`, noIssues: 'No issues', finishHelp: 'Back to all projects',
     home: 'Home', tools: 'Tools', prices: 'Price list', newMenu: 'Start something new',
+    pricesLocked: (d: string) => `This quote keeps the prices it was sent with${d ? ` (${d})` : ''}. Your price list has changed since.`, useCurrentPrices: 'Use current prices',
   },
   /** Project modes and the start menu (home tiles, header "New" menu). */
   modes: {
