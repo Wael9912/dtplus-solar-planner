@@ -8,6 +8,8 @@ import { currencies, currencyName, defaultFx } from '../data/currencies'
 import { locations } from '../data/locations'
 import { placeName } from '../i18n/places'
 import { companyTitle, fmtDate } from '../i18n/labels'
+import { en as EN } from '../i18n/en'
+import { ar as AR } from '../i18n/ar'
 import { normalizePriceBook, resolveCatalog } from '../engine/catalogContext'
 import { fxOf, money } from '../engine/format'
 import { download } from '../export/download'
@@ -79,7 +81,14 @@ export function SettingsPage() {
     return { file: tp.file.fileInfo(nm ? `${nm} (${pending.name})` : pending.name, when), counts: bc ? tp.file.fileCounts(bc.edited, bc.hidden, bc.own) : null }
   })()
   const onLogo = (f: File) => { const r = new FileReader(); r.onload = () => setCompany({ logoDataUrl: String(r.result) }); r.readAsDataURL(f) }
-  const name = companyTitle(company.name) ?? t.settings.defaultName
+  // Preview in the UI language: the Arabic name / tagline in Arabic (each falling back to the other language)
+  const nameAr = companyTitle(company.nameAr ?? ''), nameEn = companyTitle(company.name)
+  const name = (lang === 'ar' ? nameAr ?? nameEn : nameEn ?? nameAr) ?? t.settings.defaultName
+  const tagline = (lang === 'ar' ? company.taglineAr?.trim() || company.tagline : company.tagline?.trim() || company.taglineAr) || t.settings.defaultTagline
+  const C = tp.company
+  // The English fields never show the Arabic placeholders the UI-language switch swaps in; an untouched name shows as empty
+  const enName = nameEn ?? ''
+  const enText = (k: 'tagline' | 'terms') => (company[k] === AR.settings[k === 'tagline' ? 'defaultTagline' : 'defaultTerms'] ? EN.settings[k === 'tagline' ? 'defaultTagline' : 'defaultTerms'] : company[k])
   const local = company.currency && company.currency !== 'USD'
   const sortedLocs = [...locations].sort((a, b) => placeName(a, lang).localeCompare(placeName(b, lang), lang))
   return (
@@ -93,13 +102,16 @@ export function SettingsPage() {
         <div className="mb-5 overflow-hidden rounded-xl border border-slate-200" aria-label={t.settings.preview}>
           <div className="flex items-center gap-3 px-4 py-3 text-white" style={{ background: company.primaryColor }}>
             {company.logoDataUrl ? <img src={company.logoDataUrl} alt={t.settings.logo} className="h-10 w-auto max-w-28 rounded bg-white object-contain p-1" /> : <span className="grid size-10 place-items-center rounded bg-white/20"><Sun size={22} /></span>}
-            <div className="min-w-0"><p className="truncate font-semibold"><bdi>{name}</bdi></p><p className="truncate text-xs opacity-90"><bdi>{company.tagline || t.settings.defaultTagline}</bdi></p></div>
+            <div className="min-w-0"><p className="truncate font-semibold"><bdi>{name}</bdi></p><p className="truncate text-xs opacity-90"><bdi>{tagline}</bdi></p></div>
           </div>
           <p className="bg-slate-50 px-4 py-1.5 text-xs text-slate-500">{t.settings.preview}</p>
         </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Field label={t.settings.company}><input className="input" dir="auto" value={company.name} placeholder={t.settings.defaultName} onChange={(e) => setCompany({ name: e.target.value })} /></Field>
-          <Field label={t.settings.tagline}><input className="input" dir="auto" value={company.tagline} onChange={(e) => setCompany({ tagline: e.target.value })} /></Field>
+          {/* English and Arabic texts side by side: English documents print the English ones, Arabic documents the Arabic ones */}
+          <Field label={C.nameEn} help={C.enHelp}><input className="input" dir="ltr" lang="en" value={enName} placeholder={EN.settings.defaultName} onChange={(e) => setCompany({ name: e.target.value })} data-testid="settings-name" /></Field>
+          <Field label={C.nameAr} help={C.arHelp}><input className="input" dir="rtl" lang="ar" value={company.nameAr ?? ''} placeholder={AR.settings.defaultName} onChange={(e) => setCompany({ nameAr: e.target.value })} data-testid="settings-name-ar" /></Field>
+          <Field label={C.taglineEn}><input className="input" dir="ltr" lang="en" value={enText('tagline')} placeholder={EN.settings.defaultTagline} onChange={(e) => setCompany({ tagline: e.target.value })} data-testid="settings-tagline" /></Field>
+          <Field label={C.taglineAr}><input className="input" dir="rtl" lang="ar" value={company.taglineAr ?? ''} placeholder={AR.settings.defaultTagline} onChange={(e) => setCompany({ taglineAr: e.target.value })} data-testid="settings-tagline-ar" /></Field>
           <Field label={t.settings.phone}><input className="input" type="tel" dir="ltr" inputMode="tel" autoComplete="tel" value={company.phone} onChange={(e) => setCompany({ phone: e.target.value })} /></Field>
           <Field label={t.settings.email}><input className="input" type="email" dir="ltr" inputMode="email" autoComplete="email" value={company.email} onChange={(e) => setCompany({ email: e.target.value })} /></Field>
           <Field label={t.settings.website}><input className="input" type="url" dir="ltr" inputMode="url" autoComplete="url" value={company.website} onChange={(e) => setCompany({ website: e.target.value })} /></Field>
@@ -196,7 +208,14 @@ export function SettingsPage() {
       </Section>
 
       <Section title={t.settings.terms}>
-        <textarea className="input min-h-36" dir="auto" aria-label={t.settings.terms} value={company.terms} onChange={(e) => setCompany({ terms: e.target.value })} />
+        <div className="grid grid-cols-1 gap-4">
+          <Field label={C.termsEn} help={C.enHelp}>
+            <textarea className="input min-h-36" dir="ltr" lang="en" value={enText('terms')} onChange={(e) => setCompany({ terms: e.target.value })} data-testid="settings-terms" />
+          </Field>
+          <Field label={C.termsAr} help={C.arHelp}>
+            <textarea className="input min-h-36" dir="rtl" lang="ar" value={company.termsAr ?? ''} placeholder={AR.settings.defaultTerms} onChange={(e) => setCompany({ termsAr: e.target.value })} data-testid="settings-terms-ar" />
+          </Field>
+        </div>
       </Section>
 
       <ConfirmDialog open={!!pending} onClose={() => setPending(null)} danger={false} onConfirm={confirmPending}

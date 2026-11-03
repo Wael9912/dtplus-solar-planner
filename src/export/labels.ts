@@ -3,6 +3,45 @@
 // "DT+" followed by an LRM so the "+" stays on the right side of the brand in RTL text.
 export type ExportLang = 'en' | 'ar'
 
+/** Forms of an Arabic counted noun: singular, dual (nominative, oblique), plural for 3–10, singular accusative for 11–99. */
+interface ArNoun { one: string; two: [string, string]; few: string; many: string }
+/**
+ * Arabic number + counted noun from the printed number: 1 ساعة, 2 → ساعتان (the dual replaces the digit), 3–10 ساعات,
+ * 11–99 ساعة / يوما, 100+ and fractions singular. `oblique` picks the dual after a preposition or in an iḍāfa (ساعتين).
+ */
+export function arCount(n: string, w: ArNoun, oblique = false) {
+  const s = n.replace(/[,\s\u200e\u2068\u2069]/g, '')
+  if (!/^\d+$/.test(s)) return `${n} ${w.one}`
+  const v = Number(s), r = v % 100
+  if (v === 2) return w.two[oblique ? 1 : 0]
+  if (r >= 3 && r <= 10) return `${n} ${w.few}`
+  if (r >= 11 && r <= 99) return `${n} ${w.many}`
+  return `${n} ${w.one}`
+}
+export const AR_NOUNS = {
+  hour: { one: 'ساعة', two: ['ساعتان', 'ساعتين'], few: 'ساعات', many: 'ساعة' },
+  day: { one: 'يوم', two: ['يومان', 'يومين'], few: 'أيام', many: 'يوما' },
+  year: { one: 'سنة', two: ['سنتان', 'سنتين'], few: 'سنوات', many: 'سنة' },
+  panel: { one: 'لوح', two: ['لوحان', 'لوحين'], few: 'ألواح', many: 'لوحا' },
+  battery: { one: 'بطارية', two: ['بطاريتان', 'بطاريتين'], few: 'بطاريات', many: 'بطارية' },
+  inverter: { one: 'إنفرتر', two: ['إنفرتران', 'إنفرترين'], few: 'إنفرترات', many: 'إنفرترا' },
+} satisfies Record<string, ArNoun>
+const hAr = (h: string, obl = false) => arCount(h, AR_NOUNS.hour, obl)
+const dAr = (d: string, obl = false) => arCount(d, AR_NOUNS.day, obl)
+const yAr = (y: string, obl = false) => arCount(y, AR_NOUNS.year, obl)
+/**
+ * Fix "N ساعة / يوم / سنة" in Arabic strings built elsewhere (load-calculator strings): number (optionally inside a
+ * first-strong isolate) followed by the singular noun → the grammatical form. Those strings put the count after «نحو» /
+ * «لمدة», so the dual is oblique (ساعتين).
+ */
+export function arFixCounts(s: string) {
+  return s.replace(/(\u2068?)(\d[\d,]*(?:\.\d+)?)(\u2069?) (ساعة|يوم|سنة)(?![\u0600-\u06FF])/g, (_m, a: string, n: string, b: string, noun: string) => {
+    const w = noun === 'ساعة' ? AR_NOUNS.hour : noun === 'يوم' ? AR_NOUNS.day : AR_NOUNS.year
+    const out = arCount(n, w, true)
+    return out.startsWith(n) ? `${a}${n}${b}${out.slice(n.length)}` : out
+  })
+}
+
 const en = {
   brand: 'Product developed by DT+',
   sys: { offgrid: 'Off-grid (solar + battery)', hybrid: 'Hybrid (grid + battery)', gridtie: 'Grid-tied (no battery)' } as Record<string, string>,
@@ -74,9 +113,16 @@ const en = {
     backupAt: (h: string, kw: string) => `${h} h at ${kw} kW`, backupAbout: (list: string) => `backup of about ${list}`,
     tileBackup: 'Backup time', tileUsable: (kwh: string) => `${kwh} kWh usable`, atLoad: (kw: string) => `at a ${kw} kW load`, hours: (h: string) => `${h} h`,
     existingIncl: (n: string) => `incl. ${n} already on site`, existingLine: (n: string) => `+${n} already on site, not quoted`,
+    existingNote: (list: string) => `Existing equipment (not quoted): ${list}.`, existingItem: (qty: string, name: string) => `${qty} × ${name} already on site`,
     details: 'Quotation details', refN: (r: string) => `Reference ${r}`, dateN: (d: string) => `Date ${d}`,
     systemShort: (type: string, size: string) => `${type} · ${size}`,
+    // Document title when the project still has its default name: client + a short system descriptor
+    sysShort: { offgrid: 'off-grid', hybrid: 'hybrid', gridtie: 'grid-tied' } as Record<string, string>,
+    descriptor: (kwp: string, type: string) => `${kwp} kWp ${type}`, descriptorBackup: (kwh: string) => `${kwh} kWh battery backup`,
+    forCompanyBlank: 'For the company',
   },
+  /** File-name suffixes (after the project stem). */
+  file: { proposal: 'proposal', quotation: 'quotation', technical: 'technical-internal', workbook: 'workbook-internal' },
 
   tech: {
     title: 'Technical Design Report', internal: 'INTERNAL — not for the client',
@@ -175,13 +221,16 @@ const en = {
     client: 'Client name', clientOk: (n: string) => n, clientMissing: 'Add the client’s name',
     loads: 'Appliance list', loadsOk: (n: number, kwh: string) => `${n} ${n === 1 ? 'appliance' : 'appliances'} · ${kwh} kWh/day`, loadsMissing: 'No appliances yet',
     checks: 'Design checks', checksOk: 'No blocking design issues', checksErr: (n: number) => (n === 1 ? '1 issue must be fixed' : `${n} issues must be fixed`),
-    company: 'Company details', companyOk: (n: string) => n, companyMissing: 'Still the default company name',
+    company: 'Company name', companyOk: (n: string) => n, companyMissing: 'Company name not set — it is left off the documents. Add it in Settings.',
     fx: 'Exchange rate', fxOk: (cur: string, v: string) => `1 USD = ${v} ${cur}`, fxMissing: (cur: string) => `1 USD = 1 ${cur}: enter today’s rate`,
     fix: 'Fix', open: 'Open', settings: 'Settings',
     docLang: 'Document language', english: 'English', arabic: 'العربية',
     proposal: 'Client proposal (PDF)', proposalHelp: 'Branded proposal: system summary, savings, priced bill of materials and terms. Shows selling prices only, never cost or markup.',
     proposalNotReady: 'Fix the items above before sending this to a client.',
-    team: 'For your team', internal: 'Internal', clientSafe: 'For the client',
+    team: 'For your team', internal: 'Internal — includes cost prices', clientSafe: 'For the client',
+    shareInternalTitle: 'Share an internal document?',
+    shareInternalBody: (doc: string) => `${doc} includes your cost prices, markup and margin. Share it with your team only — never with the client.`,
+    shareInternalConfirm: 'Share anyway',
     tech: 'Technical report (PDF)', techHelp: 'Design checks, string and cable design, loss breakdown, plus cost, markup and margin.',
     excel: 'Engineering workbook (Excel)', excelHelp: 'Loads, sizing, production, costed bill of materials with live formulas, cash flow.',
     json: 'Project file (JSON)', jsonHelp: 'Backup, or send to a colleague to import on the Projects page.', backup: 'Backup',
@@ -222,20 +271,20 @@ const ar: ExportLabels = {
   protection: { dc: 'فيوز gPV', battery: 'فيوز class-T', ac: 'قاطع MCB' },
 
   pdf: {
-    title: 'عرض سعر نظام طاقة شمسية', quotation: 'عرض السعر', preparedFor: 'مقدم إلى', project: 'المشروع', ref: 'المرجع', date: 'التاريخ',
-    location: 'الموقع', psh: (v) => `${v} ساعة ذروة شمسية في اليوم`, validUntil: (d) => `صالح حتى ${d}`,
+    title: 'العرض الشامل للطاقة الشمسية', quotation: 'عرض سعر', preparedFor: 'مقدم إلى', project: 'المشروع', ref: 'المرجع', date: 'التاريخ',
+    location: 'الموقع', psh: (v) => `${hAr(v)} ذروة شمسية في اليوم`, validUntil: (d) => `صالح حتى ${d}`,
     tiles: { pv: 'مصفوفة الألواح', battery: 'تخزين البطاريات', inverter: 'الإنفرتر', production: 'الإنتاج السنوي', investment: 'قيمة الاستثمار', savings: 'التوفير السنوي', payback: 'فترة الاسترداد', co2: 'انبعاثات CO₂ المتجنبة', lifetime: 'الإنتاج طوال العمر', yield: 'الإنتاجية النوعية' },
-    years: (v) => `${v} سنة`, inclVat: (pct) => `شامل الضريبة ${pct}%`, perYear: '/سنة', tPerYear: 'طن/سنة', kwhPerKwp: 'kWh/kWp',
+    years: (v) => yAr(v), inclVat: (pct) => `شامل الضريبة ${pct}%`, perYear: '/سنة', tPerYear: 'طن/سنة', kwhPerKwp: 'kWh/kWp',
     yourSystem: 'نظامك', component: 'المكون', description: 'الوصف',
     rows: { modules: 'الألواح الشمسية', inverter: 'الإنفرتر', battery: 'بنك البطاريات', controller: 'منظم الشحن', generator: 'مولد احتياطي', roof: 'المساحة المطلوبة', energy: 'الطاقة' },
-    modules: (qty, name, w, tech, warranty) => `${qty} × ${name} — ${w} W ${tech}، ضمان ${warranty} سنة`,
+    modules: (qty, name, w, tech, warranty) => `${qty} × ${name} — ${w} W ${tech}، ضمان ${yAr(warranty, true)}`,
     bifacial: 'ثنائي الوجه',
     inverter: (qty, name, kw, type) => `${qty} × ${name} — ${kw} kW ${type}`,
     battery: (qty, name, total, usable) => `${qty} × ${name} — السعة الكلية ${total} kWh، المتاح ${usable} kWh`,
     batteryNoModel: (total, usable) => `السعة الكلية ${total} kWh، المتاح ${usable} kWh`,
-    autonomyDays: (d) => `استقلالية نحو ${d} يوم بكامل الحمل اليومي`,
-    backupHours: (h) => `دعم ليلي نحو ${h} ساعة للأحمال المدعومة`,
-    autonomyShort: (d) => `استقلالية ${d} يوم`, backupShort: (h) => `دعم ليلي ${h} ساعة`,
+    autonomyDays: (d) => `استقلالية نحو ${dAr(d, true)} بكامل الحمل اليومي`,
+    backupHours: (h) => `دعم ليلي نحو ${hAr(h, true)} للأحمال المدعومة`,
+    autonomyShort: (d) => `استقلالية ${dAr(d, true)}`, backupShort: (h) => `دعم ليلي ${hAr(h, true)}`,
     notQuoted: 'غير مشمول في عرض السعر هذا',
     controller: (qty, name) => `${qty} × ${name}`,
     generator: (kva) => `${kva} kVA، محسوب للحمل الأقصى وشحن البطاريات`,
@@ -247,7 +296,7 @@ const ar: ExportLabels = {
       (a.diesel ? `يحتسب التوفير مقارنة بتوليد الديزل بتكلفة ${a.tariff} لكل kWh` : `يحتسب التوفير بتعرفة الشبكة ${a.tariff} لكل kWh`) +
       ` مع زيادة ${a.esc}% سنويا، وتدهور الألواح ${a.deg}% سنويا.` +
       (a.om ? ` يشمل التدفق النقدي التشغيل والصيانة بمبلغ ${a.om} سنويا${a.repl ? `، والاستبدال: ${a.repl}` : ''}.` : '') +
-      ` التكلفة المستوية للطاقة الشمسية: ${a.lcoe} لكل kWh. العائد على الاستثمار خلال ${a.years} سنة: ${a.roi}.`,
+      ` التكلفة المستوية للطاقة الشمسية: ${a.lcoe} لكل kWh. العائد على الاستثمار خلال ${yAr(a.years, true)}: ${a.roi}.`,
     replItem: (item, year, amount) => `${item === 'battery' ? 'البطاريات' : 'الإنفرتر'} في السنة ${year} بمبلغ ${amount}`,
     vsDiesel: 'مقارنة بتوليد الديزل', vsGrid: 'مقارنة بكهرباء الشبكة', savingsDiesel: 'السنة 1 · مقارنة بالديزل',
     boq: 'قائمة المواد والأسعار', pricesIn: (cur) => `جميع الأسعار بعملة ${cur}`,
@@ -260,13 +309,19 @@ const ar: ExportLabels = {
     energyNone: (prod) => `حجم النظام حدده العميل · نحو ${prod} kWh من الطاقة الشمسية في اليوم المتوسط`,
     energyBackup: 'حجم النظام حدده العميل · نظام احتياطي بالبطاريات دون ألواح شمسية',
     selfUseNote: ' لا توجد بيانات استهلاك: يفترض التوفير استخدام كامل الطاقة الشمسية في الموقع.',
-    backupAt: (h, kw) => `${h} ساعة عند ${kw} kW`, backupAbout: (list) => `مدة احتياط نحو ${list}`,
-    tileBackup: 'مدة الاحتياط', tileUsable: (kwh) => `المتاح ${kwh} kWh`, atLoad: (kw) => `عند حمل ${kw} kW`, hours: (h) => `${h} ساعة`,
+    backupAt: (h, kw) => `${hAr(h)} عند ${kw} kW`, backupAbout: (list) => `مدة احتياط نحو ${list}`,
+    tileBackup: 'مدة الاحتياط', tileUsable: (kwh) => `المتاح ${kwh} kWh`, atLoad: (kw) => `عند حمل ${kw} kW`, hours: (h) => hAr(h),
     existingIncl: (n) => `منها ${n} موجودة في الموقع`, existingLine: (n) => `+${n} موجود في الموقع، غير مسعر`,
+    existingNote: (list) => `معدات موجودة في الموقع، غير مسعرة: ${list}.`, existingItem: (qty, name) => `${qty} × ${name}`,
     details: 'بيانات العرض', refN: (r) => `المرجع ${r}`, dateN: (d) => `التاريخ ${d}`,
     systemShort: (type, size) => `${type} · ${size}`,
+    sysShort: { offgrid: 'منفصل عن الشبكة', hybrid: 'هجين', gridtie: 'متصل بالشبكة' },
+    descriptor: (kwp, type) => `نظام ${type} ${kwp} kWp`, descriptorBackup: (kwh) => `احتياطي بطاريات ${kwh} kWh`,
+    forCompanyBlank: 'عن الشركة',
     defaultTerms: 'الأسعار صالحة للمدة المذكورة وتخضع لتوفر المخزون. دفعة مقدمة 50% عند الطلب والباقي عند التشغيل. ضمانات المعدات حسب الشركة المصنعة. ضمان أعمال التركيب سنتان. الأعمال المدنية ورسوم توصيل الشبكة والتصاريح غير مشمولة ما لم يذكر خلاف ذلك.',
   },
+
+  file: { proposal: 'العرض-الشامل', quotation: 'عرض-سعر', technical: 'التقرير-الفني-داخلي', workbook: 'الملف-الهندسي-داخلي' },
 
   tech: {
     title: 'التقرير الفني للتصميم', internal: 'داخلي — ليس للعميل',
@@ -283,11 +338,11 @@ const ar: ExportLabels = {
     inverter: 'الإنفرتر وتصميم السلاسل', required: 'المطلوب', requiredInvBasis: (s, surge) => `الحمل الأقصى × ${s}؛ قدرة البدء ${surge} kW`,
     selected: 'المختار', invBasis: (a) => `${a.kw} kW، بدء ${a.surge} kW، أقصى ألواح ${a.pv} kW، ${a.mppt} MPPT × ${a.amps} A، ${a.vmin}–${a.vmax} V، الأقصى ${a.vabs} V`,
     dcac: 'نسبة DC/AC', dcacBasis: 'المعتاد 1.1–1.3',
-    strings: 'السلاسل', stringsVal: (n, p) => `${n} × ${p} ألواح`, stringsBasis: (m, s) => `${m} MPPT مستخدمة، ${s} سلسلة لكل MPPT`,
+    strings: 'السلاسل', stringsVal: (n, p) => `${n} × ${arCount(p, AR_NOUNS.panel)}`, stringsBasis: (m, s) => `${m} MPPT مستخدمة، ${s} سلسلة لكل MPPT`,
     vocCold: 'Voc عند أدنى حرارة', vocBasis: (t, lim, ok) => `عند ${t} °C، الحد ${lim} V: ${ok ? 'سليم' : 'غير مقبول'}`,
     vmpHot: 'Vmp عند الخلية الساخنة', vmpBasis: (t, lim, ok) => `الخلية نحو ${t} °C، أدنى MPPT ${lim} V: ${ok ? 'سليم' : 'غير مقبول'}`,
     isc: 'تيار Isc للسلسلة', iscBasis: (lim, ok) => `حد مدخل MPPT ${lim} A: ${ok ? 'سليم' : 'غير مقبول'}`,
-    battery: 'بنك البطاريات', battRequired: (base, d, dod, eff) => `${base} × ${d} يوم / (عمق التفريغ ${dod}% × كفاءة الإنفرتر ${eff})`,
+    battery: 'بنك البطاريات', battRequired: (base, d, dod, eff) => `${base} × ${dAr(d)} / (عمق التفريغ ${dod}% × كفاءة الإنفرتر ${eff})`,
     dailyEnergy: 'الطاقة اليومية', criticalNight: 'الطاقة الليلية المدعومة',
     bank: 'البنك', bankBasis: (s, p, kwh, ah, v) => `${s}S × ${p}P · ${kwh} kWh · ${ah} Ah عند ${v} V`,
     usable: 'المتاح / الاستقلالية', controller: 'منظم الشحن', ctrlBasis: (a) => `المطلوب ${a} A`, generator: 'المولد', genBasis: 'الحمل الأقصى × 1.25 + الشاحن، معامل قدرة 0.8',
@@ -312,7 +367,7 @@ const ar: ExportLabels = {
     fixedInv: (kw) => `محدد بقدرة ${kw} kW من العميل`, invFromPv: (kwp, r) => `الألواح ${kwp} kWp ÷ نسبة DC/AC ${r}`,
     fixedBatt: (kwh) => `محدد بسعة اسمية ${kwh} kWh من العميل`,
     existing: 'موجود في الموقع', existingVal: (parts) => `${parts}، محسوبة في التصميم وغير مسعرة`,
-    existingParts: { panels: (n) => `${n} ألواح`, batteries: (n) => `${n} بطاريات`, inverters: (n) => `${n} إنفرتر` },
+    existingParts: { panels: (n) => arCount(String(n), AR_NOUNS.panel), batteries: (n) => arCount(String(n), AR_NOUNS.battery), inverters: (n) => arCount(String(n), AR_NOUNS.inverter) },
   },
 
   xl: {
@@ -347,9 +402,9 @@ const ar: ExportLabels = {
     bomTitle: (cur) => `قائمة المواد ${cur}`, bomSub: 'داخلي: التكلفة والإضافة وأسعار البيع. عدل الكمية أو التكلفة أو خلية الإضافة وستحدث المجاميع.',
     bomCols: ['#', 'الفئة', 'البند', 'المواصفات', 'الوحدة', 'الكمية', 'تكلفة الوحدة', 'إجمالي التكلفة', 'سعر الوحدة', 'إجمالي السعر'],
     markupCell: 'الإضافة على التكلفة (إدخال)', planner: (v) => `قيمة المخطط: ${v}`, discountIn: 'الخصم (إدخال %)', vatIn: 'الضريبة (إدخال %)', costSubtotal: 'إجمالي التكلفة', sellSubtotal: 'المجموع الفرعي بسعر البيع', markup: 'قيمة الإضافة', grossMargin: 'هامش الربح الإجمالي', discount: (p) => `الخصم ${p}%`, vat: (p) => `ضريبة القيمة المضافة ${p}%`, grandTotal: 'الإجمالي النهائي',
-    ecoTitle: (n) => `التدفق النقدي خلال ${n} سنة`, ecoSub: (tariff, esc, deg, diesel) => `${diesel ? 'تكلفة توليد الديزل' : 'تعرفة الشبكة'} ${tariff} لكل kWh، زيادة ${esc}% سنويا، تدهور ${deg}% سنويا، بعد خصم التشغيل والصيانة والاستبدال`,
+    ecoTitle: (n) => `التدفق النقدي خلال ${yAr(String(n), true)}`, ecoSub: (tariff, esc, deg, diesel) => `${diesel ? 'تكلفة توليد الديزل' : 'تعرفة الشبكة'} ${tariff} لكل kWh، زيادة ${esc}% سنويا، تدهور ${deg}% سنويا، بعد خصم التشغيل والصيانة والاستبدال`,
     ecoCols: (cur) => ['السنة', 'الإنتاج kWh', `صافي التدفق ${cur}`, `التراكمي ${cur}`],
-    quoteSheet: 'عرض السعر', quoteSub: (who) => `${who} · التكلفة والإضافة وأسعار البيع. عدل الكمية أو التكلفة أو خلية الإضافة وستحدث المجاميع.`,
+    quoteSheet: 'عرض سعر', quoteSub: (who) => `${who} · التكلفة والإضافة وأسعار البيع. عدل الكمية أو التكلفة أو خلية الإضافة وستحدث المجاميع.`,
     demandBasis: 'أساس الطلب', basis: { loads: 'قائمة الأجهزة', bill: 'فاتورة الكهرباء', none: 'حجم النظام حدده العميل' },
     billTitle: 'الطلب من فاتورة الكهرباء', billSub: 'لا توجد قائمة أجهزة: عدل الاستهلاك الشهري في الخلية الصفراء وستحدث الطاقة اليومية',
     billRows: { monthly: 'الاستهلاك الشهري', daily: 'الطاقة اليومية', profile: 'نمط الاستهلاك', night: 'نسبة الاستهلاك الليلي', nightKwh: 'الطاقة الليلية', peak: 'الطلب الأقصى', motor: 'أكبر محرك', surge: 'قدرة البدء' },
@@ -364,13 +419,16 @@ const ar: ExportLabels = {
     client: 'اسم العميل', clientOk: (n) => n, clientMissing: 'أضف اسم العميل',
     loads: 'قائمة الأجهزة', loadsOk: (n, kwh) => `${n} جهاز · ${kwh} kWh يوميا`, loadsMissing: 'لا توجد أجهزة بعد',
     checks: 'فحوصات التصميم', checksOk: 'لا توجد مشكلات تمنع الإرسال', checksErr: (n) => (n === 1 ? 'مشكلة واحدة يجب إصلاحها' : `${n} مشكلات يجب إصلاحها`),
-    company: 'بيانات الشركة', companyOk: (n) => n, companyMissing: 'ما زال اسم الشركة الافتراضي',
+    company: 'اسم الشركة', companyOk: (n) => n, companyMissing: 'لم يتم إدخال اسم الشركة — لن يظهر في المستندات. أضفه من الإعدادات.',
     fx: 'سعر الصرف', fxOk: (cur, v) => `1 USD = ${v} ${cur}`, fxMissing: (cur) => `1 USD = 1 ${cur}: أدخل سعر اليوم`,
     fix: 'إصلاح', open: 'فتح', settings: 'الإعدادات',
     docLang: 'لغة المستند', english: 'English', arabic: 'العربية',
-    proposal: 'عرض السعر للعميل (PDF)', proposalHelp: 'عرض بهوية شركتك: ملخص النظام والتوفير وقائمة المواد بالأسعار والشروط. يظهر أسعار البيع فقط، بدون التكلفة أو الإضافة.',
+    proposal: 'العرض الشامل للعميل (PDF)', proposalHelp: 'عرض بهوية شركتك: ملخص النظام والتوفير وقائمة المواد بالأسعار والشروط. يظهر أسعار البيع فقط، بدون التكلفة أو الإضافة.',
     proposalNotReady: 'أصلح البنود أعلاه قبل إرسال العرض للعميل.',
-    team: 'لفريقك', internal: 'داخلي', clientSafe: 'للعميل',
+    team: 'لفريقك', internal: 'داخلي — يتضمن أسعار التكلفة', clientSafe: 'للعميل',
+    shareInternalTitle: 'مشاركة مستند داخلي؟',
+    shareInternalBody: (doc) => `يتضمن ${doc} أسعار التكلفة والإضافة وهامش الربح. شاركه مع فريقك فقط ولا ترسله إلى العميل.`,
+    shareInternalConfirm: 'مشاركة على أي حال',
     tech: 'التقرير الفني (PDF)', techHelp: 'فحوصات التصميم، تصميم السلاسل والكابلات، تفصيل الخسائر، مع التكلفة والإضافة وهامش الربح.',
     excel: 'الملف الهندسي (Excel)', excelHelp: 'الأحمال، التحجيم، الإنتاج، قائمة المواد بالتكلفة ومعادلات حية، والتدفق النقدي.',
     json: 'ملف المشروع (JSON)', jsonHelp: 'نسخة احتياطية، أو أرسله لزميل ليستورده من صفحة المشاريع.', backup: 'نسخة احتياطية',

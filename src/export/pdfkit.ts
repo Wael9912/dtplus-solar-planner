@@ -7,7 +7,7 @@
 // "6.96 kWp" or "$1,234.00" keep their order. jspdf-autotable's default text options reverse Arabic cells, so every cell
 // gets the same options through `didParseCell`.
 import { jsPDF } from 'jspdf'
-import autoTable, { type CellHookData, type RowInput, type CellInput, type Styles, type UserOptions, type TextOptions } from 'jspdf-autotable'
+import autoTable, { __createTable, type CellHookData, type RowInput, type CellInput, type Styles, type UserOptions, type TextOptions } from 'jspdf-autotable'
 import type { CompanySettings } from '../engine/types'
 import type { PdfFontData } from './fonts'
 
@@ -88,6 +88,7 @@ if (!api.__dtStripZwnj) { api.__dtStripZwnj = true; api.events.push(['postProces
 const bidiOptions = (rtl: boolean): TextOptions => ({ isInputVisual: false, isOutputVisual: true, isInputRtl: rtl, isOutputRtl: false, isSymmetricSwapping: true })
 
 type Align = 'left' | 'right' | 'center'
+export type TableOptions = Omit<UserOptions, 'head' | 'body' | 'columnStyles'> & { head?: CellInput[][]; body: CellInput[][]; columnStyles?: Record<number, Partial<Styles>> }
 export interface TextStyle { align?: Align; bold?: boolean; size?: number; color?: RGB; maxWidth?: number; lineGap?: number }
 
 export class Pdf {
@@ -192,8 +193,38 @@ export class Pdf {
     return y + 7.5
   }
 
-  /** autoTable with the house style, glyph safety, Arabic cells and RTL mirroring (column order, alignment, margins). */
-  table(o: Omit<UserOptions, 'head' | 'body' | 'columnStyles'> & { head?: CellInput[][]; body: CellInput[][]; columnStyles?: Record<number, Partial<Styles>> }) {
+  /**
+   * autoTable with the house style, glyph safety, Arabic cells and RTL mirroring (column order, alignment, margins).
+   * No orphan header: when the header row and the first `keepRows` rows (default 3) do not fit below `startY`, the table starts
+   * on the next page.
+   */
+  table(o: TableOptions & { keepRows?: number }) {
+    const { keepRows = 3, ...rest } = o
+    let opts = this.tableOptions(rest)
+    const startY = typeof opts.startY === 'number' ? opts.startY : this.top
+    if (keepRows > 0 && startY > this.top + 1 && startY + this.measure(opts, keepRows) > this.bottom) {
+      this.doc.addPage()
+      opts = { ...opts, startY: this.top }
+    }
+    autoTable(this.doc, opts)
+    return this.lastTableY
+  }
+  /** Height (mm) of the header row plus the first `rows` body rows — a dry run, nothing is drawn. */
+  tableStartH(o: TableOptions, rows = 3) { return this.measure(this.tableOptions(o), rows) }
+  private measure(opts: UserOptions, rows: number) {
+    try {
+      const t = __createTable(this.doc, opts)
+      return t.getHeadHeight(t.columns) + t.body.slice(0, rows).reduce((s, r) => s + (r.height || 0), 0)
+    } catch { return 0 }
+  }
+  /** Section heading kept together with the start of its table (the heading never ends a page alone). Returns the y below the table. */
+  headedTable(title: string, y: number, o: TableOptions & { keepRows?: number }, right?: string) {
+    const need = 7.5 + this.tableStartH({ ...o, startY: y }, o.keepRows ?? 3) + 1
+    y = this.ensure(y, Math.max(20, need))
+    y = this.heading(title, y, right)
+    return this.table({ ...o, startY: y, keepRows: 0 })
+  }
+  private tableOptions(o: TableOptions): UserOptions {
     const nCols = Math.max(0, ...[...(o.head ?? []), ...o.body].map((r) => r.reduce<number>((n, c) => n + (c && typeof c === 'object' && !Array.isArray(c) && 'colSpan' in c ? Number(c.colSpan) || 1 : 1), 0)))
     const flip = (s?: Partial<Styles>): Partial<Styles> | undefined => (!s || !this.rtl ? s : { ...s, halign: s.halign === 'left' ? 'right' : s.halign === 'right' ? 'left' : s.halign ?? 'right' })
     const flipCell = (c: CellInput): CellInput => (this.rtl && c && typeof c === 'object' && !Array.isArray(c) && 'styles' in c ? { ...c, styles: flip(c.styles) } : c)
@@ -203,7 +234,7 @@ export class Pdf {
     const margin = { top: this.top, bottom: this.H - this.bottom, left: this.M, right: this.M, ...(typeof o.margin === 'object' && !Array.isArray(o.margin) ? o.margin : {}) }
     if (this.rtl) [margin.left, margin.right] = [margin.right, margin.left]
     const userParse = o.didParseCell
-    autoTable(this.doc, {
+    return {
       theme: 'grid',
       rowPageBreak: 'avoid',
       ...o,
@@ -224,8 +255,7 @@ export class Pdf {
         if (d.section === 'head' && columnStyles[d.column.index]?.halign) d.cell.styles.halign = columnStyles[d.column.index].halign!
         userParse?.(d)
       },
-    })
-    return this.lastTableY
+    }
   }
 
   /** Brand band across the top of a page: logo + company at the start side, document title at the end side. */
@@ -246,11 +276,12 @@ export class Pdf {
       } catch { /* unsupported image: skip the logo */ }
     }
     const blockW = 118 - blockStart
-    const name = this.wrap(company.name || '', blockW, true, 15)[0] ?? ''
-    this.text(name, this.x(blockStart), 12.5, { bold: true, size: 15, color: WHITE, align: this.start })
     const contact = [company.phone, company.email, company.website].filter((s) => s?.trim()).join('  ·  ')
     const sub = [company.tagline, contact].filter((s) => s?.trim()).map((s) => this.wrap(s, blockW, false, 8.5)[0])
-    this.text(sub, this.x(blockStart), 18, { size: 8.5, color: WHITE, align: this.start })
+    // No company name (still the placeholder): logo + tagline / contact only, centred in the band
+    const name = company.name?.trim() ? this.wrap(company.name, blockW, true, 15)[0] ?? '' : ''
+    if (name) this.text(name, this.x(blockStart), 12.5, { bold: true, size: 15, color: WHITE, align: this.start })
+    this.text(sub, this.x(blockStart), name ? 18 : sub.length > 1 ? 12.8 : 15.5, { size: name ? 8.5 : 9, color: WHITE, align: this.start, lineGap: name ? 0 : 1.2 })
     this.text(title, this.x(this.W - this.M), 12.5, { bold: true, size: 13, color: WHITE, align: this.end })
     this.text(subtitle, this.x(this.W - this.M), 18.5, { size: 8.5, color: WHITE, align: this.end })
     d.setTextColor(...SLATE)
@@ -266,8 +297,21 @@ export class Pdf {
       const c = this.wrap(contact, 120, false, 7.5)[0] ?? ''
       this.text(c, this.x(this.M), 288.5, { size: 7.5, color: MUTED, align: this.start })
       this.text(page(i, n), this.x(this.W - this.M), 288.5, { size: 7.5, color: MUTED, align: this.end })
-      this.text(credit, this.W / 2, 293, { size: 6.5, color: FAINT, align: 'center' })
+      this.credit(credit, 293)
     }
+  }
+  /**
+   * Product credit centred on the page. In Arabic the Latin brand ("DT+") is drawn as its own text run at the line's left end,
+   * so the bidi pass can never move the "+" to the wrong side ("+DT").
+   */
+  private credit(credit: string, y: number) {
+    const m = /^(.*\S)\s+([A-Za-z][\w+.-]*\+?)\s*$/u.exec(this.safe(credit).replace(/[\u200e\u200f]/g, ''))
+    if (!m || !this.unicode || !hasArabic(m[1])) { this.text(credit, this.W / 2, y, { size: 6.5, color: FAINT, align: 'center' }); return }
+    const [, words, brand] = m
+    const gap = this.width(' ', false, 6.5), wb = this.width(brand, false, 6.5), ww = this.width(words, false, 6.5)
+    const x0 = this.W / 2 - (wb + gap + ww) / 2
+    this.text(brand, x0, y, { size: 6.5, color: FAINT, align: 'left' })
+    this.text(words, x0 + wb + gap, y, { size: 6.5, color: FAINT, align: 'left' })
   }
 
   blob(): Blob { return this.doc.output('blob') }

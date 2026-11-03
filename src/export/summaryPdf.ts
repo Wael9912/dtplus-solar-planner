@@ -7,11 +7,14 @@ import { formatQuoteMoney, type Quote } from '../engine/quote'
 import { fmt } from '../engine/format'
 import { resolveSizing } from '../engine/sizing'
 import { calcEn, calcAr } from '../i18n/calc'
-import { labelsFor, loadName, locationName, localizeCompany, isDefaultCompanyName, fmtDate, addDays, num, autonomyOf, solarCoveragePct, batteryInfo, type ExportLang } from './common'
+import { labelsFor, loadName, locationName, docCompany, companyNameFor, fmtDate, addDays, num, autonomyOf, solarCoveragePct, batteryInfo, productName, existingNote, type ExportLang } from './common'
+import { arFixCounts } from './labels'
 import type { PdfFontData } from './fonts'
 
 /** The calc strings of a document language (same objects as `dicts[lang].calc`). */
 const dict = (lang: ExportLang) => (lang === 'ar' ? calcAr : calcEn)
+/** Arabic counted nouns ("8 ساعات", "ساعتان") in strings from the calc dictionary. */
+const grammar = (lang: ExportLang) => (s: string) => (lang === 'ar' ? arFixCounts(s) : s)
 const wh = (l: Project['loads'][number]) => l.watts * l.qty * l.hoursPerDay
 /** Rounded to `d` decimals first, then printed without trailing zeros (0.98 → "1", 1.25 → "1.3"). */
 export const short = (v: number, d: number) => num(Number(v.toFixed(d)), d)
@@ -40,7 +43,7 @@ export function summaryText(p: Project, r: Results, q: Quote, company: CompanySe
   const f = estimateFigures(p, r, q)
   const money = (v: number, d?: number) => formatQuoteMoney(v, q, d)
   const type = D.sysTypes[p.design.systemType] ?? p.design.systemType
-  const co = isDefaultCompanyName(company) ? '' : company.name.trim()
+  const co = companyNameFor(company, lang)
   const sep = lang === 'ar' ? '، ' : ', '
   const peak = num(r.peakW / 1000, 1)
   const out = [co ? `${T.title} · ${co}` : T.title]
@@ -52,13 +55,13 @@ export function summaryText(p: Project, r: Results, q: Quote, company: CompanySe
     const extra = a ? (a.offgrid ? T.autonomy(short(a.days, 1)) : a.hours > 72 ? T.backupLong : T.backup(short(a.hours, 0))) : ''
     out.push(`• ${T.battery(fmt(r.batteryKwh, 1), fmt(r.batteryUsableKwh, 1))}${extra ? sep + extra : ''}`)
   }
-  if (r.inverter) out.push(`• ${T.inverter(r.inverterQty, num(r.inverter.ratedAcKw, 1), `${r.inverter.brand} ${r.inverter.model}`)}`)
+  if (r.inverter) out.push(`• ${T.inverter(r.inverterQty, num(r.inverter.ratedAcKw, 1), productName(r.inverter))}`)
   out.push(`• ${T.production(fmt(r.annualProductionKwh), fmt(r.annualKwh))}`)
   out.push(T.price(money(q.total, 0), q.vatPct > 0 ? num(q.vatPct) : null, money(f.perWp, 2)))
   out.push(`${T.site(locationName(p, lang), num(p.site.psh, 1))} ${T.disclaimer}`)
   const contact = [company.phone, company.email, company.website].map((s) => s?.trim()).filter(Boolean).join(' · ')
   if (contact) out.push(contact)
-  return out.join('\n')
+  return grammar(lang)(out.join('\n'))
 }
 
 export interface SummaryPdfOptions {
@@ -72,7 +75,8 @@ export interface SummaryPdfOptions {
 export async function buildSummaryPdf(p: Project, r: Results, q: Quote, companyIn: CompanySettings, lang: ExportLang, opts: SummaryPdfOptions = {}): Promise<Blob> {
   const [{ Pdf, INK, SLATE, MUTED, tint, hasArabic }, { PdfFontError }] = await Promise.all([import('./pdfkit'), import('./pdf')])
   const D = dict(lang), C = D.pdf, L = labelsFor(lang), P = L.pdf
-  const company = localizeCompany(companyIn, lang)
+  const company = docCompany(companyIn, lang)
+  const G = grammar(lang)
   const f = estimateFigures(p, r, q)
   const loads = p.loads.filter((l) => l.qty > 0 && l.watts > 0)
 
@@ -129,16 +133,16 @@ export async function buildSummaryPdf(p: Project, r: Results, q: Quote, companyI
   y = tiles([
     { k: C.tiles.pv, v: `${fmt(r.arrayKwp, 2)} kWp`, s: C.panelsSub(r.panelQty, String(r.panel.watts)) },
     f.battery
-      ? { k: C.tiles.battery, v: `${fmt(r.batteryKwh, 1)} kWh`, s: a ? (a.offgrid ? C.autonomy(short(a.days, 1)) : a.hours > 72 ? C.backupLong : C.backup(short(a.hours, 0))) : '' }
+      ? { k: C.tiles.battery, v: `${fmt(r.batteryKwh, 1)} kWh`, s: a ? G(a.offgrid ? C.autonomy(short(a.days, 1)) : a.hours > 72 ? C.backupLong : C.backup(short(a.hours, 0))) : '' }
       : { k: C.tiles.battery, v: '—', s: C.noBattery },
     { k: C.tiles.inverter, v: r.inverter ? `${num(r.inverterTotalKw, 1)} kW` : '—', s: r.inverter ? C.invSub(r.inverterQty, r.inverter.brand) : '' },
     { k: C.tiles.production, v: prod >= 100000 ? `${fmt(prod / 1000, 1)} MWh` : `${fmt(prod)} kWh`, s: r.annualKwh > 0 ? C.coverage(fmt(f.coverage)) : '' },
   ], y) + 2.5
   const { battery } = batteryInfo(p, r)
-  const sysRows: string[][] = [[P.rows.modules, P.modules(String(r.panelQty), `${r.panel.brand} ${r.panel.model}`, String(r.panel.watts), r.panel.technology, String(r.panel.warrantyYears))]]
-  if (r.inverter) sysRows.push([P.rows.inverter, P.inverter(String(r.inverterQty), `${r.inverter.brand} ${r.inverter.model}`, num(r.inverter.ratedAcKw, 1), L.invType[r.inverter.type] ?? r.inverter.type)])
-  if (r.controller && r.controllerQty) sysRows.push([P.rows.controller, P.controller(String(r.controllerQty), `${r.controller.brand} ${r.controller.model}`)])
-  if (f.battery) sysRows.push([P.rows.battery, battery ? P.battery(String(r.batteryQty), `${battery.brand} ${battery.model}`, fmt(r.batteryKwh, 1), fmt(r.batteryUsableKwh, 1)) : P.batteryNoModel(fmt(r.batteryKwh, 1), fmt(r.batteryUsableKwh, 1))])
+  const sysRows: string[][] = [[P.rows.modules, P.modules(String(r.panelQty), productName(r.panel), String(r.panel.watts), r.panel.technology, String(r.panel.warrantyYears))]]
+  if (r.inverter) sysRows.push([P.rows.inverter, P.inverter(String(r.inverterQty), productName(r.inverter), num(r.inverter.ratedAcKw, 1), L.invType[r.inverter.type] ?? r.inverter.type)])
+  if (r.controller && r.controllerQty) sysRows.push([P.rows.controller, P.controller(String(r.controllerQty), productName(r.controller))])
+  if (f.battery) sysRows.push([P.rows.battery, battery ? P.battery(String(r.batteryQty), productName(battery), fmt(r.batteryKwh, 1), fmt(r.batteryUsableKwh, 1)) : P.batteryNoModel(fmt(r.batteryKwh, 1), fmt(r.batteryUsableKwh, 1))])
   const compact = { fontSize: 8, cellPadding: { top: 1.1, bottom: 1.1, left: 1.8, right: 1.8 } }
   y = pdf.table({ startY: y, body: sysRows, styles: compact, columnStyles: { 0: { cellWidth: 36, fontStyle: 'bold', textColor: INK } } }) + 7
 
@@ -187,7 +191,7 @@ export async function buildSummaryPdf(p: Project, r: Results, q: Quote, companyI
 
   // ---- assumptions & validity
   const days = company.quoteValidityDays || 30
-  y = pdf.text(C.assumptions(city, num(p.site.psh, 2), days, fmtDate(addDays(now, days))), pdf.x(pdf.M), y, { size: 8, color: MUTED, maxWidth: pdf.contentW, align: pdf.start }) + 1.5
+  y = pdf.text([G(C.assumptions(city, num(p.site.psh, 2), days, fmtDate(addDays(now, days)))), existingNote(r, lang, L)].filter(Boolean).join(' '), pdf.x(pdf.M), y, { size: 8, color: MUTED, maxWidth: pdf.contentW, align: pdf.start }) + 1.5
   pdf.text(C.disclaimer, pdf.x(pdf.M), y, { size: 8.5, bold: true, color: INK, maxWidth: pdf.contentW, align: pdf.start })
 
   pdf.footer(company, P.page, L.brand)

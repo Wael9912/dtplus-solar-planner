@@ -4,6 +4,17 @@
 
 /** First-strong isolate: keeps a number + Latin unit/model code in one LTR island inside an Arabic sentence. */
 const I = (x: string) => '\u2068' + x + '\u2069'
+/** Arabic hours: 1 ساعة, 2 ساعتان, 3–10 ساعات, 11–99 ساعة (fractions singular). */
+const hoursAr = (h: string) => {
+  const n = h.replace(/,/g, ''), v = Number(n), r = v % 100
+  if (!/^\d+$/.test(n)) return `${I(h)} ساعة`
+  return v === 2 ? 'ساعتان' : r >= 3 && r <= 10 ? `${I(h)} ساعات` : `${I(h)} ساعة`
+}
+const yearsAr = (y: string) => {
+  const n = y.replace(/,/g, ''), v = Number(n), r = v % 100
+  if (!/^\d+$/.test(n)) return `${I(y)} سنة`
+  return v === 2 ? 'سنتان' : r >= 3 && r <= 10 ? `${I(y)} سنوات` : `${I(y)} سنة`
+}
 
 export const outputsEn = {
   results: {
@@ -37,6 +48,14 @@ export const outputsEn = {
   },
   export: {
     quotation: 'Quotation (PDF)', quotationHelp: 'Prices only: itemised list, totals, your note to the client, terms and signatures — no sizing pages.',
+    // Savings & payback section of the client proposal (project.proposalFinance)
+    finance: 'Savings & payback in the proposal', financeOpts: { auto: 'Auto', on: 'On', off: 'Off' },
+    financeAutoShown: (years: string) => `Shown: payback ${years} years.`,
+    financePayback: (years: string, tariff: string) => `Hidden: payback ${years} years at a ${tariff}/kWh tariff.`,
+    financeNoSavings: (tariff: string) => `Hidden: no savings at a ${tariff}/kWh tariff.`,
+    financeHint: { hybrid: 'Set outage hours or the tariff on the Site step.', gridtie: 'Check the tariff on the Site step.', offgrid: 'Check the diesel cost on the Site step.' } as Record<string, string>,
+    financeOnNote: 'The proposal shows savings, payback and the cash flow.', financeOffNote: 'The proposal leaves out savings, payback and the cash flow.',
+    financeFix: 'Site step',
     proposalHelpSize: 'Branded proposal: the system the client chose, production and savings, priced bill of materials and terms. Selling prices only.',
     alsoForClient: 'Also for the client',
     excelItems: 'Price workbook (Excel)', excelItemsHelp: 'The quoted products with cost, markup and selling price, with live formulas.',
@@ -61,7 +80,7 @@ export const outputsAr: typeof outputsEn = {
     backupHelp: 'السعة المتاحة مقسومة على الحمل بعد خسائر الإنفرتر. المدة الفعلية تعتمد على الأجهزة التي تعمل أثناء الانقطاع.',
     backupCol: { load: 'الحمل', time: 'مدة الاحتياط', example: 'استخدام نموذجي' },
     backupExamples: ['إنارة وتلفاز وراوتر وثلاجة', 'الأساسيات المنزلية مع مروحة أو اثنتين', 'مكيف 1.5 حصان مع الأساسيات', 'الإنفرتر بكامل قدرته'],
-    hoursShort: (h) => `${h} ساعة`, overDays: 'أكثر من 3 أيام',
+    hoursShort: (h) => hoursAr(h), overDays: 'أكثر من 3 أيام',
     demand: 'الطلب على الطاقة', monthlyBill: 'الاستهلاك الشهري', dailyEnergy: 'الطاقة اليومية', profile: 'نمط الاستهلاك', nightShare: 'الاستهلاك الليلي', peak: 'الطلب الأقصى', surge: 'قدرة البدء',
     setByClient: 'حدده العميل', fromArray: (kwp, r) => I(`PV ${kwp} kWp ÷ DC/AC ${r}`), fromInverter: (kw, r) => `الإنفرتر ${I(`${kw} kW × DC/AC ${r}`)}`,
     noPv: 'بدون ألواح شمسية (احتياطي بالبطاريات فقط)',
@@ -78,7 +97,14 @@ export const outputsAr: typeof outputsEn = {
     currency: 'العملة', fx: 'سعر الصرف', fxLabel: (cur) => `1 USD = … ${cur}`, fxIndicative: 'تم إدخال سعر تقريبي — تأكد من سعر اليوم.',
   },
   export: {
-    quotation: 'عرض السعر (PDF)', quotationHelp: 'الأسعار فقط: قائمة البنود والإجمالي وملاحظتك للعميل والشروط والتوقيعات — بدون صفحات التصميم.',
+    quotation: 'عرض سعر (PDF)', quotationHelp: 'الأسعار فقط: قائمة البنود والإجمالي وملاحظتك للعميل والشروط والتوقيعات — بدون صفحات التصميم.',
+    finance: 'التوفير وفترة الاسترداد في العرض', financeOpts: { auto: 'تلقائي', on: 'إظهار', off: 'إخفاء' },
+    financeAutoShown: (years) => `معروض: فترة الاسترداد ${yearsAr(years)}.`,
+    financePayback: (years, tariff) => `مخفي: فترة الاسترداد ${yearsAr(years)} بتعرفة ${I(tariff)} لكل kWh.`,
+    financeNoSavings: (tariff) => `مخفي: لا يوجد توفير بتعرفة ${I(tariff)} لكل kWh.`,
+    financeHint: { hybrid: 'أدخل ساعات انقطاع الشبكة أو التعرفة في خطوة الموقع.', gridtie: 'راجع التعرفة في خطوة الموقع.', offgrid: 'راجع تكلفة الديزل في خطوة الموقع.' },
+    financeOnNote: 'يتضمن العرض الشامل التوفير وفترة الاسترداد والتدفق النقدي.', financeOffNote: 'لا يتضمن العرض الشامل التوفير وفترة الاسترداد والتدفق النقدي.',
+    financeFix: 'خطوة الموقع',
     proposalHelpSize: 'عرض بهوية شركتك: النظام الذي اختاره العميل والإنتاج والتوفير وقائمة المواد بالأسعار والشروط. أسعار البيع فقط.',
     alsoForClient: 'للعميل أيضاً',
     excelItems: 'ملف الأسعار (Excel)', excelItemsHelp: 'المنتجات المسعّرة بالتكلفة والإضافة وسعر البيع، بمعادلات حية.',
