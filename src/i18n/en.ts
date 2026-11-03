@@ -27,8 +27,8 @@ export const en = {
   steps: { info: 'Client', loads: 'Loads', site: 'Site & sun', design: 'System', results: 'Results', bom: 'Pricing', export: 'Export' },
   stepStatus: { done: 'Done', todo: 'To do', warn: 'Review', error: 'Must fix', current: 'Current step' },
   stepHelp: {
-    info: 'Who is this project for and what kind of system do they need?',
-    loads: 'List every appliance the system must power. Daily energy sets the number of panels, peak demand sets the inverter, and night use sets the battery.',
+    info: 'Who the quote is for and how to reach them. In a full design you also choose the kind of system here.',
+    loads: 'List every appliance the system must power, or enter the monthly consumption from the electricity bill. Daily energy sets the number of panels, peak demand sets the inverter, and night use sets the battery.',
     site: 'Pick the nearest city for sun hours, or enter your own. Tilt, shading and dust adjust the usable energy.',
     design: 'Choose the equipment, or leave it on Auto and the planner recommends it. Engineering settings are under Advanced.',
     results: 'What the client gets, and the engineering behind it. Fix red items before quoting.',
