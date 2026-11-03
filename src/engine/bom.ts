@@ -30,6 +30,8 @@ const MAX_QTY = 1e7, MAX_PRICE_USD = 1e9
 const TYPE_AR: Record<string, string> = { hybrid: 'هجين', offgrid: 'منفصل عن الشبكة', gridtie: 'متصل بالشبكة' }
 const CHEM_AR: Record<string, string> = { LiFePO4: 'ليثيوم حديد فوسفات (LiFePO4)', NMC: 'ليثيوم NMC', AGM: 'رصاص حمضي AGM', Gel: 'رصاص حمضي جل', Flooded: 'رصاص حمضي سائل' }
 const phaseAr = (ph: number) => (ph === 3 ? 'ثلاثي الأطوار' : 'أحادي الطور')
+/** Product name on the quote: brand + model, without the "Generic" placeholder brand of unbranded catalogue items. */
+export const productName = (x: { brand: string; model: string }) => (/^generic$/i.test(x.brand.trim()) ? x.model : `${x.brand} ${x.model}`)
 export const breakerItemId = (a: number) => (a >= 160 ? `ac-mccb-${a}` : `ac-mcb-${a}`)
 
 /** Main-equipment ids whose BOM qty is the design qty (qty overrides on them are applied to the design by computeProject). */
@@ -75,22 +77,22 @@ function buildDesignBom(p: Project, pr: PricingInput, c: BomCtx, money: (qty: nu
 
   // ---- Generation
   const pn = c.panel
-  add({ id: pn.id, category: 'PV Modules', name: `${pn.brand} ${pn.model}`, spec: `${pn.watts} W · ${pn.technology} · Voc ${pn.voc} V`,
-    nameAr: `${pn.brand} ${pn.model}`, specAr: `${pn.watts} W · ${pn.technology === 'poly' ? 'متعدد البلورات' : pn.technology} · Voc ${pn.voc} V`, unit: 'pcs', qty: c.panelQty, price: pn.approxPriceUsd })
+  add({ id: pn.id, category: 'PV Modules', name: productName(pn), spec: `${pn.watts} W · ${pn.technology} · Voc ${pn.voc} V`,
+    nameAr: productName(pn), specAr: `${pn.watts} W · ${pn.technology === 'poly' ? 'متعدد البلورات' : pn.technology} · Voc ${pn.voc} V`, unit: 'pcs', qty: c.panelQty, price: pn.approxPriceUsd })
   if (c.inverter) {
     const iv = c.inverter
-    add({ id: iv.id, category: 'Inverter', name: `${iv.brand} ${iv.model}`, spec: `${iv.ratedAcKw} kW ${iv.type} · ${iv.phase}-ph · ${iv.mpptCount} MPPT`,
-      nameAr: `${iv.brand} ${iv.model}`, specAr: `${iv.ratedAcKw} kW · ${TYPE_AR[iv.type] ?? iv.type} · ${phaseAr(iv.phase)} · ${iv.mpptCount} MPPT`, unit: 'pcs', qty: c.inverterQty, price: iv.approxPriceUsd })
+    add({ id: iv.id, category: 'Inverter', name: productName(iv), spec: `${iv.ratedAcKw} kW ${iv.type} · ${iv.phase}-ph · ${iv.mpptCount} MPPT`,
+      nameAr: productName(iv), specAr: `${iv.ratedAcKw} kW · ${TYPE_AR[iv.type] ?? iv.type} · ${phaseAr(iv.phase)} · ${iv.mpptCount} MPPT`, unit: 'pcs', qty: c.inverterQty, price: iv.approxPriceUsd })
   }
   if (c.battery && c.batteryQty > 0) {
     const b = c.battery
-    add({ id: b.id, category: 'Battery', name: `${b.brand} ${b.model}`, spec: `${b.nominalVoltage} V ${b.capacityAh} Ah · ${b.energyKwh} kWh ${b.chemistry}`,
-      nameAr: `${b.brand} ${b.model}`, specAr: `${b.nominalVoltage} V ‏${b.capacityAh} Ah · ${b.energyKwh} kWh · ${CHEM_AR[b.chemistry] ?? b.chemistry}`, unit: 'pcs', qty: c.batteryQty, price: b.approxPriceUsd })
+    add({ id: b.id, category: 'Battery', name: productName(b), spec: `${b.nominalVoltage} V ${b.capacityAh} Ah · ${b.energyKwh} kWh ${b.chemistry}`,
+      nameAr: productName(b), specAr: `${b.nominalVoltage} V ‏${b.capacityAh} Ah · ${b.energyKwh} kWh · ${CHEM_AR[b.chemistry] ?? b.chemistry}`, unit: 'pcs', qty: c.batteryQty, price: b.approxPriceUsd })
   }
   if (c.controller && c.controllerQty > 0) {
     const cc = c.controller, t = cc.type ?? 'MPPT'
-    add({ id: cc.id, category: 'Inverter', name: `${cc.brand} ${cc.model}`, spec: `${cc.maxChargeA} A ${t} · ${cc.maxPvVoltage} V PV`,
-      nameAr: `${cc.brand} ${cc.model}`, specAr: `منظم شحن ${t} ‏${cc.maxChargeA} A · ${cc.maxPvVoltage} V`, unit: 'pcs', qty: c.controllerQty, price: cc.approxPriceUsd })
+    add({ id: cc.id, category: 'Inverter', name: productName(cc), spec: `${cc.maxChargeA} A ${t} · ${cc.maxPvVoltage} V PV`,
+      nameAr: productName(cc), specAr: `منظم شحن ${t} ‏${cc.maxChargeA} A · ${cc.maxPvVoltage} V`, unit: 'pcs', qty: c.controllerQty, price: cc.approxPriceUsd })
   }
   if (c.battery && c.batteryQty > 0) {
     const b = c.battery

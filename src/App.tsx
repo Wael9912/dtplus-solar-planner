@@ -117,7 +117,7 @@ export default function App() {
           <LangSwitch />
           <div className="hidden sm:block">
             <Menu label={t.nav.newMenu} testId="nav-new" buttonClassName="btn-primary px-3" items={start.map((a) => ({ label: a.label, icon: <a.icon size={18} />, onClick: a.run, testId: `new-${a.key}` }))}>
-              <Plus size={18} /><span className="hidden md:inline">{t.nav.newProject}</span>
+              <Plus size={18} /><span className="hidden md:inline">{t.nav.newShort}</span>
             </Menu>
           </div>
           <div className="sm:hidden">

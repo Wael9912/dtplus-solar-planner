@@ -135,12 +135,16 @@ export interface Project {
    * changes never rewrite a quote the client already has. Back to Draft / "Use current prices" / New revision → current list.
    */
   lockedPrices?: PriceBook; lockedAt?: string
+  /** Client proposal shows savings, payback and cash flow: true / false, or missing → automatic (only when the payback is credible). */
+  proposalFinance?: boolean
 }
 export type ProjectStatus = 'draft' | 'quoted' | 'approved' | 'installed' | 'lost'
 
 export interface CompanySettings {
   name: string; tagline: string; phone: string; email: string; website: string; address: string;
   logoDataUrl: string | null; primaryColor: string; quoteValidityDays: number; terms: string; currency: string; fxRateToUsd: number;
+  /** Arabic company name / tagline / terms for Arabic documents (empty → the main fields are used). */
+  nameAr?: string; taglineAr?: string; termsAr?: string;
 }
 
 // ---------- Company price list ----------
