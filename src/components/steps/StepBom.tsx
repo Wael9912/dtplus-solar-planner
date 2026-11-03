@@ -1,13 +1,11 @@
 import { useDeferredValue, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Plus, RotateCcw, Trash2, SlidersHorizontal, Eye, EyeOff, ArrowLeft, ArrowRight, PackagePlus, Search, X } from 'lucide-react'
-import { useT, type Lang } from '../../i18n'
-import type { Dict } from '../../i18n/en'
+import { useT, dicts, type Lang } from '../../i18n'
 import { Field, NumberInput, Section, Segmented, Switch, IconButton, EmptyState, Parts } from '../ui'
 import { useIsDesktop } from '../hooks'
 import { Sheet, Menu } from '../overlay'
 import type { StepProps } from '../Wizard'
 import type { BomLine, PricingInput, Project, SiteInput } from '../../engine/types'
-import type { ResolvedCatalog } from '../../engine/catalogContext'
 import { fmt } from '../../engine/format'
 import { uid } from '../../engine/defaults'
 import { computeProject } from '../../engine/compute'
@@ -17,35 +15,11 @@ import { useAppStore } from '../../store/useAppStore'
 import { useCatalog, usePriceBook } from '../useEngine'
 import { bomCatLabel, bomLineName, bomLineSpec, unitLabel } from '../../i18n/labels'
 import { toast } from '../../store/useToast'
+import { catalogEntries, rankSearch, type CatalogEntry } from '../../data/searchKeywords'
 
-// ---------------------------------------------------------------- catalogue picker entries
-type Kind = 'panels' | 'inverters' | 'batteries' | 'controllers' | 'items'
-/** A product of the company price list as it becomes a quote line (names and specs in both languages, the company's unit cost). */
-interface Entry { kind: Kind; id: string; own: boolean; category: string; name: string; nameAr?: string; spec: string; specAr?: string; unit: string; priceUsd: number; hay: string }
-const TYPE_AR: Record<string, string> = { hybrid: 'هجين', offgrid: 'منفصل عن الشبكة', gridtie: 'متصل بالشبكة' }
-const CHEM_AR: Record<string, string> = { LiFePO4: 'ليثيوم حديد فوسفات (LiFePO4)', NMC: 'ليثيوم NMC', AGM: 'رصاص حمضي AGM', Gel: 'رصاص حمضي جل', Flooded: 'رصاص حمضي سائل' }
-const OWN = 'my-'
-/** Every product the company stocks (hidden ones left out), shaped like the BOM lines the engine writes for the same product. */
-function catalogEntries(c: ResolvedCatalog, t: Dict): Entry[] {
-  const vis = <T extends { id: string }>(xs: T[]) => xs.filter((x) => !c.hidden.has(x.id))
-  const out: Omit<Entry, 'hay'>[] = [
-    ...vis(c.panels).map((x) => ({ kind: 'panels' as const, id: x.id, own: x.id.startsWith(OWN), category: 'PV Modules', unit: 'pcs', priceUsd: x.approxPriceUsd,
-      name: `${x.brand} ${x.model}`, spec: `${x.watts} W · ${x.technology}${x.bifacial ? ' bifacial' : ''} · Voc ${x.voc} V`,
-      nameAr: `${x.brand} ${x.model}`, specAr: `${x.watts} W · ${x.technology === 'poly' ? 'متعدد البلورات' : x.technology}${x.bifacial ? ' · ثنائي الوجه' : ''} · Voc ${x.voc} V` })),
-    ...vis(c.inverters).map((x) => ({ kind: 'inverters' as const, id: x.id, own: x.id.startsWith(OWN), category: 'Inverter', unit: 'pcs', priceUsd: x.approxPriceUsd,
-      name: `${x.brand} ${x.model}`, spec: `${x.ratedAcKw} kW ${x.type} · ${x.phase}-ph · ${x.mpptCount} MPPT`,
-      nameAr: `${x.brand} ${x.model}`, specAr: `${TYPE_AR[x.type] ?? x.type} · ${x.phase === 3 ? 'ثلاثي الأطوار' : 'أحادي الطور'} · ${x.ratedAcKw} kW · ${x.mpptCount} MPPT` })),
-    ...vis(c.batteries).map((x) => ({ kind: 'batteries' as const, id: x.id, own: x.id.startsWith(OWN), category: 'Battery', unit: 'pcs', priceUsd: x.approxPriceUsd,
-      name: `${x.brand} ${x.model}`, spec: `${x.nominalVoltage} V ${x.capacityAh} Ah · ${x.energyKwh} kWh ${x.chemistry}`,
-      nameAr: `${x.brand} ${x.model}`, specAr: `${CHEM_AR[x.chemistry] ?? x.chemistry} · ${x.nominalVoltage} V ${x.capacityAh} Ah · ${x.energyKwh} kWh` })),
-    ...vis(c.chargeControllers).map((x) => ({ kind: 'controllers' as const, id: x.id, own: x.id.startsWith(OWN), category: 'Inverter', unit: 'pcs', priceUsd: x.approxPriceUsd,
-      name: `${x.brand} ${x.model}`, spec: `${x.maxChargeA} A ${x.type ?? 'MPPT'} · ${x.maxPvVoltage} V PV`,
-      nameAr: `${x.brand} ${x.model}`, specAr: `منظم شحن ${x.type ?? 'MPPT'} \u200F${x.maxChargeA} A · ${x.maxPvVoltage} V` })),
-    ...vis(c.items).map((x) => ({ kind: 'items' as const, id: x.id, own: x.id.startsWith(OWN), category: x.category || 'Accessories', unit: x.unit || 'pcs', priceUsd: x.approxPriceUsd,
-      name: x.name, spec: x.spec ?? '', nameAr: x.nameAr, specAr: x.specAr })),
-  ]
-  return out.map((e) => ({ ...e, hay: [e.name, e.nameAr, e.spec, e.specAr, e.id, t.bom.cats[e.category], e.category].filter(Boolean).join(' ').toLowerCase() }))
-}
+// ---------------------------------------------------------------- catalogue picker entries (built and ranked in data/searchKeywords)
+type Entry = CatalogEntry
+const catLabels = (c: string) => [dicts.en.bom.cats[c], dicts.ar.bom.cats[c]]
 const entryName = (e: Pick<Entry, 'name' | 'nameAr'>, lang: Lang) => (lang === 'ar' && e.nameAr) || e.name
 const entrySpec = (e: Pick<Entry, 'spec' | 'specAr'>, lang: Lang) => (lang === 'ar' && e.specAr) || e.spec
 
@@ -85,7 +59,11 @@ export function StepBom({ project: p, results: r, quote, update, goTo }: StepPro
   }, [showRemoved, p, pr, quote, r.bom, book])
   const allQuote = all.quote
   const onSite = useMemo(() => new Map(all.bom.filter((b) => (b.existingQty ?? 0) > 0).map((b) => [b.id, b.existingQty!])), [all.bom])
-  const lines = clientView ? allQuote.lines.filter((l) => l.qty > 0) : allQuote.lines
+  // Main equipment entirely on site (qty 0, existing > 0): listed with its badge and no price in both views; nothing to tick or type
+  // (the design counts it — the quantity is set under "Equipment already on site" on the System step)
+  const onSiteOnly = (l: QuoteLine) => l.source === 'auto' && l.qty === 0 && (onSite.get(l.id) ?? 0) > 0 && pr.qtyOverrides[l.id] == null
+  const lines = clientView ? allQuote.lines.filter((l) => l.qty > 0 || onSiteOnly(l)) : allQuote.lines
+  const dash = <span className="block text-end text-slate-400" aria-hidden="true">—</span>
   const categories = Array.from(new Set(lines.map((l) => l.category)))
   const numbering = new Map(categories.flatMap((c) => lines.filter((l) => l.category === c)).map((l, i) => [l.id, i + 1]))
 
@@ -170,9 +148,10 @@ export function StepBom({ project: p, results: r, quote, update, goTo }: StepPro
               const ex = pr.excludedIds.includes(l.id), ed = edited(l.id)
               const c = pr.customItems.find((x) => x.id === l.id)
               const custom = l.source === 'custom', typed = custom && !c?.ref // typed lines: editable name / spec / unit
+              const only = onSiteOnly(l)
               return (
                 <tr key={l.id} data-line-id={l.id} data-testid="bom-row" className={`${ex ? 'opacity-50' : ''} ${ed ? 'shadow-[inset_3px_0_0_0_#f59e0b] rtl:shadow-[inset_-3px_0_0_0_#f59e0b]' : ''}`}>
-                  <td className="text-center">{!custom && <input type="checkbox" className="size-5 accent-brand-700" checked={!ex} onChange={() => toggle(l.id)} aria-label={t.bom.includeItem(name(l))} data-testid="bom-include" />}</td>
+                  <td className="text-center">{!custom && !only && <input type="checkbox" className="size-5 accent-brand-700" checked={!ex} onChange={() => toggle(l.id)} aria-label={t.bom.includeItem(name(l))} data-testid="bom-include" />}</td>
                   <td className="text-xs text-slate-500 tabular-nums">{numbering.get(l.id)}</td>
                   <td className="min-w-64">
                     {typed ? (
@@ -188,10 +167,10 @@ export function StepBom({ project: p, results: r, quote, update, goTo }: StepPro
                       </div>
                     )}
                   </td>
-                  <td>{qtyInput(l, '', true)}</td>
+                  <td>{only ? <span className="block px-2 text-end text-slate-500 tabular-nums" data-testid="bom-onsite-qty">0</span> : qtyInput(l, '', true)}</td>
                   <td className="text-sm text-slate-600">{typed ? <input className="input-quiet w-16" dir="auto" value={c?.unit ?? ''} aria-label={t.bom.unit} onChange={(e) => patchCustom(l.id, { unit: e.target.value })} /> : unitLabel(l.unit, t)}</td>
-                  <td>{priceCell(l, true)}</td>
-                  <td className="num font-semibold text-slate-900"><bdi>{m(clientView ? l.totalSell : l.totalCost)}</bdi></td>
+                  <td>{only ? dash : priceCell(l, true)}</td>
+                  <td className="num font-semibold text-slate-900">{only ? dash : <bdi>{m(clientView ? l.totalSell : l.totalCost)}</bdi>}</td>
                   <td>
                     {custom ? <IconButton label={`${t.bom.removeLine} — ${name(l)}`} className="btn-ghost text-slate-500 hover:text-red-700" onClick={() => removeCustom(l.id)}><Trash2 size={18} /></IconButton>
                       : ed ? <IconButton label={t.bom.resetLine} className="btn-ghost text-amber-700" onClick={() => resetLine(l.id)}><RotateCcw size={18} /></IconButton> : null}
@@ -220,6 +199,7 @@ export function StepBom({ project: p, results: r, quote, update, goTo }: StepPro
                 const ex = pr.excludedIds.includes(l.id), ed = edited(l.id)
                 const c = pr.customItems.find((x) => x.id === l.id)
                 const custom = l.source === 'custom', typed = custom && !c?.ref
+                const only = onSiteOnly(l)
                 return (
                   <li key={l.id} data-line-id={l.id} data-testid="bom-card" className={`px-3 py-3 ${ex ? 'bg-slate-50' : ''} ${ed ? 'border-s-4 border-s-amber-400' : ''}`}>
                     {typed ? (
@@ -237,10 +217,10 @@ export function StepBom({ project: p, results: r, quote, update, goTo }: StepPro
                           {bomLineSpec(l, lang) && <Parts className="block text-xs text-slate-500" parts={bomLineSpec(l, lang).split(' · ')} />}
                           {existingBadge(l.id)}
                         </div>
-                        <p className={`shrink-0 text-end font-semibold text-slate-900 tabular-nums ${ex ? 'opacity-60' : ''}`}><bdi>{m(clientView ? l.totalSell : l.totalCost)}</bdi></p>
+                        <p className={`shrink-0 text-end font-semibold text-slate-900 tabular-nums ${ex ? 'opacity-60' : ''}`}>{only ? dash : <bdi>{m(clientView ? l.totalSell : l.totalCost)}</bdi>}</p>
                       </div>
                     )}
-                    <div className="mt-2 grid grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_auto] items-end gap-2">
+                    {!only && <div className="mt-2 grid grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_auto] items-end gap-2">
                       <label className={`block min-w-0 ${ex ? 'opacity-60' : ''}`}><span className="mb-1 block text-xs text-slate-500">{t.bom.qty}</span>{qtyInput(l, "[&_input]:px-2")}</label>
                       <label className={`block min-w-0 ${ex ? 'opacity-60' : ''}`}><span className="mb-1 block text-xs text-slate-500">{clientView ? t.bom.unitPrice : t.bom.costIn(cur)}</span>{clientView ? <span className="flex min-h-11 items-center"><bdi className="font-medium tabular-nums">{m(l.unitSell)}</bdi></span> : priceCell(l)}</label>
                       <div className="flex items-center">
@@ -250,7 +230,7 @@ export function StepBom({ project: p, results: r, quote, update, goTo }: StepPro
                             <Switch checked={!ex} onChange={() => toggle(l.id)} label={<span className="sr-only">{t.bom.includeItem(name(l))}</span>} data-testid="bom-include" />
                           </>}
                       </div>
-                    </div>
+                    </div>}
                   </li>
                 )
               })}
@@ -395,7 +375,7 @@ function CatalogSheet({ open, onClose, onAdd, customItems, quote: q, clientView 
   const { t, lang } = useT()
   const O = t.outputs.bom
   const cat = useCatalog()
-  const entries = useMemo(() => catalogEntries(cat, t), [cat, t])
+  const entries = useMemo(() => catalogEntries(cat, catLabels), [cat])
   const [tab, setTab] = useState<Tab>('all')
   const [query, setQuery] = useState('')
   const [said, setSaid] = useState('')
@@ -408,10 +388,8 @@ function CatalogSheet({ open, onClose, onAdd, customItems, quote: q, clientView 
     for (const c of customItems) if (c.ref) mm.set(c.ref, (mm.get(c.ref) ?? 0) + (Number.isFinite(c.qty) ? c.qty : 0))
     return mm
   }, [customItems])
-  const found = useMemo(() => {
-    const words = deferred.trim().toLowerCase().split(/\s+/).filter(Boolean)
-    return entries.filter((e) => (tab === 'all' || (tab === 'own' ? e.own : e.kind === tab)) && words.every((w) => e.hay.includes(w)))
-  }, [entries, tab, deferred])
+  // Every word, any order, English or Arabic (trade words per product family); the family asked for comes first
+  const found = useMemo(() => rankSearch(entries.filter((e) => tab === 'all' || (tab === 'own' ? e.own : e.kind === tab)), (e) => e.search, deferred), [entries, tab, deferred])
   const shown = found.slice(0, MAX_SHOWN)
   const k = 1 + q.markupPct / 100
   const price = (usd: number) => {

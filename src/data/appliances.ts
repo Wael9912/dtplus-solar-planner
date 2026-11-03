@@ -834,17 +834,32 @@ function queryTokens(q: string, pairs: boolean): string[] {
   return out
 }
 
-const nameIx = new WeakMap<Appliance, Indexed>(), aliasIx = new WeakMap<Appliance, Indexed>()
+const nameIx = new WeakMap<Appliance, Indexed>(), aliasIx = new WeakMap<Appliance, Indexed>(), firstIx = new WeakMap<Appliance, string[]>()
+/**
+ * Rank of one query word for an appliance: 3 = a name (English or Arabic) starts with it, 2 = a whole word of the name or of an alias
+ * ("fridge" for "Refrigerator"; a number or number + unit in the name), 1 = part of a name word ("fri" → "fridge"), 0 = other alias /
+ * category match, -1 = no match.
+ */
+function weight(tk: string, n: Indexed, al: Indexed, first: string[], ex: Indexed | null): number {
+  if (hit(tk, n)) {
+    if (!tk.includes(' ') && !isNum(tk) && first.some((w) => w.startsWith(tk))) return 3
+    return tk.includes(' ') || isNum(tk) || n.words.includes(tk) ? 2 : 1
+  }
+  if (hit(tk, al)) return al.words.includes(tk) ? 2 : 0 // a number + unit only in the aliases ("1.5 hp" for a 1-ton AC) stays below the name
+  return ex && tk.length >= 3 && hit(tk, ex) ? 0 : -1 // short words ("ac") never match a category label
+}
 function run(list: Appliance[], toks: string[], extra?: (a: Appliance) => string): Appliance[] {
   const scored: { a: Appliance; score: number; i: number }[] = []
   list.forEach((a, i) => {
     let n = nameIx.get(a); if (!n) { n = index(`${a.name} ${a.nameAr ?? ''}`); nameIx.set(a, n) }
     let al = aliasIx.get(a); if (!al) { al = index((applianceAliases[a.id] ?? []).join(' , ')); aliasIx.set(a, al) }
+    let first = firstIx.get(a); if (!first) { first = [a.name, a.nameAr ?? ''].map((x) => normalizeSearch(x).split(' ')[0]).filter(Boolean); firstIx.set(a, first) }
     const ex = extra ? index(extra(a)) : null
     let score = 0
     for (const tk of toks) {
-      if (hit(tk, n)) score++
-      else if (!hit(tk, al) && !(ex && tk.length >= 3 && hit(tk, ex))) return // short words ("ac") never match a category label
+      const w = weight(tk, n, al, first, ex)
+      if (w < 0) return
+      score += w
     }
     scored.push({ a, score, i })
   })
@@ -853,7 +868,9 @@ function run(list: Appliance[], toks: string[], extra?: (a: Appliance) => string
 /**
  * Library search: every query word must match (any order, any case) the appliance name (English or Arabic), its aliases or `extra`
  * (e.g. the category labels). Number + unit pairs are matched together first ("1.5 hp" is not the 1.5-ton AC), word by word if that
- * finds nothing. Results whose names match more words come first; library order otherwise.
+ * finds nothing. Ranking: names that start with the query, then whole-word name / alias matches ("fridge" → the refrigerators before
+ * "Chest fridge / chest freezer", which only shares the word), then partial name matches, then alias / category matches; library
+ * order otherwise.
  */
 export function searchAppliances(list: Appliance[], query: string, extra?: (a: Appliance) => string): Appliance[] {
   const paired = queryTokens(query, true)

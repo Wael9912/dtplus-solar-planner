@@ -4,7 +4,7 @@ import { useAppStore, STATUSES } from '../store/useAppStore'
 import { useT } from '../i18n'
 import { computeProject } from '../engine/compute'
 import { buildQuote, formatQuoteMoney } from '../engine/quote'
-import { fmt } from '../engine/format'
+import { fmt, fxOf } from '../engine/format'
 import { projectMode } from '../engine/sizing'
 import { companyTitle, fmtDate, matchAppliance, projectTitle } from '../i18n/labels'
 import { Badge } from './ui'
@@ -16,6 +16,7 @@ import type { Project } from '../engine/types'
 import { sampleProjects } from '../data/samples'
 import { download } from '../export/download'
 import { toast } from '../store/useToast'
+import { normalizeSearch } from '../data/searchKeywords'
 
 type Status = Project['status']
 const statusLevel: Record<Status, 'neutral' | 'info' | 'ok' | 'error'> = { draft: 'neutral', quoted: 'info', approved: 'ok', installed: 'ok', lost: 'error' }
@@ -26,8 +27,55 @@ const SAMPLE_AR: Record<string, Partial<Project>> = {
   'Q-2026-0105': { name: 'صيدلية الخرطوم — نظام هجين احتياطي', clientName: 'صيدلية د. صلاح', clientAddress: 'شارع 15، العمارات، الخرطوم' },
   'Q-2026-0120': { name: 'مستودع دبي — 100 كيلوواط متصل بالشبكة', clientName: 'الخليج للخدمات اللوجستية ذ.م.م', clientAddress: 'المنطقة الحرة بجبل علي' },
 }
+const revBase = (ref?: string) => (ref ?? '').trim().replace(/-R\d+$/, '')
+const revNo = (ref?: string) => Number(/-R(\d+)$/.exec((ref ?? '').trim())?.[1] ?? 1)
+/** Short money for the status chips: $12.4K, 1.2M SDG. */
+const compactMoney = (v: number, cur: string) => {
+  const n = new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: Math.abs(v) >= 1e6 ? 1 : 0 }).format(v)
+  return cur === 'USD' ? `$${n}` : `${n} ${cur}`
+}
+/**
+ * Older revisions of the same quote: same reference base with a lower -R number, or an ancestor in the `revisionOf` chain.
+ * Maps the superseded project id → label of the newest revision ("R3"; '' when that one has no -R reference).
+ */
+function supersededBy(projects: Project[]): Map<string, string> {
+  const out = new Map<string, string>()
+  const label = (p: Project) => (/-R\d+$/.test((p.reference ?? '').trim()) ? `R${revNo(p.reference)}` : '')
+  const groups = new Map<string, Project[]>()
+  for (const p of projects) { const b = revBase(p.reference); if (b) groups.set(b, [...(groups.get(b) ?? []), p]) }
+  for (const g of groups.values()) {
+    if (g.length < 2) continue
+    const newest = g.reduce((a, b) => (revNo(b.reference) > revNo(a.reference) ? b : a))
+    for (const p of g) if (revNo(p.reference) < revNo(newest.reference)) out.set(p.id, label(newest))
+  }
+  // revisionOf chain (references edited or empty): every ancestor is superseded by the newest descendant
+  const byId = new Map(projects.map((p) => [p.id, p]))
+  const children = new Map<string, Project[]>()
+  for (const p of projects) if (p.revisionOf && byId.has(p.revisionOf) && p.revisionOf !== p.id) children.set(p.revisionOf, [...(children.get(p.revisionOf) ?? []), p])
+  const newestBelow = (p: Project, seen = new Set<string>()): Project => {
+    seen.add(p.id)
+    let best: Project | null = null
+    for (const c of children.get(p.id) ?? []) {
+      if (seen.has(c.id)) continue
+      const n = newestBelow(c, seen)
+      if (!best || n.createdAt > best.createdAt) best = n
+    }
+    return best ?? p
+  }
+  for (const id of children.keys()) if (!out.has(id)) { const p = byId.get(id)!; const n = newestBelow(p); if (n !== p) out.set(id, label(n)) }
+  return out
+}
 /** Digits only (Arabic-Indic digits normalised) — phone search ignores spaces, dashes and "+". */
-const digits = (s: string) => s.replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 0x660)).replace(/\D/g, '')
+const digits = (s: string) => s.replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 0x660)).replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 0x6f0)).replace(/\D/g, '')
+/**
+ * Phone search on digits only. From 7 digits the number is compared without its trunk zero / country code: the last 9 digits of the
+ * query must appear in the phone ("0912345678" finds "+249 912 345 678"); shorter queries (3+ digits) match anywhere.
+ */
+function phoneMatch(phone: string, query: string): boolean {
+  const ph = digits(phone), d = digits(query).replace(/^0+/, '')
+  if (!ph || d.length < 3) return false
+  return d.length >= 7 ? ph.includes(d.slice(-9)) : ph.includes(d)
+}
 
 /** Home: start hub (every way to start work, the load calculator first) and the project list. */
 export function ProjectsPage() {
@@ -55,12 +103,27 @@ export function ProjectsPage() {
     return { p, r, quote, priced, mode: projectMode(p), value: priced ? r.totalUsd : 0 }
   }), [projects, book])
   const counts = useMemo(() => Object.fromEntries(STATUSES.map((s) => [s, projects.filter((p) => p.status === s).length])) as Record<Status, number>, [projects])
+  const superseded = useMemo(() => supersededBy(projects), [projects])
+  // Per-status value: sell total incl. VAT in the company currency (other currencies via the project's own rate → USD → company rate, shown as ≈);
+  // superseded revisions and projects with nothing to price are left out
+  const coCur = company.currency || 'USD'
+  const totals = useMemo(() => {
+    const coFx = fxOf({ currency: coCur, fxRateToUsd: company.fxRateToUsd })
+    const sum = Object.fromEntries(STATUSES.map((s) => [s, 0])) as Record<Status, number>
+    const approx = new Set<Status>()
+    for (const { p, quote, priced } of enriched) {
+      if (!priced || superseded.has(p.id) || !(quote.total > 0)) continue
+      if (quote.currency === coCur) sum[p.status] += quote.total
+      else { sum[p.status] += (quote.total / quote.fx) * coFx; approx.add(p.status) }
+    }
+    return { sum, approx }
+  }, [enriched, superseded, coCur, company.fxRateToUsd])
+  const statusValue = (s: Status) => totals.sum[s] > 0 ? `${totals.approx.has(s) ? '≈ ' : ''}${compactMoney(totals.sum[s], coCur)}` : null
   const list = useMemo(() => {
-    const s = q.trim().toLowerCase()
-    const d = digits(s)
+    const s = normalizeSearch(q)
     const xs = enriched.filter(({ p }) => (status === 'all' || p.status === status) && (!s
-      || `${p.name} ${p.clientName} ${p.reference} ${p.clientAddress} ${p.clientPhone} ${p.clientEmail}`.toLowerCase().includes(s)
-      || (d.length >= 3 && digits(p.clientPhone || '').includes(d))))
+      || normalizeSearch(`${p.name} ${p.clientName} ${p.reference} ${p.clientAddress} ${p.clientPhone} ${p.clientEmail}`).includes(s)
+      || phoneMatch(p.clientPhone || '', q)))
     return [...xs].sort((a, b) => sort === 'name' ? projectTitle(a.p.name, t).localeCompare(projectTitle(b.p.name, t), lang) : sort === 'value' ? b.value - a.value : b.p.updatedAt.localeCompare(a.p.updatedAt))
   }, [enriched, q, status, sort, t, lang])
 
@@ -170,7 +233,11 @@ export function ProjectsPage() {
               </div>
               <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-0.5 [scrollbar-width:none] sm:mx-0 sm:px-0" role="group" aria-label={t.projects.statusFilter}>
                 <button type="button" className="chip" aria-pressed={status === 'all'} onClick={() => setStatus('all')} data-testid="filter-all">{t.projects.all} <span className="opacity-70">{projects.length}</span></button>
-                {STATUSES.map((s) => <button key={s} type="button" className="chip" aria-pressed={status === s} onClick={() => setStatus(s)} data-testid={`filter-${s}`}>{t.info.statuses[s]} <span className="opacity-70">{counts[s]}</span></button>)}
+                {STATUSES.map((s) => { const v = statusValue(s); return (
+                  <button key={s} type="button" className="chip" aria-pressed={status === s} onClick={() => setStatus(s)} data-testid={`filter-${s}`}>
+                    {t.info.statuses[s]} <span className="opacity-70">{counts[s]}</span>{v && <span className="opacity-70" data-testid="filter-total"> · <bdi>{v}</bdi></span>}
+                  </button>
+                ) })}
               </div>
               <label className="flex items-center gap-2 text-sm text-slate-600 lg:ms-auto">
                 <span className="shrink-0">{t.projects.sort}</span>
@@ -179,6 +246,10 @@ export function ProjectsPage() {
                 </select>
               </label>
             </div>
+
+            {STATUSES.some((s) => totals.sum[s] > 0) && (
+              <p className="-mt-1 text-xs text-slate-500" data-testid="totals-note">{C.totalsNote(coCur)}{totals.approx.size > 0 && <> {C.totalsConverted}</>}</p>
+            )}
 
             {list.length === 0 ? (
               <div className="card flex flex-col items-center px-6 py-10 text-center" data-testid="no-match">
@@ -189,6 +260,7 @@ export function ProjectsPage() {
               <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-3" data-testid="project-list">
                 {list.map(({ p, r, quote, priced, mode }) => {
                   const total = priced ? formatQuoteMoney(quote.total, quote, 0) : '—'
+                  const old = superseded.get(p.id)
                   const nProducts = r.bom.filter((b) => b.qty > 0 && b.category !== 'Services').length
                   return (
                     <li key={p.id} data-testid="project-card" data-mode={mode} className="card group relative flex flex-col p-4 transition hover:border-slate-300 hover:shadow-md focus-within:ring-2 focus-within:ring-brand-500">
@@ -198,6 +270,7 @@ export function ProjectsPage() {
                             <button type="button" data-testid="project-open" onClick={() => openProject(p.id)} className="text-start after:absolute after:inset-0 after:rounded-xl after:content-[''] focus-visible:outline-none group-hover:text-brand-800"><bdi>{projectTitle(p.name, t)}</bdi></button>
                           </h3>
                           <p className="mt-0.5 truncate text-sm text-slate-500"><bdi>{[p.clientName || '—', p.reference].filter(Boolean).join(' · ')}</bdi></p>
+                          {old != null && <p className="mt-1"><span className="badge-neutral bg-white whitespace-normal text-slate-500" title={C.supersededHelp} data-testid="project-superseded">{old ? C.superseded(old) : C.supersededNewer}</span></p>}
                         </div>
                         <div className="relative z-10 -me-2 -mt-1">
                           <Menu label={t.projects.moreActions} testId="project-menu" items={[
@@ -209,7 +282,7 @@ export function ProjectsPage() {
                           ]} />
                         </div>
                       </div>
-                      <dl className="mt-3 grid grid-cols-3 gap-2 text-sm" data-testid="project-figures">
+                      <dl className={`mt-3 grid grid-cols-3 gap-2 text-sm ${old != null ? 'opacity-60' : ''}`} data-testid="project-figures">
                         {mode === 'items' ? <>
                           <Fig k={C.products} v={String(nProducts)} />
                           <Fig k={t.projects.total} v={total} className="col-span-2" />
@@ -236,9 +309,9 @@ export function ProjectsPage() {
       </section>
 
       {projects.length > 0 && (
-        <button type="button" onClick={() => setStartSheet(true)} aria-haspopup="dialog" data-testid="fab-new"
+        <button type="button" onClick={() => setStartSheet(true)} aria-haspopup="dialog" aria-label={t.nav.newProject} data-testid="fab-new"
           className="btn-primary fixed end-4 bottom-[calc(1rem+env(safe-area-inset-bottom))] z-20 h-14 rounded-full px-5 shadow-[var(--shadow-float)] sm:hidden">
-          <Plus size={20} />{t.nav.newProject}
+          <Plus size={20} />{t.nav.newShort}
         </button>
       )}
       <Sheet open={startSheet} onClose={() => setStartSheet(false)} title={C.title} testId="start-sheet">

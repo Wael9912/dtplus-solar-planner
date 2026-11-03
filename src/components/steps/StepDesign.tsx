@@ -1,10 +1,11 @@
 import { Fragment, useMemo, useState, type ReactNode } from 'react'
-import { Search, Check, Sun, Zap, BatteryFull, Cpu, ChevronDown } from 'lucide-react'
+import { Search, Check, Sun, Zap, BatteryFull, Cpu, ChevronDown, Info, Lightbulb } from 'lucide-react'
 import { useT } from '../../i18n'
 import { Field, NumberInput, Section, Switch, Disclosure, Parts, Segmented } from '../ui'
 import { Sheet } from '../overlay'
 import type { StepProps } from '../Wizard'
 import type { Project, SizeTargets, SystemType, Results } from '../../engine/types'
+import type { Dict } from '../../i18n/en'
 import { fitsSystemVoltage } from '../../engine/compute'
 import { applySystemType, modeDefaults } from '../../engine/defaults'
 import { projectMode, resolveSizing } from '../../engine/sizing'
@@ -14,6 +15,7 @@ import { formatQuoteMoney } from '../../engine/quote'
 import { useAppStore } from '../../store/useAppStore'
 import { useCatalog } from '../useEngine'
 import { iso } from '../../i18n/labels'
+import { toast } from '../../store/useToast'
 
 interface Opt { id: string; title: string; sub: string[]; price?: string; search: string; hidden?: boolean; own?: boolean }
 
@@ -78,8 +80,8 @@ function EquipRow({ icon, label, title, sub, auto, notStocked, onOpen, testId }:
 }
 
 /** One fixed size (kWp / kWh / kW): empty = auto (the placeholder shows what auto gives), with the installed result underneath. */
-function TargetField({ label, value, auto, unit, installed, disabled, disabledText, onChange, testId, children }: {
-  label: string; value: number | null; auto: string; unit: string; installed: ReactNode; disabled?: boolean; disabledText?: string
+function TargetField({ label, value, auto, unit, installed, why, disabled, disabledText, onChange, testId, children }: {
+  label: string; value: number | null; auto: string; unit: string; installed: ReactNode; why?: string; disabled?: boolean; disabledText?: string
   onChange: (v: number | null) => void; testId: string; children?: ReactNode
 }) {
   const { t } = useT()
@@ -92,6 +94,8 @@ function TargetField({ label, value, auto, unit, installed, disabled, disabledTe
         <NumberInput value={disabled ? null : value} allowEmpty min={0.1} max={100000} step={0.5} suffix={unit} disabled={disabled}
           placeholder={disabled ? disabledText : iso(t.design.autoValue(auto))} onChange={onChange} data-testid={testId} />
       </Field>
+      {/* Installed ≠ fixed size: one line saying why (whole panels / strings, battery modules, catalogue inverter sizes) */}
+      {fixed && why && <p className="mt-1 flex items-start gap-1.5 text-xs leading-5 text-slate-600" data-testid={`${testId}-why`}><Info size={14} className="mt-[3px] shrink-0 text-slate-400" aria-hidden="true" /><span className="min-w-0">{why}</span></p>}
       {(fixed || children) && (
         <div className="mt-1 flex flex-wrap items-center gap-x-4">
           {children}
@@ -100,6 +104,41 @@ function TargetField({ label, value, auto, unit, installed, disabled, disabledTe
       )}
     </div>
   )
+}
+
+/** Shown under a fixed size when the installed system differs from it — derived from the results (the engine rounds to whole products). */
+function sizeReasons(p: Project, r: Results, T: Dict['inputs']['design']): { pv?: string; batt?: string; inv?: string } {
+  const tg = resolveSizing(p).targets
+  const d = p.design, qo = p.pricing.qtyOverrides ?? {}
+  const W = String(r.panel.watts)
+  const out: { pv?: string; batt?: string; inv?: string } = {}
+  // Solar array: whole panels, then equal strings
+  const pv = tg.pvKwp
+  if (pv != null && pv > 0 && r.panelQty > 0 && Math.abs(r.arrayKwp - pv) >= 0.005) {
+    const minQty = Math.max(1, Math.ceil((pv * 1000) / r.panel.watts - 1e-9))
+    out.pv = d.panelOverrideQty != null || qo[r.panel.id] != null ? T.whyPvManual
+      : r.strings && r.strings.totalPanels === r.panelQty && r.panelQty !== minQty ? T.whyPvStrings(r.strings.strings, r.strings.panelsPerString, W)
+        : T.whyPvWhole(W, r.panelQty)
+  }
+  // Battery: whole modules (and whole series strings on a low-voltage bus)
+  const bk = d.systemType === 'gridtie' ? null : tg.batteryKwh
+  if (bk != null && bk > 0 && r.battery && r.batteryQty > 0 && Math.abs(r.batteryKwh - bk) > Math.max(0.01, bk * 0.002)) {
+    const e = fmt(r.battery.energyKwh, r.battery.energyKwh % 1 ? 2 : 0)
+    out.batt = d.batteryOverrideQty != null || qo[r.battery.id] != null ? T.whyBattManual
+      : r.batteryConfig.series > 1 ? T.whyBattSeries(e, r.batteryConfig.series, String(d.systemVoltage))
+        : T.whyBattModules(e)
+  }
+  // Inverter: the engine picks catalogue units at or above the size that also suit the array (and the battery bus)
+  const ik = tg.inverterKw
+  if (ik != null && ik > 0 && r.inverter && Math.abs(r.inverterTotalKw - ik) >= 0.05) {
+    const kw = fmt(r.inverterTotalKw, r.inverterTotalKw % 1 ? 1 : 0), target = fmt(ik, ik % 1 ? 1 : 0)
+    out.inv = d.inverterId || qo[r.inverter.id] != null ? T.whyInvManual
+      : r.inverterTotalKw < ik ? T.whyInvBelow
+        : d.systemType === 'gridtie' ? T.whyInvGridTie(target, kw)
+          : r.inverterQty > 1 ? T.whyInvParallel(r.inverterQty, fmt(r.inverter.ratedAcKw, r.inverter.ratedAcKw % 1 ? 1 : 0))
+            : T.whyInvNearest(target, W, kw)
+  }
+  return out
 }
 
 /** PV kWp / battery kWh / inverter kW targets (§15.2): null = auto, PV 0 = no panels (backup only), battery 0 = no battery. */
@@ -112,20 +151,21 @@ function SizeInputs({ p, r, update, columns }: { p: Project; r: Results; update:
   const [lastPv, setLastPv] = useState<number | null>(null), [lastBatt, setLastBatt] = useState<number | null>(null)
   const setT = (x: Partial<SizeTargets>) => update((prev) => { const sz = resolveSizing(prev); return { sizing: { ...sz, targets: { ...sz.targets, ...x } } } })
   const noPv = tg.pvKwp === 0, noBatt = tg.batteryKwh === 0
+  const why = sizeReasons(p, r, T)
   return (
     <div className={`grid grid-cols-1 gap-x-4 gap-y-4 ${columns}`} data-testid="size-targets">
       <TargetField label={T.pvKwp} value={tg.pvKwp} auto={fmt(r.arrayKwp, 2)} unit="kWp" disabled={noPv} disabledText={T.noPanels} testId="target-pv"
-        installed={r.panelQty > 0 ? T.installed(`${r.panelQty} × ${r.panel.watts} W = ${fmt(r.arrayKwp, 2)} kWp`) : T.noPanels} onChange={(v) => setT({ pvKwp: v })}>
+        installed={r.panelQty > 0 ? T.installed(`${r.panelQty} × ${r.panel.watts} W = ${fmt(r.arrayKwp, 2)} kWp`) : T.noPanels} why={why.pv} onChange={(v) => setT({ pvKwp: v })}>
         <Switch checked={noPv} onChange={(on) => { if (on) setLastPv(tg.pvKwp); setT({ pvKwp: on ? 0 : lastPv }) }} label={T.noPv} data-testid="sw-no-pv" />
       </TargetField>
       {!gt && (
         <TargetField label={T.battKwh} value={tg.batteryKwh} auto={fmt(r.batteryKwh, 1)} unit="kWh" disabled={noBatt} disabledText={T.noBatt} testId="target-batt"
-          installed={r.battery && r.batteryQty > 0 ? T.installed(`${r.batteryQty} × ${fmt(r.battery.energyKwh, 2)} kWh = ${fmt(r.batteryKwh, 2)} kWh`) : T.noBatt} onChange={(v) => setT({ batteryKwh: v })}>
+          installed={r.battery && r.batteryQty > 0 ? T.installed(`${r.batteryQty} × ${fmt(r.battery.energyKwh, 2)} kWh = ${fmt(r.batteryKwh, 2)} kWh`) : T.noBatt} why={why.batt} onChange={(v) => setT({ batteryKwh: v })}>
           <Switch checked={noBatt} onChange={(on) => { if (on) setLastBatt(tg.batteryKwh); setT({ batteryKwh: on ? 0 : lastBatt }) }} label={T.noBatt} data-testid="sw-no-batt" />
         </TargetField>
       )}
       <TargetField label={T.invKw} value={tg.inverterKw} auto={fmt(r.inverterTotalKw, 1)} unit="kW" testId="target-inv"
-        installed={r.inverter ? T.installed(`${r.inverterQty} × ${fmt(r.inverter.ratedAcKw, 1)} kW = ${fmt(r.inverterTotalKw, 1)} kW`) : '—'} onChange={(v) => setT({ inverterKw: v })} />
+        installed={r.inverter ? T.installed(`${r.inverterQty} × ${fmt(r.inverter.ratedAcKw, 1)} kW = ${fmt(r.inverterTotalKw, 1)} kW`) : '—'} why={why.inv} onChange={(v) => setT({ inverterKw: v })} />
     </div>
   )
 }
@@ -186,6 +226,14 @@ export function StepDesign({ project: p, results: r, quote, update }: StepProps)
   const curBatt = d.batteryId === null || tg.batteryKwh === 0 ? t.design.noBattery : battName && r.batteryQty > 0 ? `${r.batteryQty} × ${battName}` : d.batteryId === 'auto' ? t.design.notNeeded : '—'
   const curCc = r.controller ? `${r.controller.brand} ${r.controller.model}` : '—'
   const autonomyHelp = `${d.systemType === 'offgrid' ? t.design.autonomyOffgrid : t.design.autonomyHybrid} ${T.autonomyZero}`
+  // §4.2: 48 V suits inverters up to 15 kW; above that recommend a high-voltage battery (one tap, battery and inverter back to auto)
+  const hvAdvice = hasBattery && sysV === 48 && d.batteryId !== null && tg.batteryKwh !== 0 && Math.max(r.requiredInverterKw, r.inverterTotalKw) > 15
+  const hvStocked = C.avail.inverters.some((i) => i.phase === d.phase && typeof i.batteryVoltage === 'string' && (d.systemType === 'hybrid' ? i.type === 'hybrid' : i.type !== 'gridtie'))
+  const switchToHv = () => {
+    const prev = { systemVoltage: d.systemVoltage, batteryId: d.batteryId, inverterId: d.inverterId, batteryOverrideQty: d.batteryOverrideQty }
+    set({ systemVoltage: 'hv', batteryId: 'auto', inverterId: null, batteryOverrideQty: null })
+    toast({ message: T.hvSwitched, tone: 'ok', action: { label: t.common.undo, run: () => set(prev) } })
+  }
   const setType = (type: SystemType) => update((prev) => {
     const sz = resolveSizing(prev)
     // A known-size quote switched to a battery system starts with the typical battery instead of none
@@ -246,11 +294,20 @@ export function StepDesign({ project: p, results: r, quote, update }: StepProps)
         <Section title={t.design.title}>
           <div className="grid grid-cols-1 gap-4">
             {hasBattery && (
-              <Field label={t.design.voltage}>
-                <select className="input" value={String(sysV)} onChange={(e) => set({ systemVoltage: e.target.value === 'hv' ? 'hv' : (Number(e.target.value) as 12 | 24 | 48), batteryId: d.batteryId === null ? null : 'auto', inverterId: null })} data-testid="design-voltage">
-                  {(['12', '24', '48', 'hv'] as const).map((k) => <option key={k} value={k}>{iso(t.design.voltages[k])}</option>)}
-                </select>
-              </Field>
+              <div className="min-w-0">
+                <Field label={t.design.voltage}>
+                  <select className="input" value={String(sysV)} onChange={(e) => set({ systemVoltage: e.target.value === 'hv' ? 'hv' : (Number(e.target.value) as 12 | 24 | 48), batteryId: d.batteryId === null ? null : 'auto', inverterId: null })} data-testid="design-voltage">
+                    {(['12', '24', '48', 'hv'] as const).map((k) => <option key={k} value={k}>{iso(t.design.voltages[k])}</option>)}
+                  </select>
+                </Field>
+                {hvAdvice && (
+                  <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900" data-testid="hv-advice">
+                    <Lightbulb size={16} className="shrink-0 text-amber-600" aria-hidden="true" />
+                    <span className="min-w-0 flex-1">{T.hvAdvice}{!hvStocked && <span className="block text-xs text-amber-800">{T.hvNone}</span>}</span>
+                    {hvStocked && <button type="button" className="btn-secondary min-h-10 border-amber-300 bg-white px-3 text-amber-900 hover:bg-amber-100" onClick={switchToHv} data-testid="hv-switch">{T.hvSwitch}</button>}
+                  </div>
+                )}
+              </div>
             )}
             {/* Autonomy sizes the bank from the demand; a known-size quote has none (the battery kWh is fixed above) */}
             {hasBattery && !sizeMode && <Field label={t.design.autonomy} help={autonomyHelp}><NumberInput value={d.autonomyDays} step={0.5} min={0} max={5} onChange={(v) => set({ autonomyDays: v ?? 1 })} data-testid="design-autonomy" /></Field>}
