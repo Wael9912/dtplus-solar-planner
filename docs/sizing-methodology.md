@@ -772,6 +772,45 @@ Datasheet inverter efficiency in the derate; LiFePO4 DoD 0.80 planning value (ca
 
 ---
 
+## 16. PROJECT MODES AND SIZING SOURCES (v0.2, 2026-11-03)
+
+A project is built in one of three modes (`Project.mode`, missing → `design`); the wizard shows only the steps a mode needs (`MODE_STEPS` in `src/components/wizardModel.ts`). The load calculator is a full-design scratch project shown on one screen; the engineering tools (`src/engine/tools.ts`) call the same formulas without a project.
+
+| Mode | Steps | Demand | Sized from |
+|---|---|---|---|
+| `design` | Client → Loads → Site → System → Results → Pricing → Export | appliance list or bill (§16.1) | demand, unless sizes are fixed (§16.2) |
+| `size` | System → Site → Results → Pricing → Client → Export | none | fixed sizes (§16.2) |
+| `items` | Pricing → Client → Export | none | — (product list, §16.5) |
+
+### 16.1 Demand from the electricity bill (`sizing.demand = 'bill'`)
+- E_day = monthly kWh × 1000 / 30.4 (Wh/day).
+- Profile → night share and peak factor (peak ÷ 24-hour average load): residential 45 % / 3.5, commercial 25 % / 2.8, daytime-only 5 % / 3.2.
+- P_peak = measured peak kW when given, else (E_day / 24) × peak factor; never below the largest motor.
+- P_surge = P_peak + P_motor × (3 − 1) (direct-on-line start ≈ 3 × running power).
+- All demand is treated as backed up (no critical subset). Everything downstream (§3–§11) is unchanged.
+
+### 16.2 Fixed sizes (`sizing.targets`)
+- PV: N = ⌈pvKwp × 1000 / W_module⌉, then rounded up to equal strings (not a fixed count). pvKwp = 0 → no panels (battery backup / UPS): no strings, mounting, PV DC parts or production; labour is charged per inverter kW.
+- Battery: auto unit chosen for the nominal kWh, N = ⌈kWh / unit kWh⌉ in series groups for the bus. 0 → no battery.
+- Inverter: the auto-selection aims at the fixed kW instead of the load; the `inv-small` check still compares with the load requirement when there is demand.
+- No demand and no PV size: PV = inverter kW × DC:AC target.
+- Explicit quantities (BOM qty overrides, panel / battery override) still win over targets.
+
+### 16.3 Equipment already on site (`sizing.existing`)
+Existing panels / batteries / inverters (same models as the design) count in the design (strings, bank, checks) but are deducted from the quoted quantities; mounting and labour cover the new panels only. Savings and payback are still shown for the whole system (ok-level note).
+
+### 16.4 Hybrid with daily outages (`site.outageHoursPerDay`)
+Avoided cost per useful kWh = tariff × (1 − h/24) + diesel cost × h/24 (diesel cost per kWh as for off-grid, default 0.40 USD/kWh). Without consumption data (`size` mode) savings assume all solar energy is used on site (ok-level note `savings-assumed`).
+
+### 16.5 Product list (`items`)
+The BOM is the project's custom lines only (picked from the catalogue with the company price, or typed); every engineering figure is 0; the money chain (markup, discount, VAT, rounding) is the same `buildQuote()`.
+
+### 16.6 Company price list (`company.priceBook`)
+Unit cost (USD) by catalogue / item id, products not stocked (never auto-selected; a manual pick still works with a `not-stocked` warning; when a whole family is hidden the auto-selection falls back to all), and the company's own products (ids `my-…`, full datasheet values, used by the engine like catalogue products). Precedence: project BOM price override > company price > catalogue price. An unknown product id raises an `unknown-*` error instead of being silently replaced.
+
+### 16.7 Auto-selection fix
+When no single inverter accepts the whole array, units of one size are stacked within the parallel limit before falling back to one unit (removes self-inflicted `pv-input` warnings). A battery bank more than 1.5 × over the parallel limit is an error, not a warning.
+
 ## Appendix A — Appliance library (JSON)
 ```json
 [

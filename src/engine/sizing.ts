@@ -1,4 +1,4 @@
-// Sizing sources (methodology §15): where the demand comes from (appliance list or electricity bill), sizes the user fixes,
+// Sizing sources (methodology §16): where the demand comes from (appliance list or electricity bill), sizes the user fixes,
 // and equipment already on site. Projects saved before v0.2 have no `sizing` → appliance list, nothing fixed, nothing existing.
 import type { BillInput, BillProfile, Project, ProjectMode, SizingInput } from './types'
 
@@ -10,7 +10,7 @@ export const defaultSizing = (): SizingInput => ({
 })
 
 /**
- * Bill profiles (§15.1): share of the daily energy used after sunset, and peak ÷ 24-hour average load.
+ * Bill profiles (§16.1): share of the daily energy used after sunset, and peak ÷ 24-hour average load.
  * Residential: evening-heavy, peak ≈ 3.5 × average; commercial (shops, offices ~12 h): 25 % at night, ≈ 2.8 ×;
  * daytime-only (workshops, schools, farms): 5 % at night, ≈ 3.2 × (the same energy in ~8–10 working hours).
  */
@@ -48,7 +48,7 @@ export function resolveSizing(p: Pick<Project, 'sizing'>): SizingInput {
 
 export const projectMode = (p: Pick<Project, 'mode'>): ProjectMode => (p.mode === 'size' || p.mode === 'items' ? p.mode : 'design')
 
-/** Demand summary from a monthly bill — same shape as computeLoads() (§15.1). */
+/** Demand summary from a monthly bill — same shape as computeLoads() (§16.1). */
 export function demandFromBill(b: BillInput) {
   const prof = BILL_PROFILES[b.profile] ?? BILL_PROFILES.residential
   const dailyWh = (Math.max(0, b.monthlyKwh) * 1000) / 30.4

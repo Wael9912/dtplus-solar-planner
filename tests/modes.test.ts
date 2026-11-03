@@ -1,5 +1,5 @@
 // v0.2 flexibility: project modes (full design / known size / product list), demand from the bill, fixed sizes, backup-only,
-// existing equipment, outage-hours economics and the company price list (methodology §15).
+// existing equipment, outage-hours economics and the company price list (methodology §16).
 import { describe, it, expect } from 'vitest'
 import { computeProject } from '../src/engine/compute'
 import { newProject, siteFromLocation, defaultDesign, defaultPricing, modeDefaults } from '../src/engine/defaults'

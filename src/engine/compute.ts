@@ -320,7 +320,7 @@ const PEGGED_1_TO_1 = new Set(['USD', 'BSD', 'BMD', 'PAB'])
 
 /**
  * Compute a project with the company price list applied (`book`: prices, hidden products, own products; omitted → catalogue).
- * Mode 'items' is a priced product list only; 'size' and 'design' run the full engine (§15: demand, fixed sizes, existing kit).
+ * Mode 'items' is a priced product list only; 'size' and 'design' run the full engine (§16: demand, fixed sizes, existing kit).
  */
 export function computeProject(p: Project, book?: PriceBook | null): Results {
   return withPriceBook(book, () => (projectMode(p) === 'items' ? computeItems(p) : computeCore(p)))
@@ -387,7 +387,7 @@ function computeCore(p: Project): Results {
   if (pc.markupPct !== pr.marginPct || pc.discountPct !== pr.discountPct || pc.vatPct !== pr.vatPct)
     checks.push(mk('pricing-input', 'warn', 'bom', 'Markup (0–1000 %), discount (0–100 %) or VAT (0–100 %) was out of range and has been limited.', 'كانت نسبة الإضافة (0–1000%) أو الخصم (0–100%) أو ضريبة القيمة المضافة (0–100%) خارج النطاق وتم حصرها.'))
 
-  // ---- Loads (§1) — or the electricity bill (§15.1)
+  // ---- Loads (§1) — or the electricity bill (§16.1)
   const items = sanitize(loadsIn)
   const dfManual = clamp(d.coincidenceFactor, 0.1, 1)
   const critCount = items.filter((l) => l.critical).length
@@ -419,7 +419,7 @@ function computeCore(p: Project): Results {
       `المصفوفة منحرفة ${r0(azAbs)}° عن اتجاه خط الاستواء: إنتاج سنوي أقل بنحو ${r0(loss * 100)}% مقارنةً بتوجيهها نحو خط الاستواء بنفس الميل.`))
   }
 
-  // ---- Panel (fixed PV size §15.2: pvKwp 0 = no panels, battery backup only)
+  // ---- Panel (fixed PV size §16.2: pvKwp 0 = no panels, battery backup only)
   const pvTarget = tgt.pvKwp
   const invTarget = tgt.inverterKw
   // No consumption data and no PV size: the array follows the inverter (DC:AC target), else nothing
@@ -463,7 +463,7 @@ function computeCore(p: Project): Results {
   }
   const derate = breakdown.reduce((a, b) => a * b.factor, 1)
 
-  // ---- PV (§3) — or the fixed size (§15.2)
+  // ---- PV (§3) — or the fixed size (§16.2)
   const tiltedPsh = s.psh * tiltGainUsed
   const requiredPvKwp = pvTarget ?? pvAuto ?? (tiltedPsh > 0 && derate > 0 ? (L.dailyWh / 1000) / (tiltedPsh * derate) * d.pvOversize : 0)
   const sizedQty = noPv ? 0 : Math.max(1, ceilSafe((requiredPvKwp * 1000) / panel.watts - 1e-9))
@@ -520,7 +520,7 @@ function computeCore(p: Project): Results {
     `الإنفرتر المختار ${inverter.phase === 3 ? 'ثلاثي الأطوار' : 'أحادي الطور'} بينما المشروع ${d.phase === 3 ? 'ثلاثي الأطوار' : 'أحادي الطور'}.`))
   if (items.some((l) => l.phase === 3) && d.phase === 1) checks.push(mk('load-phase', 'error', 'info', 'Three-phase loads present but system is single-phase.', 'توجد أحمال ثلاثية الأطوار بينما النظام أحادي الطور.'))
 
-  // ---- Battery (§4): sized for the energy it must deliver — or the fixed nominal kWh (§15.2; 0 = no battery); unit must suit the bus and the inverter
+  // ---- Battery (§4): sized for the energy it must deliver — or the fixed nominal kWh (§16.2; 0 = no battery); unit must suit the bus and the inverter
   const battTarget = isGT ? null : tgt.batteryKwh
   const battDailyWh = d.systemType === 'offgrid' ? L.dailyWh : d.systemType === 'hybrid' ? (hybridCritical ? L.criticalNightWh : L.nightWh) : 0
   const usableNeedKwh = (battDailyWh * d.autonomyDays) / INV_EFF_BATT / 1000
@@ -775,7 +775,7 @@ function computeCore(p: Project): Results {
   }
 
   // ---- BOM (§12) and the money chain (same builder as the quote → Results.totalUsd × fx === quote.total)
-  // ---- Existing equipment (§15.3): counted in the design, not quoted; company stock list
+  // ---- Existing equipment (§16.3): counted in the design, not quoted; company stock list
   const ex = sz.existing
   const exCheck = (n: number, of: number, what: string, whatAr: string) => {
     if (n > of) checks.push(mk(`existing-${what}`, 'warn', 'design', `${n} existing ${what} entered but the design has only ${of}; only ${of} are deducted from the quote.`,
@@ -808,7 +808,7 @@ function computeCore(p: Project): Results {
   const battLife = battery ? Math.max(1, Math.min(battery.cycles / 365, CALENDAR_LIFE_BY_CHEMISTRY[battery.chemistry] ?? 10)) : null
   const offgrid = d.systemType === 'offgrid'
   const dieselKwh = s.dieselCostUsdPerKwh != null && s.dieselCostUsdPerKwh >= 0 ? s.dieselCostUsdPerKwh : DEFAULT_DIESEL_USD_PER_KWH
-  // Hybrid with daily outages (§15.4): energy used during outages displaces diesel, the rest the grid tariff
+  // Hybrid with daily outages (§16.4): energy used during outages displaces diesel, the rest the grid tariff
   const outageShare = d.systemType === 'hybrid' ? clamp(Number.isFinite(s.outageHoursPerDay) ? s.outageHoursPerDay ?? 0 : 0, 0, 24) / 24 : 0
   const avoidedCostUsdPerKwh = offgrid ? dieselKwh : Math.max(0, s.gridTariff || 0) * (1 - outageShare) + dieselKwh * outageShare
   // No consumption data (fixed-size quote): assume the solar energy is used on site
@@ -849,7 +849,7 @@ function computeCore(p: Project): Results {
 }
 
 /**
- * Mode 'items' (§15.5): a priced product list with no design — the BOM is the custom lines only, every engineering figure is 0.
+ * Mode 'items' (§16.5): a priced product list with no design — the BOM is the custom lines only, every engineering figure is 0.
  * The money chain is the same quote builder as a full design, so screen, PDF and Excel agree.
  */
 function computeItems(p: Project): Results {

@@ -18,7 +18,7 @@ export interface BomCtx {
   /** PV DC inputs that each get an isolator + SPD (inverters, or charge controllers on the controller path). */
   dcInputs: number
   generatorKva: number | null
-  /** Main equipment already on site (§15.3): counted in the design, deducted from the quoted qty. */
+  /** Main equipment already on site (§16.3): counted in the design, deducted from the quoted qty. */
   existing?: { panels: number; batteries: number; inverters: number }
 }
 export const COMBINER_TO_INVERTER_M = 3 // combiner at the inverter end: short output lead (string home-runs carry the full DC run)
