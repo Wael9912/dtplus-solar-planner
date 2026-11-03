@@ -21,7 +21,7 @@ Status of the prioritised backlog from `features.md` (competitive review of Open
 | 15 | Quotation PDF with branding | logo, colour, terms, validity, signature lines |
 | 16 | Proposal PDF | tiles, system description, monthly production chart, cash-flow table |
 | 17 | Save/load projects, duplicate, delete, JSON import/export, status | localStorage |
-| 18 | Arabic/English UI with RTL | PDFs English only (see below) |
+| 18 | Arabic/English UI with RTL | Arabic PDFs via embedded IBM Plex Sans Arabic |
 | 19 | Multi-currency with manual FX rate | USD catalog base |
 | 20 | Validation & warnings panel | OK / warning / error with fix hints |
 | 21 | Generator sizing (kVA) | fuel-cost model not yet |
@@ -29,12 +29,32 @@ Status of the prioritised backlog from `features.md` (competitive review of Open
 | 25 | Monthly energy balance chart | production vs demand |
 | 37 | 25-year cash flow, payback, LCOE, ROI | 3 % tariff escalation; no NPV/IRR yet |
 
+## Delivered in v0.2 (2026-11-03) — flexibility
+
+Multi-agent audit (sales desk, field engineer, design lead, owner) found that every feature sat behind one 7-step wizard driven by an appliance list. v0.2:
+
+| Feature | Notes |
+|---|---|
+| Start hub | Load calculator · Quote a known size · Product quote · Full design · Engineering tools; header "New" menu |
+| Load calculator | one screen, result card, copy / WhatsApp / 1-page PDF, promote to a full project |
+| Project modes | `design` / `size` / `items` with their own steps; convert between them keeping the price |
+| Alternative load entry (#4) | monthly kWh from the bill with residential / commercial / daytime profiles |
+| Fixed sizes, backup-only, no battery | kWp / kWh / kW targets; 0 panels = UPS-style backup |
+| Expansion | equipment already on site designed but not quoted |
+| Outage hours | hybrid savings at the diesel cost during outages |
+| Catalogue management (#14) | company prices, not-stocked products, own products with datasheets, services defaults |
+| Company file & backup | share one setup across staff devices |
+| Engineering tools | string checker, battery bank, cable & breaker at any ambient, generator & inverter |
+| Quotation-only PDF | plus `proposalNote` (printed) separate from internal notes (never printed) |
+| Pipeline | Lost status, New revision (-R2), search by phone/email |
+| Engine fixes | unknown product ids raise errors (no silent swap), inverter stacking for large arrays, battery parallel over-limit error, autonomy 0 allowed |
+
 ## Next (suggested order)
 
-1. **Arabic PDF** — embed a Noto Sans Arabic font and shape text (jsPDF needs a shaping helper), or render the proposal from HTML via print CSS.
-2. **Alternative load entry from monthly kWh bills** (#4) with hourly shape templates — important for grid-tied customers.
-3. **Catalog management screen** (#14): add/edit/hide items, supplier price lists with landed cost (#33), import CSV.
-4. **Compare 2–3 system options** (#24) — Good/Better/Best tabs in the proposal.
+1. **Compare 2–3 system options** (#24) — Good/Better/Best tabs in the proposal (today: duplicate / new revision per option).
+2. **Supplier price lists** with landed cost (#33) and CSV import for the company price list.
+3. **Frozen quote snapshots** — lock the figures of a sent revision so later price-list changes don't alter it.
+4. **Export limit / zero-export** sizing for grid-tied commercial jobs; area-limited sizing ("fit to roof").
 5. **Fuel-savings model for generator-hybrid** (#21): litres/kWh, diesel price, today's hours → savings in proposal.
 6. **Share link / read-only online proposal** (#28) — needs a small backend or static JSON hosting; WhatsApp share.
 7. **Single-line diagram SVG** (#36) auto-drawn from the design.
