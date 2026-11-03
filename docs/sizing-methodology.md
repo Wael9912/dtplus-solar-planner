@@ -811,6 +811,13 @@ Unit cost (USD) by catalogue / item id, products not stocked (never auto-selecte
 ### 16.7 Auto-selection fix
 When no single inverter accepts the whole array, units of one size are stacked within the parallel limit before falling back to one unit (removes self-inflicted `pv-input` warnings). A battery bank more than 1.5 × over the parallel limit is an error, not a warning.
 
+### 16.8 Standalone engineering tools (`src/engine/tools.ts`)
+The tools reuse the project formulas so a tool result matches the same circuit inside a project:
+- **String checker** — `designStrings` (§7) with the panel count fixed; Isc per MPPT ≤ 1.25 × input current (hard limit), string fuse nextStd(1.56 × Isc) (1.5 × when above the module max series fuse) at ≥ 3 strings per input. A charge controller is modelled as the engine does: tracking from 1.2 × V_bus + 5 V, upper limit 0.95 × max PV V, max PV power = charge A × V_bus × 1.3.
+- **Battery bank** — modules = series (bus ÷ module V) × parallel (usable kWh needed ÷ DoD ÷ string kWh); backup hours = usable kWh × 0.95 ÷ load; discharge current = load ÷ (V_bus × 0.94); C-rate vs the bank limit; fuse and cable via `sizeCable('battery')`.
+- **Cable & breaker** — `sizeCable` at any ambient: k_amb from IEC 60364-5-52 Table B.52.14 (PVC 70 °C / XLPE 90 °C, linear between 5 °C rows); the engine's fixed 0.87 (PVC, 40 °C) is rescaled (current × 0.87 / k, length ÷ that factor) so ampacity and voltage drop are exact.
+- **Generator & inverter** — motor start factor: direct-on-line 3, star-delta 2, soft starter 1.5, VFD 1.1; surge kW = running kW + motor kW × (factor − 1); steady kW = (running + battery charging ÷ 0.95) × 1.1; kVA = max(steady, surge) ÷ PF × 1.1 above 40 °C, rounded up to the standard sizes; inverter continuous ≥ running × 1.25.
+
 ## Appendix A — Appliance library (JSON)
 ```json
 [

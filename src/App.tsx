@@ -11,6 +11,7 @@ import { QuickCalc } from './components/QuickCalc'
 import { PriceListPage } from './components/PriceListPage'
 import { Menu, Toaster } from './components/overlay'
 import { useStartActions } from './components/startMenu'
+import { useMediaQuery } from './components/hooks'
 
 const YEAR = new Date().getFullYear()
 
@@ -52,6 +53,8 @@ export default function App() {
   const setClientView = useAppStore((s) => s.setClientView)
   const project = useCurrentProject()
   const inWizard = view === 'wizard' && !!project
+  // The load calculator keeps its result in a bottom bar below 1280 px (side column above): toasts must clear it
+  const calcBar = !useMediaQuery('(min-width: 1280px)') && view === 'calc'
 
   useEffect(() => {
     document.documentElement.lang = lang; document.documentElement.dir = dir
@@ -106,10 +109,10 @@ export default function App() {
           )}
           <div className="hidden flex-1 sm:block" />
           <nav className="hidden items-center gap-1 sm:flex" aria-label={t.nav.menu}>
-            <button type="button" data-testid="nav-projects" aria-current={view === 'projects' ? 'page' : undefined} className={`btn-ghost px-3 ${view === 'projects' ? 'bg-slate-100 text-slate-900' : ''}`} title={t.nav.projects} onClick={() => setView('projects')}><FolderOpen size={18} /><span className="hidden lg:inline">{t.nav.projects}</span></button>
-            <button type="button" data-testid="nav-tools" aria-current={view === 'tools' ? 'page' : undefined} className={`btn-ghost px-3 ${view === 'tools' ? 'bg-slate-100 text-slate-900' : ''}`} title={t.nav.tools} onClick={() => setView('tools')}><Wrench size={18} /><span className="hidden lg:inline">{t.nav.tools}</span></button>
-            <button type="button" data-testid="nav-prices" aria-current={view === 'prices' ? 'page' : undefined} className={`btn-ghost px-3 ${view === 'prices' ? 'bg-slate-100 text-slate-900' : ''}`} title={t.nav.prices} onClick={() => setView('prices')}><Tags size={18} /><span className="hidden lg:inline">{t.nav.prices}</span></button>
-            <button type="button" data-testid="nav-settings" aria-current={view === 'settings' ? 'page' : undefined} className={`btn-ghost px-3 ${view === 'settings' ? 'bg-slate-100 text-slate-900' : ''}`} title={t.nav.settings} onClick={() => setView('settings')}><Settings size={18} /><span className="hidden lg:inline">{t.nav.settings}</span></button>
+            <button type="button" data-testid="nav-projects" aria-current={view === 'projects' ? 'page' : undefined} className={`btn-ghost px-3 ${view === 'projects' ? 'bg-slate-100 text-slate-900' : ''}`} title={t.nav.projects} onClick={() => setView('projects')}><FolderOpen size={18} /><span className="hidden xl:inline">{t.nav.projects}</span></button>
+            <button type="button" data-testid="nav-tools" aria-current={view === 'tools' ? 'page' : undefined} className={`btn-ghost px-3 ${view === 'tools' ? 'bg-slate-100 text-slate-900' : ''}`} title={t.nav.tools} onClick={() => setView('tools')}><Wrench size={18} /><span className="hidden xl:inline">{t.nav.tools}</span></button>
+            <button type="button" data-testid="nav-prices" aria-current={view === 'prices' ? 'page' : undefined} className={`btn-ghost px-3 ${view === 'prices' ? 'bg-slate-100 text-slate-900' : ''}`} title={t.nav.prices} onClick={() => setView('prices')}><Tags size={18} /><span className="hidden xl:inline">{t.nav.prices}</span></button>
+            <button type="button" data-testid="nav-settings" aria-current={view === 'settings' ? 'page' : undefined} className={`btn-ghost px-3 ${view === 'settings' ? 'bg-slate-100 text-slate-900' : ''}`} title={t.nav.settings} onClick={() => setView('settings')}><Settings size={18} /><span className="hidden xl:inline">{t.nav.settings}</span></button>
           </nav>
           <LangSwitch />
           <div className="hidden sm:block">
@@ -141,7 +144,7 @@ export default function App() {
           <bdi>{t.by}</bdi> · <bdi dir="ltr">© {YEAR} DT+</bdi> · <bdi dir="ltr">v{__APP_VERSION__}</bdi>
         </footer>
       )}
-      <Toaster raised={inWizard} />
+      <Toaster raised={inWizard || calcBar} />
     </div>
   )
 }

@@ -127,13 +127,15 @@ export function Section({ title, description, children, right, className = '', i
   )
 }
 
+/** Arabic letters: a sub-line that is an Arabic sentence keeps RTL even when it starts with an isolated number (bdi's first-strong rule would make it LTR). */
+const ARABIC = /[\u0600-\u06FF]/
 export function Stat({ label, value, sub, unit, tone = 'default', className = '' }: { label: ReactNode; value: ReactNode; sub?: ReactNode; unit?: ReactNode; tone?: 'default' | 'brand' | 'warn' | 'err'; className?: string }) {
   const cls = tone === 'brand' ? 'stat-hero' : tone === 'warn' ? 'stat border-amber-200 bg-amber-50' : tone === 'err' ? 'stat border-red-200 bg-red-50' : 'stat'
   return (
     <div className={`${cls} ${className}`}>
       <div className="stat-value"><bdi>{value}{unit != null && <span className="ms-1 text-[0.8125rem] font-medium text-slate-500">{unit}</span>}</bdi></div>
       <div className="stat-label">{label}</div>
-      {sub && <div className="stat-sub"><bdi>{sub}</bdi></div>}
+      {sub && <div className="stat-sub">{typeof sub === 'string' && ARABIC.test(sub) ? <span dir="rtl">{sub}</span> : <bdi>{sub}</bdi>}</div>}
     </div>
   )
 }

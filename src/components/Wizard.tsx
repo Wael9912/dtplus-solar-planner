@@ -68,7 +68,7 @@ export function Wizard() {
   const nErr = issues.filter((c) => c.level === 'error').length
 
   const kpi = (() => {
-    const sys = `${fmt(results.arrayKwp, 2)} kWp${results.batteryKwh ? ` · ${fmt(results.batteryKwh, 1)} kWh` : ''}${results.inverter && (!tiny || !results.batteryKwh) ? ` · ${fmt(results.inverterTotalKw, 1)} kW` : ''}`
+    const sys = [results.arrayKwp > 0 ? `${fmt(results.arrayKwp, 2)} kWp` : '', results.batteryKwh ? `${fmt(results.batteryKwh, 1)} kWh` : '', results.inverter && (!tiny || !results.batteryKwh || !results.arrayKwp) ? `${fmt(results.inverterTotalKw, 1)} kW` : ''].filter(Boolean).join(' · ') || '—'
     if (results.mode === 'items') return { cap: t.bom.grand, val: formatQuoteMoney(quote.total, quote, 0) }
     if (results.mode === 'design' && (key === 'info' || key === 'loads')) return { cap: t.loads.totalDaily, val: `${fmt(results.dailyWh / 1000, 2)} kWh${results.peakW ? ` · ${fmt(results.peakW / 1000, 1)} kW` : ''}` }
     if (!hasLoads) return { cap: t.loads.totalDaily, val: '0 kWh' }

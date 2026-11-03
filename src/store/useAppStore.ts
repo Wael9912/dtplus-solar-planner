@@ -122,7 +122,7 @@ function freshProject(c: Company, lang: Lang, partial: Partial<Project> = {}, mo
   const d = lang === 'ar' ? ar : en
   const sysType = partial.design?.systemType ?? c.defaultSystemType ?? 'hybrid'
   const p = newProject({ ...modeDefaults(mode, sysType), ...partial }, c)
-  if (!partial.name) p.name = d.info.defaultName
+  if (!partial.name) p.name = mode === 'design' ? d.info.defaultName : d.info.defaultQuoteName
   if (!partial.design) p.design = { ...defaultDesign(sysType), phase: c.defaultPhase === 3 ? 3 : 1 }
   if (!partial.site) {
     const cur = c.currency || 'USD'
@@ -147,7 +147,8 @@ export const useAppStore = create<AppState>()(
         return {
           lang,
           company: { ...c, name: swap(c.name, [from.settings.defaultName, defaultCompany.name], to.settings.defaultName), tagline: swap(c.tagline, [from.settings.defaultTagline, defaultCompany.tagline], to.settings.defaultTagline), terms: swap(c.terms, [from.settings.defaultTerms, defaultCompany.terms], to.settings.defaultTerms) },
-          projects: s.projects.some((p) => p.name === from.info.defaultName) ? s.projects.map((p) => (p.name === from.info.defaultName ? { ...p, name: to.info.defaultName } : p)) : s.projects,
+          projects: s.projects.some((p) => p.name === from.info.defaultName || p.name === from.info.defaultQuoteName)
+            ? s.projects.map((p) => (p.name === from.info.defaultName ? { ...p, name: to.info.defaultName } : p.name === from.info.defaultQuoteName ? { ...p, name: to.info.defaultQuoteName } : p)) : s.projects,
         }
       }),
       setView: (view) => set(view === 'tools' ? { view, toolId: null } : { view }),

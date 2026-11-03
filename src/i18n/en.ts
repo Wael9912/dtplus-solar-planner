@@ -33,13 +33,13 @@ export const en = {
     design: 'Choose the equipment, or leave it on Auto and the planner recommends it. Engineering settings are under Advanced.',
     results: 'What the client gets, and the engineering behind it. Fix red items before quoting.',
     bom: 'Every item needed for installation with quantities and prices. Edit quantities and prices, add lines, set markup, discount and VAT.',
-    export: 'Download the client proposal (PDF) and the engineering workbook (Excel), or save the project file.',
+    export: 'Download the client proposal, the quotation only, the technical report (PDF) or the Excel workbook, or save the project file.',
   },
   empty: {
     needLoadsTitle: 'Add the client’s appliances first', needLoadsBody: 'Sizing, pricing and the proposal are all calculated from the load list.', goLoads: 'Go to Loads',
   },
   info: {
-    title: 'Client & project', name: 'Project name', namePh: 'e.g. Al-Fahad villa — hybrid 10 kW', defaultName: 'New solar project',
+    title: 'Client & project', name: 'Project name', namePh: 'e.g. Al-Fahad villa — hybrid 10 kW', defaultName: 'New solar project', defaultQuoteName: 'New quote',
     client: 'Client name', phone: 'Phone', email: 'Email', address: 'Site address', reference: 'Quote reference', notes: 'Notes', notesPh: 'Anything to remember about this site or client',
     systemType: 'System type', offgrid: 'Off-grid', hybrid: 'Hybrid (grid + battery backup)', gridtie: 'Grid-tied (no battery)',
     offgridShort: 'Off-grid', hybridShort: 'Hybrid', gridtieShort: 'Grid-tied',

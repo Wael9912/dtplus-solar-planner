@@ -76,6 +76,7 @@ export function projectTitle(name: string, t: Dict) {
   const n = name.trim()
   if (!n) return t.projects.untitled
   if (n === EN.info.defaultName || n === AR.info.defaultName) return t.info.defaultName
+  if (n === EN.info.defaultQuoteName || n === AR.info.defaultQuoteName) return t.info.defaultQuoteName
   return n
 }
 /** Company name for display: the untouched default follows the UI language. */
