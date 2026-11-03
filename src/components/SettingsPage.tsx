@@ -1,18 +1,83 @@
-import { useRef } from 'react'
-import { Upload, X, Sun, CloudCheck } from 'lucide-react'
-import { useAppStore } from '../store/useAppStore'
+import { useMemo, useRef, useState, type ReactNode } from 'react'
+import { Upload, X, Sun, CloudCheck, Tags, ChevronRight, ChevronLeft, FileDown, FileUp, DatabaseBackup, ArchiveRestore } from 'lucide-react'
+import { useAppStore, type Backup, type CompanyBundle } from '../store/useAppStore'
 import { useT } from '../i18n'
-import { Field, NumberInput, Section } from './ui'
+import { Field, NumberInput, Section, Segmented } from './ui'
+import { ConfirmDialog } from './overlay'
 import { currencies, currencyName, defaultFx } from '../data/currencies'
 import { locations } from '../data/locations'
 import { placeName } from '../i18n/places'
-import { companyTitle } from '../i18n/labels'
+import { companyTitle, fmtDate } from '../i18n/labels'
+import { normalizePriceBook, resolveCatalog } from '../engine/catalogContext'
+import { fxOf, money } from '../engine/format'
+import { download } from '../export/download'
+import { toast } from '../store/useToast'
+import type { PriceBook, Phase, SystemType } from '../engine/types'
+
+/** Edited prices (catalogue products), not-stocked products and own products of a price list. */
+function bookCounts(b: PriceBook) {
+  const r = resolveCatalog(b)
+  const own = b.custom.panels.length + b.custom.batteries.length + b.custom.inverters.length + b.custom.chargeControllers.length + b.custom.items.length
+  const ownIds = new Set([...b.custom.panels, ...b.custom.batteries, ...b.custom.inverters, ...b.custom.chargeControllers, ...b.custom.items].map((x) => x.id))
+  return { edited: Object.keys(b.prices).filter((id) => r.basePrice.has(id) && !ownIds.has(id)).length, hidden: b.hidden.filter((id) => r.basePrice.has(id)).length, own }
+}
+const fileSafe = (s: string) => s.trim().replace(/[^\w\u0600-\u06FF-]+/g, '-').replace(/^-+|-+$/g, '') || 'dtplus'
+const today = () => new Date().toISOString().slice(0, 10)
+/** A picked JSON file waiting for the user's confirmation. */
+type Pending = { kind: 'company'; data: CompanyBundle; name: string } | { kind: 'backup'; data: Backup | CompanyBundle; name: string; projects: number; company: boolean }
 
 export function SettingsPage() {
-  const { t, lang } = useT()
+  const { t, lang, dir } = useT()
+  const tp = t.prices
   const company = useAppStore((s) => s.company)
   const setCompany = useAppStore((s) => s.setCompany)
+  const projectCount = useAppStore((s) => s.projects.length)
+  const setView = useAppStore((s) => s.setView)
   const fileRef = useRef<HTMLInputElement>(null)
+  const companyFileRef = useRef<HTMLInputElement>(null)
+  const backupFileRef = useRef<HTMLInputElement>(null)
+  const [pending, setPending] = useState<Pending | null>(null)
+  const counts = useMemo(() => bookCounts(company.priceBook), [company.priceBook])
+  const fx = fxOf(company)
+  const localHint = (usd: number) => (company.currency && company.currency !== 'USD' ? tp.approx(money(usd, company.currency, fx)) : undefined)
+  const Chevron = dir === 'rtl' ? ChevronLeft : ChevronRight
+  const baseName = fileSafe(companyTitle(company.name) ?? 'dtplus')
+
+  const saveJson = (data: unknown, name: string) => {
+    download(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }), name)
+    toast({ message: tp.file.exported(name), tone: 'ok' })
+  }
+  const readJson = async (f: File): Promise<unknown> => { try { return JSON.parse(await f.text()) } catch { return null } }
+  const isObj = (x: unknown): x is Record<string, unknown> => !!x && typeof x === 'object' && !Array.isArray(x)
+  const onCompanyFile = async (f: File) => {
+    const x = await readJson(f)
+    if (!isObj(x) || x.kind !== 'dtplus-company' || !isObj(x.company)) { toast({ message: tp.file.importError, tone: 'err' }); return }
+    setPending({ kind: 'company', data: x as unknown as CompanyBundle, name: f.name })
+  }
+  const onBackupFile = async (f: File) => {
+    const x = await readJson(f)
+    if (!isObj(x) || (x.kind !== 'dtplus-backup' && x.kind !== 'dtplus-company') || (x.kind === 'dtplus-company' && !isObj(x.company))) { toast({ message: tp.file.restoreError, tone: 'err' }); return }
+    const projects = x.kind === 'dtplus-backup' && Array.isArray(x.projects) ? x.projects.length : 0
+    setPending({ kind: 'backup', data: x as unknown as Backup, name: f.name, projects, company: isObj(x.company) })
+  }
+  const confirmPending = () => {
+    if (!pending) return
+    const st = useAppStore.getState()
+    if (pending.kind === 'company') {
+      if (st.importCompany(pending.data)) toast({ message: tp.file.imported, tone: 'ok' }); else toast({ message: tp.file.importError, tone: 'err' })
+      return
+    }
+    const r = st.importBackup(pending.data)
+    if (r) toast({ message: tp.file.restored(r.projects, r.company), tone: 'ok' }); else toast({ message: tp.file.restoreError, tone: 'err' })
+  }
+  const pendingInfo = (() => {
+    if (!pending) return null
+    const c = isObj(pending.data.company) ? pending.data.company as Record<string, unknown> : null
+    const nm = c && typeof c.name === 'string' ? companyTitle(c.name) ?? t.settings.defaultName : null
+    const when = typeof pending.data.exportedAt === 'string' ? fmtDate(pending.data.exportedAt) : '—'
+    const bc = c ? bookCounts(normalizePriceBook(c.priceBook)) : null
+    return { file: tp.file.fileInfo(nm ? `${nm} (${pending.name})` : pending.name, when), counts: bc ? tp.file.fileCounts(bc.edited, bc.hidden, bc.own) : null }
+  })()
   const onLogo = (f: File) => { const r = new FileReader(); r.onload = () => setCompany({ logoDataUrl: String(r.result) }); r.readAsDataURL(f) }
   const name = companyTitle(company.name) ?? t.settings.defaultName
   const local = company.currency && company.currency !== 'USD'
@@ -76,17 +141,89 @@ export function SettingsPage() {
               {sortedLocs.map((l) => <option key={l.id} value={l.id}>{placeName(l, lang)}</option>)}
             </select>
           </Field>
+
+          <div className="col-span-2 mt-2 border-t border-slate-100 pt-4">
+            <h4 className="text-sm font-semibold text-slate-900">{tp.newDefaults}</h4>
+          </div>
+          <Field label={tp.defaultSystemType} as="div" className="col-span-2 sm:col-span-1">
+            <Segmented<SystemType> full label={tp.defaultSystemType} value={company.defaultSystemType ?? 'hybrid'} onChange={(v) => setCompany({ defaultSystemType: v })}
+              options={(['offgrid', 'hybrid', 'gridtie'] as const).map((v) => ({ value: v, label: t.info[`${v}Short`], testId: `settings-systype-${v}` }))} />
+          </Field>
+          <Field label={tp.defaultPhase} as="div" className="col-span-2 sm:col-span-1">
+            <Segmented<'1' | '3'> full label={tp.defaultPhase} value={company.defaultPhase === 3 ? '3' : '1'} onChange={(v) => setCompany({ defaultPhase: Number(v) as Phase })}
+              options={(['1', '3'] as const).map((v) => ({ value: v, label: t.design.phaseN(Number(v)), testId: `settings-phase-${v}` }))} />
+          </Field>
+
+          <div className="col-span-2 mt-2 border-t border-slate-100 pt-4">
+            <h4 className="text-sm font-semibold text-slate-900">{tp.services}</h4>
+            <p className="mt-0.5 text-xs text-slate-500">{tp.servicesHelp}</p>
+          </div>
+          <Field label={tp.labour} className="col-span-2 sm:col-span-1" help={localHint(company.labourPerKwUsd ?? 0)}>
+            <NumberInput value={company.labourPerKwUsd ?? 0} min={0} max={100000} onChange={(v) => setCompany({ labourPerKwUsd: v ?? 0 })} suffix={tp.perKwp} data-testid="settings-labour" />
+          </Field>
+          <Field label={tp.transport} help={localHint(company.transportUsd ?? 0)}>
+            <NumberInput value={company.transportUsd ?? 0} min={0} max={1000000} onChange={(v) => setCompany({ transportUsd: v ?? 0 })} suffix="USD" data-testid="settings-transport" />
+          </Field>
+          <Field label={tp.commissioning} help={localHint(company.commissioningUsd ?? 0)}>
+            <NumberInput value={company.commissioningUsd ?? 0} min={0} max={1000000} onChange={(v) => setCompany({ commissioningUsd: v ?? 0 })} suffix="USD" data-testid="settings-commissioning" />
+          </Field>
         </div>
+      </Section>
+
+      <Section title={tp.link.title} description={tp.link.help}>
+        <button type="button" onClick={() => setView('prices')} data-testid="settings-prices-link"
+          className="flex min-h-14 w-full items-center gap-3 rounded-xl border border-slate-200 px-3 py-2 text-start hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500">
+          <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-brand-50 text-brand-700"><Tags size={20} /></span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-medium text-slate-900">{tp.link.open}</span>
+            <span className="block text-xs text-slate-600" data-testid="settings-prices-counts">{tp.link.summary(counts.edited, counts.hidden, counts.own)}</span>
+          </span>
+          <Chevron size={18} className="shrink-0 text-slate-400" />
+        </button>
+      </Section>
+
+      <Section title={tp.file.title} description={tp.file.help}>
+        <input ref={companyFileRef} type="file" accept="application/json,.json" hidden data-testid="import-company-file" onChange={(e) => { const f = e.target.files?.[0]; if (f) onCompanyFile(f); e.target.value = '' }} />
+        <input ref={backupFileRef} type="file" accept="application/json,.json" hidden data-testid="restore-file" onChange={(e) => { const f = e.target.files?.[0]; if (f) onBackupFile(f); e.target.value = '' }} />
+        <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <FileAction icon={<FileDown size={20} />} label={tp.file.exportCompany} help={tp.file.exportCompanyHelp} testId="export-company"
+            onClick={() => saveJson(useAppStore.getState().exportCompany(), `${baseName}-company.json`)} />
+          <FileAction icon={<FileUp size={20} />} label={tp.file.importCompany} help={tp.file.importCompanyHelp} testId="import-company" onClick={() => companyFileRef.current?.click()} />
+          <FileAction icon={<DatabaseBackup size={20} />} label={tp.file.exportBackup} help={tp.file.exportBackupHelp(projectCount)} testId="export-backup"
+            onClick={() => saveJson(useAppStore.getState().exportBackup(), `${baseName}-backup-${today()}.json`)} />
+          <FileAction icon={<ArchiveRestore size={20} />} label={tp.file.restore} help={tp.file.restoreHelp} testId="restore-backup" onClick={() => backupFileRef.current?.click()} />
+        </ul>
       </Section>
 
       <Section title={t.settings.terms}>
         <textarea className="input min-h-36" dir="auto" aria-label={t.settings.terms} value={company.terms} onChange={(e) => setCompany({ terms: e.target.value })} />
       </Section>
 
+      <ConfirmDialog open={!!pending} onClose={() => setPending(null)} danger={false} onConfirm={confirmPending}
+        title={pending?.kind === 'backup' ? tp.file.restoreTitle : tp.file.importTitle}
+        confirmLabel={pending?.kind === 'backup' ? tp.file.restoreConfirm : tp.file.importConfirm}
+        body={pending && pendingInfo ? <>
+          {pending.kind === 'backup' ? tp.file.restoreBody(pending.projects, pending.company) : tp.file.importBody}
+          <span className="mt-3 block text-xs text-slate-500" data-testid="pending-file"><bdi>{pendingInfo.file}</bdi></span>
+          {pendingInfo.counts && <span className="block text-xs text-slate-500"><bdi>{pendingInfo.counts}</bdi></span>}
+        </> : undefined} />
+
       <Section title={t.settings.about}>
         <p className="text-sm text-slate-600"><bdi>{t.appName}</bdi> · <bdi>{t.settings.version(__APP_VERSION__)}</bdi></p>
         <p className="mt-1 text-sm text-slate-600"><bdi>{t.by}</bdi></p>
       </Section>
     </div>
+  )
+}
+
+function FileAction({ icon, label, help, onClick, testId }: { icon: ReactNode; label: string; help: string; onClick: () => void; testId: string }) {
+  return (
+    <li>
+      <button type="button" onClick={onClick} data-testid={testId}
+        className="flex h-full min-h-16 w-full items-start gap-3 rounded-xl border border-slate-200 p-3 text-start hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500">
+        <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-600">{icon}</span>
+        <span className="min-w-0"><span className="block text-sm font-medium text-slate-900">{label}</span><span className="mt-0.5 block text-xs text-slate-600">{help}</span></span>
+      </button>
+    </li>
   )
 }
