@@ -797,16 +797,19 @@ A project is built in one of three modes (`Project.mode`, missing → `design`);
 - Explicit quantities (BOM qty overrides, panel / battery override) still win over targets.
 
 ### 16.3 Equipment already on site (`sizing.existing`)
-Existing panels / batteries / inverters (same models as the design) count in the design (strings, bank, checks) but are deducted from the quoted quantities; mounting and labour cover the new panels only. Savings and payback are still shown for the whole system (ok-level note).
+Existing panels / batteries / inverters (same models as the design) count in the design (strings, bank, checks) but are deducted from the quoted quantities; a line that is entirely existing stays in the BOM at qty 0 ("already on site, not quoted"). Mounting covers the new panels only. Labour = min(complete-system labour, new kWp + new inverter kW when panels exist or there are none + 1 for new batteries), so marking more equipment as existing never raises the price. Savings and payback are still shown for the whole system (ok-level note).
 
-### 16.4 Hybrid with daily outages (`site.outageHoursPerDay`)
+### 16.4 Hybrid with daily outages (`site.outageHoursPerDay`) and the proposal's savings section
 Avoided cost per useful kWh = tariff × (1 − h/24) + diesel cost × h/24 (diesel cost per kWh as for off-grid, default 0.40 USD/kWh). Without consumption data (`size` mode) savings assume all solar energy is used on site (ok-level note `savings-assumed`).
+The client proposal prints savings, payback and cash flow when `project.proposalFinance` is on, or — automatic, the default — only when savings > 0 and payback ≤ 12 years (never for backup-only or product lists); the Export step says why it was hidden. Excel always carries the full economics.
+Grid-tied auto-selection never picks an inverter that its own DC:AC check would flag as oversized (prefers DC:AC ≥ 0.8 when any candidate reaches it).
 
 ### 16.5 Product list (`items`)
 The BOM is the project's custom lines only (picked from the catalogue with the company price, or typed); every engineering figure is 0; the money chain (markup, discount, VAT, rounding) is the same `buildQuote()`.
 
 ### 16.6 Company price list (`company.priceBook`)
-Unit cost (USD) by catalogue / item id, products not stocked (never auto-selected; a manual pick still works with a `not-stocked` warning; when a whole family is hidden the auto-selection falls back to all), and the company's own products (ids `my-…`, full datasheet values, used by the engine like catalogue products). Precedence: project BOM price override > company price > catalogue price. An unknown product id raises an `unknown-*` error instead of being silently replaced.
+Unit cost (USD) by catalogue / item id, products not stocked (never auto-selected; a manual pick still works with a `not-stocked` warning; when a whole family is hidden the auto-selection falls back to all), and the company's own products (ids `my-…`, full datasheet values, used by the engine like catalogue products). Precedence: project BOM price override > company price > catalogue price. An unknown product id raises an `unknown-*` error and the design uses the automatic choice until the user picks again (never a silent swap).
+**Price lock:** when a project leaves Draft its company price list is frozen (`Project.lockedPrices`), so later price-list edits never change a quote the client already has; the wizard shows "Use current prices" when the list has changed. Back to Draft, New revision and Duplicate follow the current list. Projects migrated from v0.1 that were already quoted are locked at catalogue prices.
 
 ### 16.7 Auto-selection fix
 When no single inverter accepts the whole array, units of one size are stacked within the parallel limit before falling back to one unit (removes self-inflicted `pv-input` warnings). A battery bank more than 1.5 × over the parallel limit is an error, not a warning.

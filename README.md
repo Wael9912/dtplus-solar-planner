@@ -17,6 +17,7 @@ Runs entirely in the browser (no backend); projects and the company price list a
   - **Engineering tools**: string checker, battery bank, cable & breaker, generator & inverter sizing — no project needed
 - Projects convert between modes; equipment already on site (upgrades) is designed but not quoted; daily grid-outage hours value hybrid savings at the diesel cost
 - Company price list: own prices, products not stocked (never auto-selected), own products with datasheet values, services rates; company file and full backup to share one setup across staff devices
+- Sent quotes keep the prices they were quoted with ("Use current prices" to re-price); Arabic company name, tagline and terms for Arabic documents
 - Off-grid, hybrid (grid + battery backup) and grid-tied systems; single- and three-phase
 - Appliance library (72 items, EN/AR) with typical watts, hours, surge factors; quick templates (home, shop, farm pump, clinic)
 - 70 locations with monthly peak-sun-hours from NASA POWER climatology, plus custom location
