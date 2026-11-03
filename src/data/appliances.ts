@@ -727,3 +727,137 @@ export const appliances: Appliance[] = [
 export const applianceCategories = Array.from(new Set(appliances.map((a) => a.category)))
 // Default share of each category's daily energy that falls after sunset (drives battery sizing)
 export const nightShareByCategory: Record<string, number> = { lighting: 90, cooling: 60, refrigeration: 50, electronics: 60, security: 50, office: 10, kitchen: 40, appliance: 30, heating: 50, pump: 20, motor: 20, agri: 20, workshop: 10, other: 40 }
+
+// ---------------- Library search ----------------
+// Other names people type for an appliance (English, Sudanese / Gulf Arabic, trade sizes). AC sizes are also searchable in BTU
+// ("12000 btu", "18 الف وحدة") and in the "horse" market convention (1 ton ≈ 1.5 حصان, 1.5 ton ≈ 2.25, 2 ton ≈ 3).
+const AC = ['ac', 'a/c', 'air conditioner', 'aircon', 'cooling', 'تكييف', 'مكيف']
+const AC1 = [...AC, '12000 btu', '12k btu', '1.5 hp', '1.5 حصان', '12000 وحدة', '12 الف وحدة']
+const AC15 = [...AC, '18000 btu', '18k btu', '2.25 hp', '2.25 حصان', '18000 وحدة', '18 الف وحدة']
+const AC2 = [...AC, '24000 btu', '24k btu', '3 hp', '3 حصان', '24000 وحدة', '24 الف وحدة']
+const SPLIT = ['wall split', 'سبلت', 'اسبليت']
+const INV = ['dc inverter', 'inverter ac', 'انفرتر']
+const FIXED = ['non-inverter', 'on/off', 'conventional', 'عادي']
+const LIGHT = ['light', 'lamp', 'lighting', 'اضاءة', 'انارة', 'نور']
+const FRIDGE = ['fridge', 'refrigerator', 'ثلاجة', 'تلاجة', 'براد']
+const FREEZER = ['freezer', 'deep freezer', 'فريزر', 'ديب فريزر', 'مجمد']
+const TV = ['tv', 'television', 'screen', 'تلفزيون', 'تلفاز', 'شاشة']
+const PC = ['computer', 'pc', 'كمبيوتر', 'حاسوب']
+const CCTV = ['camera', 'cameras', 'security', 'كاميرا', 'كاميرات', 'مراقبة']
+const PUMP = ['pump', 'water pump', 'motor', 'طلمبة', 'موتور', 'ماطور', 'مضخة مياه']
+const BORE = [...PUMP, 'borehole', 'well', 'deep well', 'submersible', 'بئر', 'بير', 'غاطس']
+const MOTOR = ['motor', 'induction motor', 'موتور', 'ماطور', 'محرك']
+const HEATER = ['heater', 'water heater', 'سخان']
+
+export const applianceAliases: Record<string, string[]> = {
+  led_bulb_10w: [...LIGHT, 'bulb', 'لمبة'], led_tube_18w: [...LIGHT, 'tube', 'fluorescent', 'neon', 'نيون'],
+  led_flood_50w: [...LIGHT, 'flood', 'spotlight', 'projector', 'كشاف', 'بروجكتور'], cfl_20w: [...LIGHT, 'energy saver', 'saving lamp', 'موفرة'],
+  led_highbay_150w: [...LIGHT, 'highbay', 'warehouse', 'factory', 'هاي باي', 'مستودع', 'مخزن'],
+  street_light_60w: [...LIGHT, 'street', 'yard', 'outdoor', 'pole', 'اضاءة شارع', 'عمود انارة'],
+  ceiling_fan: ['fan', 'مروحة'], stand_fan: ['fan', 'floor fan', 'table fan', 'مروحة', 'مروحة ستاند', 'مروحة طاولة'],
+  evap_cooler: ['air cooler', 'desert cooler', 'swamp cooler', 'cooler', 'مبرد', 'مكيف مويه', 'مكيف ماء', 'تكييف'],
+  ac_window_1ton: [...AC1, 'window'], ac_window_1_5ton: [...AC15, 'window'],
+  ac_split_1ton_inv: [...AC1, ...SPLIT, ...INV], ac_split_1ton_fixed: [...AC1, ...SPLIT, ...FIXED],
+  ac_split_1_5ton_inv: [...AC15, ...SPLIT, ...INV], ac_split_1_5ton_fixed: [...AC15, ...SPLIT, ...FIXED],
+  ac_split_2ton_inv: [...AC2, ...SPLIT, ...INV], ac_split_2ton_fixed: [...AC2, ...SPLIT, ...FIXED],
+  ac_cassette_4ton_3ph: [...AC, 'ducted', 'central', '48000 btu', '48k btu', '48 الف وحدة', 'دكت', 'مركزي'],
+  ac_package_10ton_3ph: [...AC, 'central', 'rooftop', 'package unit', '120000 btu', 'باكيج', 'مكيف مركزي'],
+  water_cooler: ['dispenser', 'water dispenser', 'كولر', 'مبرد مياه', 'موزع مياه'],
+  fridge_small: [...FRIDGE], fridge_large: [...FRIDGE, 'freezer', 'فريزر'], chest_freezer: [...FREEZER, 'chest'], deep_freezer: [...FREEZER, 'chest freezer'],
+  display_chiller: [...FRIDGE, 'showcase', 'cold display', 'chiller', 'شوكيس', 'ثلاجة بقالة'],
+  vaccine_fridge: [...FRIDGE, 'medical', 'pharmacy', 'vaccine', 'صيدلية', 'لقاح', 'دواء'],
+  tv_led_43: TV, tv_led_65: TV,
+  satellite_receiver: ['dish', 'decoder', 'receiver', 'satellite', 'دش', 'ستلايت', 'رسيفر'],
+  router: ['wifi', 'internet', 'modem', 'انترنت', 'مودم', 'واي فاي'],
+  phone_charger: ['mobile', 'charger', 'جوال', 'موبايل', 'تلفون'],
+  laptop: [...PC, 'notebook', 'لاب توب'], desktop_pc: [...PC, 'desktop'],
+  printer_laser: ['printer', 'طابعة'], printer_inkjet: ['printer', 'طابعة'],
+  photocopier: ['copier', 'photocopy', 'xerox', 'printer', 'تصوير', 'فوتوكوبي'],
+  pos_terminal: ['cash register', 'cashier', 'pos', 'كاشير', 'نقاط بيع'],
+  cctv_4ch: CCTV, cctv_16ch: CCTV, server_rack: ['server', 'network', 'switch', 'سيرفر', 'شبكة'],
+  washing_machine: ['washer', 'laundry', 'غسالة'], electric_iron: ['iron', 'مكواة'],
+  microwave: ['oven', 'مايكرويف', 'ميكرويف'], kettle: ['tea', 'جك', 'كاتل', 'كفتيرة'], toaster: ['toast', 'توستر'],
+  blender: ['mixer', 'juicer', 'خلاط', 'عصارة'],
+  water_heater_geyser: [...HEATER, 'geyser', 'boiler', 'بويلر'], instant_water_heater: [...HEATER, 'instant', 'tankless', 'shower', 'فوري'],
+  electric_stove: ['stove', 'cooker', 'hot plate', 'hob', 'cooking', 'بوتاجاز', 'موقد', 'عين'],
+  hair_dryer: ['dryer', 'blow dryer', 'سشوار', 'استشوار'], vacuum: ['hoover', 'cleaner', 'مكنسة'],
+  pump_surface_0_5hp: PUMP, pump_surface_1hp: PUMP,
+  pump_sub_0_5hp: BORE, pump_sub_1hp: BORE, pump_sub_1_5hp: BORE, pump_sub_2hp: BORE, pump_sub_3hp_3ph: BORE, pump_sub_5hp_3ph: BORE,
+  pressure_booster: [...PUMP, 'booster', 'pressure pump', 'طلمبة ضغط', 'ماطور ضغط'],
+  motor_3ph_5hp: MOTOR, motor_3ph_10hp: MOTOR, motor_3ph_20hp: MOTOR,
+  grain_mill: ['mill', 'flour', 'grinder', 'طاحونة', 'مطحنة', 'دقيق'], milking_machine: ['milk', 'dairy', 'حلابة', 'حليب'],
+  incubator: ['eggs', 'hatchery', 'poultry', 'فقاسة', 'حضانة', 'دواجن'],
+  poultry_fan: ['fan', 'chicken', 'farm', 'exhaust', 'ventilation', 'مروحة', 'شفاط', 'دواجن', 'مزرعة'],
+  welding_machine: ['welder', 'welding', 'لحام'], compressor_2hp: ['compressor', 'air', 'كمبروسر', 'كومبريسور', 'ضاغط'],
+  angle_grinder: ['grinder', 'drill', 'tools', 'صاروخ', 'دريل', 'شنيور', 'عدد'],
+  sterilizer: ['autoclave', 'sterilize', 'clinic', 'تعقيم', 'اوتوكلاف'],
+  ev_charger_7kw: ['electric car', 'ev', 'car charger', 'wallbox', 'سيارة', 'شاحن سيارة'],
+}
+
+/**
+ * Search text normalised for matching: lower case, Western digits, no Arabic diacritics / tatweel, unified alef / ya / ta-marbuta,
+ * thousands separators dropped ("12,000" → "12000"), numbers split from units ("2hp" → "2 hp"), punctuation → spaces.
+ */
+export function normalizeSearch(s: string): string {
+  return s.toLowerCase()
+    .replace(/[\u0660-\u0669]/g, (d) => String(d.charCodeAt(0) - 0x660)).replace(/[\u06F0-\u06F9]/g, (d) => String(d.charCodeAt(0) - 0x6f0))
+    .replace(/[\u064B-\u065F\u0670\u0640]/g, '')
+    .replace(/[أإآٱ]/g, 'ا').replace(/ى/g, 'ي').replace(/ة/g, 'ه').replace(/ؤ/g, 'و').replace(/ئ/g, 'ي')
+    .replace(/(\d)[,٬](?=\d{3}(?!\d))/g, '$1').replace(/(\d)٫(?=\d)/g, '$1.')
+    .replace(/(\d)([^\d\s.])/g, '$1 $2').replace(/([^\d\s.])(\d)/g, '$1 $2')
+    .replace(/\.(?!\d)|(?<!\d)\./g, ' ').replace(/[^\p{L}\p{N}.]+/gu, ' ')
+    .split(' ').map((w) => w.replace(/^\.+|\.+$/g, '')).filter(Boolean)
+    // Arabic definite article: "الثلاجة" finds "ثلاجة"
+    .map((w) => (w.length > 3 && /^\u0627\u0644[\u0621-\u064A]/.test(w) ? w.slice(2) : w))
+    .join(' ')
+}
+
+const isNum = (w: string) => /^\d+(\.\d+)?$/.test(w)
+const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+interface Indexed { words: string[]; text: string }
+const index = (s: string): Indexed => { const text = normalizeSearch(s); return { words: text.split(' ').filter(Boolean), text } }
+/**
+ * A query word matches a number exactly ("1.5" ≠ "1"), a word by prefix ("ac" → "AC", not "vacuum"), and from 4 letters anywhere
+ * ("light" → "floodlight"). A number + unit ("1.5 hp", "2hp", "12000 btu") must appear together, the unit by prefix.
+ */
+const hit = (tok: string, ix: Indexed) => {
+  if (tok.includes(' ')) return new RegExp(`(^| )${esc(tok)}`).test(ix.text)
+  return isNum(tok) ? ix.words.some((w) => isNum(w) && Number(w) === Number(tok))
+    : ix.words.some((w) => w.startsWith(tok)) || (tok.length >= 4 && ix.text.includes(tok))
+}
+/** Query words; with `pairs`, a number and the word after it form one phrase. */
+function queryTokens(q: string, pairs: boolean): string[] {
+  const ws = normalizeSearch(q).split(' ').filter(Boolean), out: string[] = []
+  for (let i = 0; i < ws.length; i++) {
+    if (pairs && isNum(ws[i]) && i + 1 < ws.length && !isNum(ws[i + 1])) { out.push(`${ws[i]} ${ws[i + 1]}`); i++ } else out.push(ws[i])
+  }
+  return out
+}
+
+const nameIx = new WeakMap<Appliance, Indexed>(), aliasIx = new WeakMap<Appliance, Indexed>()
+function run(list: Appliance[], toks: string[], extra?: (a: Appliance) => string): Appliance[] {
+  const scored: { a: Appliance; score: number; i: number }[] = []
+  list.forEach((a, i) => {
+    let n = nameIx.get(a); if (!n) { n = index(`${a.name} ${a.nameAr ?? ''}`); nameIx.set(a, n) }
+    let al = aliasIx.get(a); if (!al) { al = index((applianceAliases[a.id] ?? []).join(' , ')); aliasIx.set(a, al) }
+    const ex = extra ? index(extra(a)) : null
+    let score = 0
+    for (const tk of toks) {
+      if (hit(tk, n)) score++
+      else if (!hit(tk, al) && !(ex && tk.length >= 3 && hit(tk, ex))) return // short words ("ac") never match a category label
+    }
+    scored.push({ a, score, i })
+  })
+  return scored.sort((x, y) => y.score - x.score || x.i - y.i).map((x) => x.a)
+}
+/**
+ * Library search: every query word must match (any order, any case) the appliance name (English or Arabic), its aliases or `extra`
+ * (e.g. the category labels). Number + unit pairs are matched together first ("1.5 hp" is not the 1.5-ton AC), word by word if that
+ * finds nothing. Results whose names match more words come first; library order otherwise.
+ */
+export function searchAppliances(list: Appliance[], query: string, extra?: (a: Appliance) => string): Appliance[] {
+  const paired = queryTokens(query, true)
+  if (!paired.length) return list
+  const r = run(list, paired, extra)
+  return r.length || paired.every((x) => !x.includes(' ')) ? r : run(list, queryTokens(query, false), extra)
+}

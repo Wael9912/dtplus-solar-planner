@@ -1,14 +1,15 @@
 import { useMemo, useRef, useState } from 'react'
-import { Plus, Trash2, Search, Pencil, Library, Home, Building2, Store, Droplets, Stethoscope, PenLine, Check } from 'lucide-react'
-import { useT } from '../../i18n'
-import { Field, NumberInput, Section, Stat, Switch, Disclosure, IconButton } from '../ui'
+import { Plus, Trash2, Search, Pencil, Library, Home, Building2, Store, Droplets, Stethoscope, PenLine, Check, ListChecks, ReceiptText } from 'lucide-react'
+import { useT, dicts } from '../../i18n'
+import { Field, NumberInput, Section, Stat, Switch, Disclosure, IconButton, Segmented, Choice } from '../ui'
 import { useMediaQuery } from '../hooks'
 import { Sheet, ConfirmDialog, Menu } from '../overlay'
 import type { StepProps } from '../Wizard'
-import type { Appliance, LoadItem } from '../../engine/types'
-import { appliances, applianceCategories } from '../../data/appliances'
+import type { Appliance, BillInput, BillProfile, LoadItem } from '../../engine/types'
+import { appliances, applianceCategories, searchAppliances } from '../../data/appliances'
+import { BILL_PROFILES, demandFromBill, resolveSizing } from '../../engine/sizing'
 import { loadFromAppliance, uid } from '../../engine/defaults'
-import { fmt } from '../../engine/format'
+import { fmt, fxOf } from '../../engine/format'
 import { loadTemplates } from '../../data/samples'
 import { applianceName, catLabel, iso, loadName, matchAppliance } from '../../i18n/labels'
 import { toast } from '../../store/useToast'
@@ -19,6 +20,8 @@ const whDay = (l: LoadItem) => l.watts * l.qty * l.hoursPerDay
 
 export function StepLoads({ project: p, results: r, update }: StepProps) {
   const { t, lang } = useT()
+  const demand = resolveSizing(p).demand
+  const setDemand = (v: 'loads' | 'bill') => update((prev) => ({ sizing: { ...resolveSizing(prev), demand: v } }))
   const wide = useMediaQuery('(min-width: 1024px)')
   const [libOpen, setLibOpen] = useState(false)
   const [editId, setEditId] = useState<string | null>(null)
@@ -40,6 +43,15 @@ export function StepLoads({ project: p, results: r, update }: StepProps) {
   const decAppliance = (a: Appliance) => setLoads((ls) => {
     const ex = [...ls].reverse().find((l) => matchAppliance(l.name)?.id === a.id); if (!ex) return ls
     return ex.qty > 1 ? ls.map((l) => (l.id === ex.id ? { ...l, qty: l.qty - 1 } : l)) : ls.filter((l) => l.id !== ex.id)
+  })
+  /** Library quantity typed directly: earlier rows of this appliance keep their quantity, the last one takes the rest (0 removes them). */
+  const setCount = (a: Appliance, n: number) => setLoads((ls) => {
+    const idx = ls.flatMap((l, i) => (matchAppliance(l.name)?.id === a.id ? [i] : []))
+    if (!idx.length) return n > 0 ? [...ls, localize(loadFromAppliance(a, n))] : ls
+    let left = Math.max(0, Math.round(n))
+    const qty = new Map<number, number>()
+    idx.forEach((i, k) => { const q = k === idx.length - 1 ? left : Math.min(ls[i].qty, left); qty.set(i, q); left -= q })
+    return ls.flatMap((l, i) => { const q = qty.get(i); return q == null ? [l] : q > 0 ? [{ ...l, qty: q }] : [] })
   })
   const remove = (id: string) => {
     let removed: LoadItem | undefined, idx = -1
@@ -99,7 +111,14 @@ export function StepLoads({ project: p, results: r, update }: StepProps) {
 
   return (
     <div className="space-y-4 sm:space-y-5">
-      {p.loads.length === 0 ? emptyView : <>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5" data-testid="demand-switch">
+        <span className="text-sm font-medium text-slate-700">{t.inputs.loads.demandFrom}</span>
+        <Segmented className="w-full sm:w-96" full label={t.inputs.loads.demandFrom} value={demand} onChange={setDemand} options={[
+          { value: 'loads', label: t.inputs.loads.demandLoads, icon: <ListChecks size={16} className="shrink-0" />, testId: 'demand-loads' },
+          { value: 'bill', label: t.inputs.loads.demandBill, icon: <ReceiptText size={16} className="shrink-0" />, testId: 'demand-bill' },
+        ]} />
+      </div>
+      {demand === 'bill' ? <BillView project={p} results={r} update={update} /> : p.loads.length === 0 ? emptyView : <>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3" data-testid="load-kpis">
         <Stat tone="brand" className="col-span-2 sm:col-span-1" label={t.loads.totalDaily} value={fmt(r.dailyWh / 1000, 2)} unit="kWh" sub={<>{iso(`${fmt(r.monthlyKwh)} kWh`)} {t.loads.monthly}</>} />
         <Stat label={t.loads.peak} value={fmt(r.peakW / 1000, 2)} unit="kW" sub={isHybrid && r.sizingPeakW < r.peakW ? t.results.sizedFor(fmt(r.sizingPeakW / 1000, 2)) : <>{t.loads.surgeW}: {iso(`${fmt(r.surgeW / 1000, 1)} kW`)}</>} />
@@ -194,7 +213,7 @@ export function StepLoads({ project: p, results: r, update }: StepProps) {
       </Section>
       </>}
 
-      <LibrarySheet open={libOpen} onClose={() => setLibOpen(false)} countOf={countOf} onAdd={addAppliance} onDec={decAppliance} onTemplate={pickTemplate} total={p.loads.length} />
+      <LibrarySheet open={libOpen} onClose={() => setLibOpen(false)} countOf={countOf} onAdd={addAppliance} onDec={decAppliance} onSet={setCount} onTemplate={pickTemplate} total={p.loads.length} />
       <LoadEditor load={editing} three={three} hybrid={isHybrid} onChange={(x) => editing && patch(editing.id, x)} onClose={() => setEditId(null)} onDelete={() => editing && remove(editing.id)} />
       <LoadEditor load={draft} isNew three={three} hybrid={isHybrid} onChange={(x) => setDraft((d) => (d ? { ...d, ...x } : d))} onClose={() => setDraft(null)} onAdd={commitDraft} />
       <ConfirmDialog open={confirmClear} onClose={() => setConfirmClear(false)} title={t.loads.confirmClear(p.loads.length)} body={t.loads.confirmClearBody} confirmLabel={t.loads.clear} onConfirm={clearAll} />
@@ -206,15 +225,14 @@ export function StepLoads({ project: p, results: r, update }: StepProps) {
   )
 }
 
-function LibrarySheet({ open, onClose, countOf, onAdd, onDec, onTemplate, total }: { open: boolean; onClose: () => void; countOf: (a: Appliance) => number; onAdd: (a: Appliance) => void; onDec: (a: Appliance) => void; onTemplate: (k: TplKey) => void; total: number }) {
+function LibrarySheet({ open, onClose, countOf, onAdd, onDec, onSet, onTemplate, total }: { open: boolean; onClose: () => void; countOf: (a: Appliance) => number; onAdd: (a: Appliance) => void; onDec: (a: Appliance) => void; onSet: (a: Appliance, n: number) => void; onTemplate: (k: TplKey) => void; total: number }) {
   const { t, lang } = useT()
   const [q, setQ] = useState('')
   const [cat, setCat] = useState('all')
   const listTop = useRef<HTMLDivElement>(null)
-  const filtered = useMemo(() => {
-    const s = q.trim().toLowerCase()
-    return appliances.filter((a) => (cat === 'all' || a.category === cat) && (!s || `${a.name} ${a.nameAr ?? ''} ${catLabel(a.category, t)}`.toLowerCase().includes(s)))
-  }, [q, cat, t])
+  // All words in any order, English / Arabic names, trade aliases ("1.5 hp", "btu", "مكيف", "طلمبة") and category labels in both languages
+  const filtered = useMemo(() => searchAppliances(appliances.filter((a) => cat === 'all' || a.category === cat), q,
+    (a) => `${catLabel(a.category, dicts.en)} ${catLabel(a.category, dicts.ar)}`), [q, cat])
   return (
     <Sheet open={open} onClose={onClose} title={t.loads.library} variant="drawer" testId="library-sheet"
       footer={<><span className="me-auto text-sm text-slate-600" data-testid="library-count">{t.loads.nAdded(total)}</span><button type="button" className="btn-primary" onClick={onClose} data-testid="library-done"><Check size={18} />{t.loads.done}</button></>}>
@@ -246,7 +264,7 @@ function LibrarySheet({ open, onClose, countOf, onAdd, onDec, onTemplate, total 
               {n > 0 ? (
                 <div className="flex shrink-0 items-center rounded-lg border border-brand-200 bg-brand-50">
                   <button type="button" className="grid size-11 place-items-center text-brand-800" aria-label={`${t.loads.decrease} — ${applianceName(a, lang)}`} onClick={() => onDec(a)}>−</button>
-                  <span className="w-7 text-center text-sm font-semibold text-brand-900 tabular-nums" aria-live="polite">{n}</span>
+                  <LibQty n={n} label={`${t.loads.qty} — ${applianceName(a, lang)}`} onSet={(x) => onSet(a, x)} />
                   <button type="button" className="grid size-11 place-items-center text-brand-800" aria-label={`${t.loads.increase} — ${applianceName(a, lang)}`} onClick={() => onAdd(a)}><Plus size={16} /></button>
                 </div>
               ) : (
@@ -285,5 +303,77 @@ function LoadEditor({ load, isNew = false, three, hybrid, onChange, onClose, onA
         <p className="col-span-2 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">{t.loads.totalDaily}: <bdi className="font-semibold tabular-nums">{fmt(whDay(load))} Wh</bdi></p>
       </div>
     </Sheet>
+  )
+}
+
+const westernDigits = (s: string) => s.replace(/[\u0660-\u0669]/g, (d) => String(d.charCodeAt(0) - 0x660)).replace(/[\u06F0-\u06F9]/g, (d) => String(d.charCodeAt(0) - 0x6f0))
+/** Quantity typed straight into a library row (Arabic digits accepted); 0 on leaving the field removes the appliance. */
+function LibQty({ n, label, onSet }: { n: number; label: string; onSet: (n: number) => void }) {
+  const [draft, setDraft] = useState<string | null>(null)
+  return (
+    <input type="text" inputMode="numeric" dir="ltr" autoComplete="off" aria-label={label} data-testid="library-qty"
+      className="h-11 w-11 rounded-md bg-transparent text-center text-base font-semibold text-brand-900 tabular-nums outline-none focus:bg-white focus:ring-2 focus:ring-brand-500"
+      value={draft ?? String(n)}
+      onFocus={(e) => { setDraft(String(n)); const el = e.currentTarget; requestAnimationFrame(() => { try { el.select() } catch { /* ignore */ } }) }}
+      onChange={(e) => {
+        const v = westernDigits(e.target.value).replace(/\D/g, '').slice(0, 4)
+        setDraft(v)
+        if (v !== '' && Number(v) > 0) onSet(Number(v))
+      }}
+      onBlur={() => { if (draft === '0') onSet(0); setDraft(null) }}
+      onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }} />
+  )
+}
+
+/** Demand from the electricity bill (methodology §15.1): monthly kWh (or the amount ÷ tariff), usage profile, optional peak and motor. */
+function BillView({ project: p, results: r, update }: Pick<StepProps, 'project' | 'results' | 'update'>) {
+  const { t } = useT()
+  const T = t.inputs.loads
+  const b = resolveSizing(p).bill
+  const setBill = (x: Partial<BillInput>) => update((prev) => { const sz = resolveSizing(prev); return { sizing: { ...sz, bill: { ...sz.bill, ...x } } } })
+  const [amount, setAmount] = useState<number | null>(null)
+  const cur = p.site.currency || 'USD'
+  const tariffLocal = Math.max(0, p.site.gridTariff || 0) * fxOf(p.site)
+  const tariffTxt = `${fmt(tariffLocal, tariffLocal < 1 ? 3 : tariffLocal < 10 ? 2 : 1)} ${cur}`
+  const fromAmount = (v: number | null) => { setAmount(v); if (v != null && tariffLocal > 0) setBill({ monthlyKwh: Math.round(v / tariffLocal) }) }
+  const est = demandFromBill({ ...b, peakKw: null, largestMotorKw: null })
+  const nightPct = r.dailyWh > 0 ? (r.nightWh / r.dailyWh) * 100 : BILL_PROFILES[b.profile].nightPct
+  const profiles: BillProfile[] = ['residential', 'commercial', 'daytime']
+  return (
+    <div className="grid grid-cols-1 gap-4 sm:gap-5 lg:grid-cols-5" data-testid="bill-view">
+      <Section title={T.billTitle} description={T.billHelp} className="lg:col-span-3">
+        <div className="grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2">
+          <Field label={T.monthlyKwh}>
+            <NumberInput value={b.monthlyKwh || null} allowEmpty min={0} max={10000000} placeholder="0" suffix={T.kwhMonth} data-testid="bill-kwh"
+              onChange={(v) => { setAmount(null); setBill({ monthlyKwh: v ?? 0 }) }} />
+          </Field>
+          <Field label={T.amount(cur)} help={tariffLocal > 0 ? (amount ? T.amountHelp(tariffTxt, fmt(amount / tariffLocal)) : T.tariffIs(tariffTxt)) : T.amountNoTariff}>
+            <NumberInput value={amount} allowEmpty min={0} placeholder={T.amountPh} suffix={cur} disabled={!(tariffLocal > 0)} data-testid="bill-amount" onChange={fromAmount} />
+          </Field>
+        </div>
+        <div className="mt-5">
+          <span className="label">{T.profile}</span>
+          <Choice label={T.profile} columns="sm:grid-cols-3" value={b.profile} onChange={(v) => setBill({ profile: v })}
+            options={profiles.map((k) => ({ value: k, label: T.profiles[k], help: T.profileHelp[k] }))} />
+        </div>
+        <div className="mt-5 grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2">
+          <Field label={T.peakKw} help={T.peakHelp}>
+            <NumberInput value={b.peakKw} allowEmpty min={0.1} max={100000} step={0.5} suffix="kW" placeholder={T.estimated(fmt(est.peakW / 1000, 1))} data-testid="bill-peak" onChange={(v) => setBill({ peakKw: v })} />
+          </Field>
+          <Field label={T.motorKw} help={T.motorHelp}>
+            <NumberInput value={b.largestMotorKw} allowEmpty min={0.1} max={10000} step={0.5} suffix="kW" placeholder={T.motorPh} data-testid="bill-motor" onChange={(v) => setBill({ largestMotorKw: v })} />
+          </Field>
+        </div>
+        {p.loads.length > 0 && <p className="mt-4 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-600">{T.keptList(p.loads.length)}</p>}
+      </Section>
+      <Section title={T.derived} className="lg:col-span-2">
+        <div className="grid grid-cols-2 gap-2 sm:gap-3" data-testid="bill-kpis">
+          <Stat tone="brand" className="col-span-2" label={T.perDay} value={fmt(r.dailyWh / 1000, 1)} unit="kWh" sub={<>{iso(`${fmt(r.monthlyKwh)} kWh`)} {t.loads.monthly}</>} />
+          <Stat label={T.nightShare} value={fmt(nightPct)} unit="%" sub={iso(`${fmt(r.nightWh / 1000, 1)} kWh`)} />
+          <Stat label={t.loads.peak} value={fmt(r.peakW / 1000, 1)} unit="kW" sub={b.peakKw == null ? T.estimatedShort : undefined} />
+          <Stat className="col-span-2" label={T.surge} value={fmt(r.surgeW / 1000, 1)} unit="kW" sub={b.largestMotorKw ? T.fromMotor(fmt(b.largestMotorKw, 1)) : T.noMotor} />
+        </div>
+      </Section>
+    </div>
   )
 }
