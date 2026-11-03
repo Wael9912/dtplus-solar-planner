@@ -6,6 +6,13 @@ const I = (x: string) => '\u2068' + x + '\u2069'
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
 
 export const pricesEn = {
+  /** Company name / tagline / terms in both document languages (Settings). */
+  company: {
+    nameEn: 'Company name (English)', nameAr: 'Company name (Arabic)', taglineEn: 'Tagline (English)', taglineAr: 'Tagline (Arabic)',
+    termsEn: 'Terms & conditions (English)', termsAr: 'Terms & conditions (Arabic)',
+    arHelp: 'Printed on Arabic documents. Left empty, the English text is used.',
+    enHelp: 'Printed on English documents. Left empty, the Arabic text is used.',
+  },
   title: 'Price list',
   intro: 'Your cost prices and the products you stock, applied to every project. A price typed in a project’s pricing step still wins.',
   lastUpdated: (d: string) => `Last updated ${d}`,
@@ -146,6 +153,12 @@ export const pricesEn = {
 }
 
 export const pricesAr: typeof pricesEn = {
+  company: {
+    nameEn: 'اسم الشركة (بالإنجليزية)', nameAr: 'اسم الشركة (بالعربية)', taglineEn: 'العبارة التعريفية (بالإنجليزية)', taglineAr: 'العبارة التعريفية (بالعربية)',
+    termsEn: 'الشروط والأحكام (بالإنجليزية)', termsAr: 'الشروط والأحكام (بالعربية)',
+    arHelp: 'تظهر في المستندات العربية. إذا تُركت فارغة يُستخدم النص الإنجليزي.',
+    enHelp: 'تظهر في المستندات الإنجليزية. إذا تُركت فارغة يُستخدم النص العربي.',
+  },
   title: 'قائمة الأسعار',
   intro: 'أسعار التكلفة لديك والمنتجات التي توفّرها، وتُطبَّق على كل المشاريع. السعر الذي تكتبه في خطوة التسعير داخل المشروع تكون له الأولوية.',
   lastUpdated: (d: string) => `آخر تحديث ${I(d)}`,

@@ -3,16 +3,18 @@
 // Every money figure comes from buildQuote() so the documents match the screen to the cent.
 // Modes: a known-size quote has no consumption data (no load tables; savings assume full self-use), a battery-backup system has
 // no panels (no production chart, no payback), a bill-based design prints the bill instead of the appliance table, and a product
-// quote only gets the quotation.
+// quote only gets the quotation. Savings, payback and the cash flow appear on the proposal only when proposalFinance() says so
+// (Auto: a payback of 12 years or less). Placeholder company names and default project names never print (docCompany, docTitle).
 import type { Project, Results, CompanySettings, CableResult } from '../engine/types'
+import type { CellHookData } from 'jspdf-autotable'
 import { fmt } from '../engine/format'
 import { buildQuote, type Quote } from '../engine/quote'
 import { loadPdfFonts, type PdfFontData } from './fonts'
 import { Pdf, INK, SLATE, MUTED, WHITE, tint, hasArabic, type RGB } from './pdfkit'
 import {
   labelsFor, fmtDate, addDays, qtyText, num, money, plain, unitDecimals, systemName, phaseName, locationName, unitName, categoryName, lineName, lineSpec,
-  loadName, derateName, checkMessage, batteryInfo, autonomyOf, solarCoveragePct, footprintM2, termsText, localizeCompany, escalationPct, cableLabel, cableSize, cableDevice, protectionRows, INV_EFF_BATT,
-  sizingOf, isBackupOnly, backupHoursAt, backupLoads, sizeSummary, existingQtyOf, type ExportLang, type ExportLabels,
+  loadName, derateName, checkMessage, batteryInfo, autonomyOf, solarCoveragePct, footprintM2, termsText, docCompany, escalationPct, cableLabel, cableSize, cableDevice, protectionRows, INV_EFF_BATT,
+  sizingOf, isBackupOnly, backupHoursAt, backupLoads, sizeSummary, existingQtyOf, existingNote, docTitle, proposalFinance, productName, avoidedCostUsd, type ExportLang, type ExportLabels,
 } from './common'
 
 export interface PdfOptions {
@@ -60,7 +62,6 @@ interface QuoteCtx { p: Project; r: Results; q: Quote; company: CompanySettings;
 function drawQuotation(pdf: Pdf, { p, r, q, company, lang, L }: QuoteCtx, y0: number) {
   const P = L.pdf, M = money(q), N = plain(q)
   const { doc, brand } = pdf
-  let y = pdf.heading(P.boq, y0, P.pricesIn(q.currency))
   const body: Body = []
   const lines = q.lines.filter((l) => l.qty > 0)
   let n = 0
@@ -74,18 +75,37 @@ function drawQuotation(pdf: Pdf, { p, r, q, company, lang, L }: QuoteCtx, y0: nu
     }
   }
   const C = P.cols
-  y = pdf.table({
-    startY: y, head: [[C.no, C.item, C.spec, C.qty, C.unit, `${C.unitPrice} (${q.currency})`, `${C.total} (${q.currency})`]], body,
+  let y = pdf.headedTable(P.boq, y0, {
+    head: [[C.no, C.item, C.spec, C.qty, C.unit, `${C.unitPrice} (${q.currency})`, `${C.total} (${q.currency})`]], body,
     styles: { fontSize: 8 }, alternateRowStyles: { fillColor: WHITE },
     columnStyles: { 0: { cellWidth: 8, halign: 'center', textColor: MUTED }, 1: { cellWidth: 50, textColor: INK }, 2: { cellWidth: 45 }, 3: { cellWidth: 15, halign: 'right' }, 4: { cellWidth: 18 }, 5: { cellWidth: 23, halign: 'right' }, 6: { cellWidth: 23, halign: 'right', fontStyle: 'bold', textColor: INK } },
-  }) + 3
+  }, P.pricesIn(q.currency)) + 3
+  // Main equipment entirely on site: named, never priced
+  const onSite = existingNote(r, lang, L)
+  if (onSite) {
+    const ls = pdf.wrap(onSite, pdf.contentW, false, 8)
+    y = pdf.ensure(y, ls.length * pdf.lineH(8) + 2)
+    y = pdf.text(ls, pdf.x(pdf.M), y + 1.5, { size: 8, color: SLATE, align: pdf.start }) + 2
+  }
 
   // Totals: subtotal, discount, VAT, total — no cost or markup on a client document
   const totals: [string, string][] = []
   if (q.discount > 0 || q.vatPct > 0) totals.push([P.subtotal, M(q.sellSubtotal)])
   if (q.discount > 0) totals.push([P.discount(num(q.discountPct)), M(-q.discount)])
   if (q.vatPct > 0) totals.push([P.vat(num(q.vatPct)), M(q.vat)])
-  y = pdf.ensure(y, 12 + totals.length * 6 + 10)
+  // Closing block: note to the client (never the internal project notes), terms and signatures — measured first so it is never
+  // split badly: it stays on this page (spacing tightened when that is enough) or moves to the next page whole; a page never
+  // holds the signatures alone.
+  const FS = 8.3, lh = pdf.lineH(FS)
+  const note = p.proposalNote?.trim() ?? ''
+  const terms = termsText(company, lang)
+  const paras = [note ? { title: P.notes, lines: pdf.wrap(note, pdf.contentW, false, FS) } : null, terms ? { title: P.terms, lines: pdf.wrap(terms, pdf.contentW, false, FS) } : null]
+    .filter((x): x is { title: string; lines: string[] } => !!x)
+  const sigH = (gap: number) => 4 + 3 * gap + 1.5
+  const blockH = (paraGap: number, sigGap: number, lead: number) => paras.reduce((h, x) => h + 7.5 + x.lines.length * lh + paraGap, 0) + lead + sigH(sigGap)
+  const totalsH = (totals.length + 1) * 6.4 + 9
+  // Without a note or terms the totals move with the signatures
+  y = pdf.ensure(y, totalsH + (paras.length ? 0 : sigH(6.5) + 2))
   const totW = 100, hl = { fontStyle: 'bold' as const, fontSize: 10.5, textColor: WHITE, fillColor: brand }
   y = pdf.table({
     startY: y, theme: 'plain', margin: { left: pdf.W - pdf.M - totW, right: pdf.M }, tableWidth: totW, alternateRowStyles: { fillColor: WHITE },
@@ -94,34 +114,39 @@ function drawQuotation(pdf: Pdf, { p, r, q, company, lang, L }: QuoteCtx, y0: nu
     columnStyles: { 0: { halign: 'right', cellWidth: 54 }, 1: { halign: 'right', cellWidth: 46, textColor: INK } },
   }) + 9
 
-  // Note to the client (never the internal project notes), terms, signatures
-  const para = (title: string, text: string) => {
-    y = pdf.heading(title, y)
-    for (const line of pdf.wrap(text, pdf.contentW, false, 8.3)) { y = pdf.ensure(y, 5); y = pdf.text(line, pdf.x(pdf.M), y, { size: 8.3, color: SLATE, align: pdf.start }) }
-    y += 5
+  let paraGap = 5, sigGap = 6.5, lead = 2
+  if (y + blockH(paraGap, sigGap, lead) > pdf.bottom) {
+    if (y + blockH(3, 5.5, 0) <= pdf.bottom) { paraGap = 3; sigGap = 5.5; lead = 0 }
+    else if (paras.length && blockH(paraGap, sigGap, lead) <= pdf.bottom - pdf.top) { doc.addPage(); y = pdf.top }
   }
-  const note = p.proposalNote?.trim()
-  if (note) para(P.notes, note)
-  const terms = termsText(company, lang)
-  if (terms) para(P.terms, terms)
-  y = pdf.ensure(y + 2, 34)
+  for (const x of paras) {
+    y = pdf.heading(x.title, y)
+    x.lines.forEach((line, i) => {
+      // the last lines of the last paragraph stay with the signatures
+      const tail = x === paras[paras.length - 1] && i === Math.max(0, x.lines.length - 3)
+      y = pdf.ensure(y, tail ? (x.lines.length - i) * lh + lead + sigH(sigGap) : 5)
+      y = pdf.text(line, pdf.x(pdf.M), y, { size: FS, color: SLATE, align: pdf.start })
+    })
+    y += paraGap
+  }
+  y = pdf.ensure(y + lead, sigH(sigGap))
   const sig = (title: string, ltrX: number, w: number) => {
     let yy = pdf.textStart(title, ltrX, y, { bold: true, size: 9, color: INK, maxWidth: w })
     for (const f of [P.name, P.signature, P.date]) {
-      yy += 6.5
+      yy += sigGap
       const lw = pdf.width(f + ':', false, 8.5)
       pdf.textStart(f + ':', ltrX, yy, { size: 8.5, color: MUTED })
       doc.setDrawColor(...tint(SLATE, 0.6)); doc.setLineWidth(0.25); doc.line(pdf.x(ltrX + lw + 2), yy + 0.6, pdf.x(ltrX + w), yy + 0.6)
     }
   }
   sig(P.accepted, 14, 82)
-  sig(P.forCompany(company.name || ''), 110, 86)
+  sig(company.name?.trim() ? P.forCompany(company.name.trim()) : P.forCompanyBlank, 110, 86)
 }
 
 // ---------------------------------------------------------------- client proposal
 export async function buildProposalPdf(p: Project, r: Results, companyIn: CompanySettings, lang: ExportLang, opts: PdfOptions = {}): Promise<Blob> {
   const L = labelsFor(lang), P = L.pdf
-  const company = localizeCompany(companyIn, lang)
+  const company = docCompany(companyIn, lang)
   const q = buildQuote(p, r)
   const M = money(q), N = plain(q)
   const pdf = await openPdf(lang, p, company, opts)
@@ -129,6 +154,8 @@ export async function buildProposalPdf(p: Project, r: Results, companyIn: Compan
   const now = opts.now ?? new Date()
   const date = fmtDate(now)
   const noDemand = r.demand === 'none', backupOnly = isBackupOnly(r)
+  // Savings, payback and cash flow only when they help the sale (or the user asked for them): project.proposalFinance
+  const finance = proposalFinance(p, r).show
   const sz = sizingOf(p), ex = sz.existing
   const at1 = backupHoursAt(r, 1) // hours of backup at a 1 kW load (no consumption data)
 
@@ -137,7 +164,7 @@ export async function buildProposalPdf(p: Project, r: Results, companyIn: Compan
   let y = 37
   const block = (label: string, first: string, rest: string[], ltrX: number, w: number) => infoBlock(pdf, lang, y, label, first, rest, ltrX, w)
   const yClient = block(P.preparedFor, p.clientName, [p.clientAddress, p.clientPhone, p.clientEmail], 14, 84)
-  const yProject = block(P.project, p.name, [
+  const yProject = block(P.project, docTitle(p, r, lang), [
     `${systemName(p, L)} · ${phaseName(p, L)}`,
     backupOnly ? `${P.location}: ${locationName(p, lang)}` : `${P.location}: ${locationName(p, lang)} · ${P.psh(fmt(p.site.psh, 2))}`,
     P.validUntil(fmtDate(addDays(now, company.quoteValidityDays || 30))),
@@ -151,6 +178,7 @@ export async function buildProposalPdf(p: Project, r: Results, companyIn: Compan
   const shortAutonomy = auto ? (auto.offgrid || auto.hours > 72 ? P.autonomyShort(num(auto.days, 1)) : P.backupShort(num(auto.hours, 0))) : noDemand ? at1Text : ''
   const prodKwh = r.annualProductionKwh
   const invTile = { k: P.tiles.inverter, v: r.inverter ? `${num(r.inverterTotalKw, 1)} kW` : '—', s: r.inverter ? `${r.inverterQty} × ${r.inverter.brand}` : '' }
+  const co2Tile = { k: P.tiles.co2, v: `${fmt(r.co2TonsPerYear, 1)} ${P.tPerYear}`, s: diesel ? P.vsDiesel : P.vsGrid }
   const investTile = { k: P.tiles.investment, v: M(q.total, 0), s: q.vatPct ? P.inclVat(num(q.vatPct)) : '' }
   const tiles: { k: string; v: string; s?: string }[] = backupOnly ? [
     { k: P.tiles.battery, v: r.batteryKwh > 0 ? `${fmt(r.batteryKwh, 1)} kWh` : '—', s: r.batteryKwh > 0 ? P.tileUsable(fmt(r.batteryUsableKwh, 1)) : '' },
@@ -165,36 +193,40 @@ export async function buildProposalPdf(p: Project, r: Results, companyIn: Compan
     invTile,
     { k: P.tiles.production, v: prodKwh >= 100000 ? `${fmt(prodKwh / 1000, 1)} MWh` : `${fmt(prodKwh)} kWh`, s: `${fmt(r.specificYield)} ${P.kwhPerKwp}` },
     investTile,
-    { k: P.tiles.savings, v: M(r.annualSavingsUsd * q.fx, 0), s: diesel ? P.savingsDiesel : P.yearN(1) },
-    { k: P.tiles.payback, v: r.paybackYears != null && Number.isFinite(r.paybackYears) ? P.years(fmt(r.paybackYears, 1)) : '—' },
-    { k: P.tiles.co2, v: `${fmt(r.co2TonsPerYear, 1)} ${P.tPerYear}`, s: diesel ? P.vsDiesel : P.vsGrid },
+    ...(finance ? [
+      { k: P.tiles.savings, v: M(r.annualSavingsUsd * q.fx, 0), s: diesel ? P.savingsDiesel : P.yearN(1) },
+      { k: P.tiles.payback, v: r.paybackYears != null && Number.isFinite(r.paybackYears) ? P.years(fmt(r.paybackYears, 1)) : '—' },
+    ] : []),
+    co2Tile,
   ]
-  const tw = 43, tg = (pdf.contentW - 4 * tw) / 3, th = 18.5
+  // 4 tiles a row; 6 tiles (no savings / payback) as two full rows of 3 — never a gap
+  const perRow = tiles.length % 4 && tiles.length % 3 === 0 ? 3 : 4
+  const tg = 10 / 3, tw = (pdf.contentW - (perRow - 1) * tg), th = 18.5
   tiles.forEach((t, i) => {
-    const col = i % 4, row = Math.floor(i / 4)
-    const ltrX = 14 + col * (tw + tg), yy = y + row * (th + 2.5)
-    const x = pdf.rtl ? pdf.W - ltrX - tw : ltrX
-    doc.setFillColor(...tint(brand, 0.93)); doc.setDrawColor(...tint(brand, 0.75)); doc.setLineWidth(0.25); doc.roundedRect(x, yy, tw, th, 2, 2, 'FD')
+    const col = i % perRow, row = Math.floor(i / perRow)
+    const w = tw / perRow
+    const ltrX = 14 + col * (w + tg), yy = y + row * (th + 2.5)
+    const x = pdf.rtl ? pdf.W - ltrX - w : ltrX
+    doc.setFillColor(...tint(brand, 0.93)); doc.setDrawColor(...tint(brand, 0.75)); doc.setLineWidth(0.25); doc.roundedRect(x, yy, w, th, 2, 2, 'FD')
     let size = 12.5
-    while (size > 7.5 && pdf.width(t.v, true, size) > tw - 6) size -= 0.5
-    const tx = pdf.rtl ? x + tw - 3 : x + 3
+    while (size > 7.5 && pdf.width(t.v, true, size) > w - 6) size -= 0.5
+    const tx = pdf.rtl ? x + w - 3 : x + 3
     pdf.text(t.v, tx, yy + 7.2, { bold: true, size, color: brand, align: pdf.start })
     pdf.text(t.k, tx, yy + 12, { size: 7.6, color: INK, align: pdf.start })
-    if (t.s) pdf.text(pdf.wrap(t.s, tw - 6, false, 6.6)[0] ?? '', tx, yy + 15.6, { size: 6.6, color: MUTED, align: pdf.start })
+    if (t.s) pdf.text(pdf.wrap(t.s, w - 6, false, 6.6)[0] ?? '', tx, yy + 15.6, { size: 6.6, color: MUTED, align: pdf.start })
   })
-  const tileRows = Math.ceil(tiles.length / 4)
+  const tileRows = Math.ceil(tiles.length / perRow)
   y += tileRows * th + (tileRows - 1) * 2.5 + 7
 
   // Your system
-  y = pdf.heading(P.yourSystem, y)
   const { battery, excluded } = batteryInfo(p, r)
   const onSite = (n: number) => (n > 0 ? ` (${P.existingIncl(String(n))})` : '')
   const sysRows: string[][] = []
-  if (r.panelQty > 0) sysRows.push([P.rows.modules, P.modules(String(r.panelQty), `${r.panel.brand} ${r.panel.model}`, String(r.panel.watts), `${r.panel.technology}${r.panel.bifacial && !/bifacial/i.test(r.panel.model) ? ' ' + P.bifacial : ''}`, String(r.panel.warrantyYears)) + onSite(ex.panels)])
-  if (r.inverter) sysRows.push([P.rows.inverter, P.inverter(String(r.inverterQty), `${r.inverter.brand} ${r.inverter.model}`, num(r.inverter.ratedAcKw, 1), L.invType[r.inverter.type] ?? r.inverter.type) + onSite(ex.inverters)])
-  if (r.controller && r.controllerQty) sysRows.push([P.rows.controller, P.controller(String(r.controllerQty), `${r.controller.brand} ${r.controller.model}`)])
+  if (r.panelQty > 0) sysRows.push([P.rows.modules, P.modules(String(r.panelQty), productName(r.panel), String(r.panel.watts), `${r.panel.technology}${r.panel.bifacial && !/bifacial/i.test(r.panel.model) ? ' ' + P.bifacial : ''}`, String(r.panel.warrantyYears)) + onSite(ex.panels)])
+  if (r.inverter) sysRows.push([P.rows.inverter, P.inverter(String(r.inverterQty), productName(r.inverter), num(r.inverter.ratedAcKw, 1), L.invType[r.inverter.type] ?? r.inverter.type) + onSite(ex.inverters)])
+  if (r.controller && r.controllerQty) sysRows.push([P.rows.controller, P.controller(String(r.controllerQty), productName(r.controller))])
   if (r.batteryQty > 0) {
-    const parts = [(battery ? P.battery(String(r.batteryQty), `${battery.brand} ${battery.model}`, fmt(r.batteryKwh, 1), fmt(r.batteryUsableKwh, 1)) : P.batteryNoModel(fmt(r.batteryKwh, 1), fmt(r.batteryUsableKwh, 1))) + onSite(ex.batteries)]
+    const parts = [(battery ? P.battery(String(r.batteryQty), productName(battery), fmt(r.batteryKwh, 1), fmt(r.batteryUsableKwh, 1)) : P.batteryNoModel(fmt(r.batteryKwh, 1), fmt(r.batteryUsableKwh, 1))) + onSite(ex.batteries)]
     if (auto) parts.push(auto.offgrid || auto.hours > 72 ? P.autonomyDays(num(auto.days, 1)) : P.backupHours(num(auto.hours, 0)))
     else if (noDemand && at1 > 0) parts.push(P.backupAbout(backupLoads(r).slice(0, 2).map((kw) => P.backupAt(num(backupHoursAt(r, kw), 1), num(kw, 2))).join(lang === 'ar' ? '، ' : ', ')))
     if (excluded) parts.push(P.notQuoted)
@@ -206,7 +238,7 @@ export async function buildProposalPdf(p: Project, r: Results, companyIn: Compan
     ? P.energyBill(fmt(sz.bill.monthlyKwh), P.profiles[sz.bill.profile] ?? sz.bill.profile, fmt(solarCoveragePct(r)))
     : noDemand ? (backupOnly ? P.energyBackup : P.energyNone(fmt(prodKwh / 365, 1))) : P.energy(fmt(r.dailyWh / 1000, 1), fmt(solarCoveragePct(r)))
   sysRows.push([P.rows.energy, energy])
-  y = pdf.table({ startY: y, head: [[P.component, P.description]], body: sysRows, columnStyles: { 0: { cellWidth: 38, fontStyle: 'bold', textColor: INK } } }) + 7
+  y = pdf.headedTable(P.yourSystem, y, { head: [[P.component, P.description]], body: sysRows, columnStyles: { 0: { cellWidth: 38, fontStyle: 'bold', textColor: INK } } }) + 7
 
   // No panels (battery backup only): no production chart, no savings or payback
   if (prodKwh > 0) {
@@ -242,37 +274,40 @@ export async function buildProposalPdf(p: Project, r: Results, companyIn: Compan
     })
     y = cy + 11
 
-    // Financial summary
-    y = pdf.ensure(y, 34)
-    y = pdf.heading(P.finance, y)
-    const horizon = p.design.analysisYears
-    const yrs = [1, 5, 10, 15, 20, 25, 30].filter((n) => n <= horizon && r.cumulativeCashflow[n] != null)
-    if (!yrs.includes(horizon) && r.cumulativeCashflow[horizon] != null) yrs.push(horizon)
-    const cum = yrs.map((n) => r.cumulativeCashflow[n] * q.fx)
-    y = pdf.table({
-      startY: y, head: [[P.year, ...yrs.map((n) => P.yearN(n))]], body: [[`${P.cumulative} (${q.currency})`, ...cum.map((v) => N(v, 0))]],
-      columnStyles: Object.fromEntries([[0, { cellWidth: 40, fontStyle: 'bold', textColor: INK }], ...yrs.map((_, i) => [i + 1, { halign: 'right' }])]),
-      didParseCell: (d) => {
-        if (d.section !== 'body') return
-        const k = pdf.rtl ? yrs.length - d.column.index : d.column.index // logical column (0 = label)
-        if (k > 0 && cum[k - 1] != null) d.cell.styles.textColor = cum[k - 1] < 0 ? NEG : POS
-      },
-    }) + 3
-    const tariffUsd = Number.isFinite(r.avoidedCostUsdPerKwh) && r.avoidedCostUsdPerKwh > 0 ? r.avoidedCostUsdPerKwh : p.site.gridTariff
-    const tariff = tariffUsd * q.fx, lcoe = r.lcoeUsdPerKwh * q.fx
-    pdf.text(P.financeNote({
-      diesel, tariff: M(tariff, unitDecimals(tariff)), esc: num(escalationPct(p), 2), deg: num(p.design.degradationPctPerYear), lcoe: M(lcoe, unitDecimals(lcoe)),
-      years: String(horizon), roi: r.roi25Pct != null && Number.isFinite(r.roi25Pct) ? `${fmt(r.roi25Pct)}%` : '—',
-      om: r.omUsdPerYear > 0 ? M(r.omUsdPerYear * q.fx, 0) : '',
-      repl: (r.replacements ?? []).filter((x) => x.year <= horizon).map((x) => P.replItem(x.item, x.year, M(x.usd * q.fx, 0))).join(lang === 'ar' ? '، ' : ', '),
-    }) + (noDemand ? P.selfUseNote : ''), pdf.x(pdf.M), y + 1, { size: 8, color: MUTED, maxWidth: pdf.contentW, align: pdf.start })
+    // Financial summary (left out when the payback would not help the sale — see proposalFinance)
+    if (finance) {
+      const horizon = p.design.analysisYears
+      const yrs = [1, 5, 10, 15, 20, 25, 30].filter((n) => n <= horizon && r.cumulativeCashflow[n] != null)
+      if (!yrs.includes(horizon) && r.cumulativeCashflow[horizon] != null) yrs.push(horizon)
+      const cum = yrs.map((n) => r.cumulativeCashflow[n] * q.fx)
+      const tariff = avoidedCostUsd(p, r) * q.fx, lcoe = r.lcoeUsdPerKwh * q.fx
+      const financeNote = P.financeNote({
+        diesel, tariff: M(tariff, unitDecimals(tariff)), esc: num(escalationPct(p), 2), deg: num(p.design.degradationPctPerYear), lcoe: M(lcoe, unitDecimals(lcoe)),
+        years: String(horizon), roi: r.roi25Pct != null && Number.isFinite(r.roi25Pct) ? `${fmt(r.roi25Pct)}%` : '—',
+        om: r.omUsdPerYear > 0 ? M(r.omUsdPerYear * q.fx, 0) : '',
+        repl: (r.replacements ?? []).filter((x) => x.year <= horizon).map((x) => P.replItem(x.item, x.year, M(x.usd * q.fx, 0))).join(lang === 'ar' ? '، ' : ', '),
+      }) + (noDemand ? P.selfUseNote : '')
+      const cashTable = {
+        head: [[P.year, ...yrs.map((n) => P.yearN(n))]], body: [[`${P.cumulative} (${q.currency})`, ...cum.map((v) => N(v, 0))]],
+        columnStyles: Object.fromEntries([[0, { cellWidth: 40, fontStyle: 'bold' as const, textColor: INK }], ...yrs.map((_, i) => [i + 1, { halign: 'right' as const }])]),
+        didParseCell: (d: CellHookData) => {
+          if (d.section !== 'body') return
+          const k = pdf.rtl ? yrs.length - d.column.index : d.column.index // logical column (0 = label)
+          if (k > 0 && cum[k - 1] != null) d.cell.styles.textColor = cum[k - 1] < 0 ? NEG : POS
+        },
+      }
+      // heading, cash-flow row and the note stay together
+      y = pdf.ensure(y, 7.5 + pdf.tableStartH({ ...cashTable, startY: y }, 1) + 4 + pdf.wrap(financeNote, pdf.contentW, false, 8).length * pdf.lineH(8))
+      y = pdf.headedTable(P.finance, y, cashTable) + 3
+      pdf.text(financeNote, pdf.x(pdf.M), y + 1, { size: 8, color: MUTED, maxWidth: pdf.contentW, align: pdf.start })
+    }
   }
 
   // ---- quotation (selling prices; markup is spread into the line prices). A battery-backup proposal has a short first page:
   // the quotation continues on it.
   if (prodKwh > 0 || y > 150) {
     doc.addPage()
-    pdf.header(company, P.quotation, `${p.reference} · ${date}`)
+    pdf.header(company, P.title, `${p.reference} · ${date}`)
     y = 37
   } else y += 3
   drawQuotation(pdf, { p, r, q, company, lang, L }, y)
@@ -285,7 +320,7 @@ export async function buildProposalPdf(p: Project, r: Results, companyIn: Compan
 /** The quotation on its own: header, client and quote details (reference, date, validity), priced items, totals, note, terms, signatures. */
 export async function buildQuotationPdf(p: Project, r: Results, companyIn: CompanySettings, lang: ExportLang, opts: PdfOptions = {}): Promise<Blob> {
   const L = labelsFor(lang), P = L.pdf
-  const company = localizeCompany(companyIn, lang)
+  const company = docCompany(companyIn, lang)
   const q = buildQuote(p, r)
   const pdf = await openPdf(lang, p, company, opts)
   const now = opts.now ?? new Date()
@@ -294,7 +329,7 @@ export async function buildQuotationPdf(p: Project, r: Results, companyIn: Compa
   const y = 37
   const system = r.mode !== 'items' && sizeSummary(r) ? P.systemShort(systemName(p, L), sizeSummary(r)) : ''
   const yClient = infoBlock(pdf, lang, y, P.preparedFor, p.clientName, [p.clientAddress, p.clientPhone, p.clientEmail], 14, 84)
-  const yQuote = infoBlock(pdf, lang, y, P.details, p.name, [
+  const yQuote = infoBlock(pdf, lang, y, P.details, docTitle(p, r, lang), [
     system, p.reference?.trim() ? P.refN(p.reference.trim()) : '', P.dateN(date), P.validUntil(fmtDate(addDays(now, company.quoteValidityDays || 30))),
   ], 110, 86)
   drawQuotation(pdf, { p, r, q, company, lang, L }, Math.max(yClient, yQuote) + 6)
@@ -305,7 +340,7 @@ export async function buildQuotationPdf(p: Project, r: Results, companyIn: Compa
 // ---------------------------------------------------------------- technical report (internal)
 export async function buildTechnicalPdf(p: Project, r: Results, companyIn: CompanySettings, lang: ExportLang, opts: PdfOptions = {}): Promise<Blob> {
   const L = labelsFor(lang), T = L.tech
-  const company = localizeCompany(companyIn, lang)
+  const company = docCompany(companyIn, lang)
   const q = buildQuote(p, r)
   const M = money(q), N = plain(q)
   const pdf = await openPdf(lang, p, company, opts)
@@ -323,7 +358,7 @@ export async function buildTechnicalPdf(p: Project, r: Results, companyIn: Compa
   y = pdf.table({
     startY: y, theme: 'plain', styles: { fontSize: 8.3, cellPadding: { top: 0.8, bottom: 0.8, left: 1.5, right: 1.5 } },
     body: [
-      [T.project, p.name || '—', T.client, p.clientName || '—'],
+      [T.project, docTitle(p, r, lang), T.client, p.clientName || '—'],
       [T.systemType, systemName(p, L), T.supply, phaseName(p, L)],
       [T.location, `${locationName(p, lang)} · ${fmt(p.site.psh, 2)} h`, T.site, p.clientAddress || '—'],
     ],
@@ -331,11 +366,10 @@ export async function buildTechnicalPdf(p: Project, r: Results, companyIn: Compa
   }) + 6
 
   // Design checks
-  y = pdf.heading(T.checks, y)
   const lvlColor: Record<string, RGB> = { error: NEG, warn: [180, 83, 9], ok: POS }
   const checks = r.checks
-  y = pdf.table({
-    startY: y, head: [[T.level, T.check]], body: checks.map((c) => [L.levels[c.level] ?? c.level, checkMessage(c, lang)]),
+  y = pdf.headedTable(T.checks, y, {
+    head: [[T.level, T.check]], body: checks.map((c) => [L.levels[c.level] ?? c.level, checkMessage(c, lang)]),
     columnStyles: { 0: { cellWidth: 24, fontStyle: 'bold' } },
     didParseCell: (d) => { if (d.section === 'body' && d.column.index === (pdf.rtl ? 1 : 0)) d.cell.styles.textColor = lvlColor[checks[d.row.index]?.level] ?? SLATE },
   }) + 7
@@ -346,9 +380,8 @@ export async function buildTechnicalPdf(p: Project, r: Results, companyIn: Compa
   const kv = { 0: { cellWidth: 40, fontStyle: 'bold' as const, textColor: INK }, 1: { cellWidth: 46 } }
   if (r.demand === 'bill') {
     const B = T.billRows, b = sz.bill
-    y = pdf.heading(T.bill, y)
-    y = pdf.table({
-      startY: y, head: [[T.param, T.value, T.basis]], columnStyles: kv,
+    y = pdf.headedTable(T.bill, y, {
+      head: [[T.param, T.value, T.basis]], columnStyles: kv,
       body: [
         [B.monthly, `${fmt(b.monthlyKwh)} kWh`, ''],
         [B.daily, `${fmt(r.dailyWh / 1000, 2)} kWh`, `${fmt(b.monthlyKwh)} / 30.4`],
@@ -364,9 +397,8 @@ export async function buildTechnicalPdf(p: Project, r: Results, companyIn: Compa
     y = pdf.heading(T.basisTitle, y)
     y = pdf.text(T.noDemand(sizeSummary(r) || '—') + (r.arrayKwp > 0 ? T.assumeSelfUse : ''), pdf.x(pdf.M), y, { size: 8.5, color: SLATE, maxWidth: pdf.contentW, align: pdf.start }) + 5
   } else {
-    y = pdf.heading(T.loads, y)
-    y = pdf.table({
-      startY: y, head: [T.loadCols],
+    y = pdf.headedTable(T.loads, y, {
+      head: [T.loadCols],
       body: [
         ...p.loads.map((l) => [loadName(l, lang), fmt(l.watts), fmt(l.qty), num(l.hoursPerDay, 2), fmt(l.nightSharePct), num(l.surgeFactor, 2), fmt(l.watts * l.qty * l.hoursPerDay)]),
         [{ content: T.total, styles: { fontStyle: 'bold', textColor: INK } }, fmt(r.connectedW), '', '', fmt(r.dailyWh ? (r.nightWh / r.dailyWh) * 100 : 0), '', { content: fmt(r.dailyWh), styles: { fontStyle: 'bold', textColor: INK } }],
@@ -381,26 +413,24 @@ export async function buildTechnicalPdf(p: Project, r: Results, companyIn: Compa
   if (exParts.length) y = pdf.text(`${T.existing}: ${T.existingVal(exParts.join(lang === 'ar' ? '، ' : ', '))}`, pdf.x(pdf.M), y, { size: 8.3, color: SLATE, maxWidth: pdf.contentW, align: pdf.start }) + 4
 
   // PV sizing (none for a battery-backup system)
-  y = pdf.heading(T.pv, y)
   if (r.arrayKwp > 0) {
     const dcacTarget = num(p.design.dcAcRatio, 2)
     const pvBasis = tg.pvKwp != null && tg.pvKwp > 0 ? T.fixedPv(num(tg.pvKwp, 2)) : r.demand === 'none' ? T.pvFromInv(num(tg.inverterKw ?? r.requiredInverterKw, 2), dcacTarget) : T.requiredPvBasis(num(p.design.pvOversize, 2))
-    y = pdf.table({
-      startY: y, head: [[T.param, T.value, T.basis]], columnStyles: kv,
+    y = pdf.headedTable(T.pv, y, {
+      head: [[T.param, T.value, T.basis]], columnStyles: kv,
       body: [
         [T.psh, T.tilted(fmt(p.site.psh, 2), fmt(r.tiltedPsh, 2)), T.tiltBasis(num(r.tiltGainUsed > 0 ? r.tiltGainUsed : p.site.tiltGainFactor, 3), fmt(p.site.tiltDeg))],
         [T.derate, `${fmt(r.derate * 100, 1)}%`, r.derateBreakdown.map((b) => `${derateName(b, lang, L)} ${b.factor.toFixed(2)}`).join(' × ')],
         [T.requiredPv, `${fmt(r.requiredPvKwp, 3)} kWp`, pvBasis],
-        [T.array, `${r.panelQty} × ${r.panel.watts} W = ${fmt(r.arrayKwp, 2)} kWp`, `${r.panel.brand} ${r.panel.model} · Voc ${r.panel.voc} V · Vmp ${r.panel.vmp} V · Isc ${r.panel.isc} A · ${r.panel.tempCoeffPmaxPctPerC}%/°C`],
+        [T.array, `${r.panelQty} × ${r.panel.watts} W = ${fmt(r.arrayKwp, 2)} kWp`, `${productName(r.panel)} · Voc ${r.panel.voc} V · Vmp ${r.panel.vmp} V · Isc ${r.panel.isc} A · ${r.panel.tempCoeffPmaxPctPerC}%/°C`],
         [T.areaWeight, `${fmt(r.arrayAreaM2, 1)} m² / ${fmt(r.arrayWeightKg)} kg`, T.areaBasis(String(r.panel.lengthMm), String(r.panel.widthMm), num(r.panel.weightKg, 1))],
         [T.production, `${fmt(r.annualProductionKwh)} kWh`, T.specYield(fmt(r.specificYield))],
       ],
     }) + 7
-  } else y = pdf.text(T.noPv, pdf.x(pdf.M), y, { size: 8.5, color: SLATE, maxWidth: pdf.contentW, align: pdf.start }) + 6
+  } else y = pdf.text(T.noPv, pdf.x(pdf.M), pdf.heading(T.pv, y), { size: 8.5, color: SLATE, maxWidth: pdf.contentW, align: pdf.start }) + 6
 
   // Inverter & strings
   if (r.inverter) {
-    y = pdf.heading(T.inverter, y)
     const inv = r.inverter, st = r.strings
     const dcac = r.dcAcRatio > 0 ? r.dcAcRatio : r.inverterTotalKw > 0 ? r.arrayKwp / r.inverterTotalKw : 0
     const vLimit = st?.maxSystemVoltageV ?? inv.maxPvVoltage
@@ -409,7 +439,7 @@ export async function buildTechnicalPdf(p: Project, r: Results, companyIn: Compa
         : T.requiredInvBasis(num(p.design.inverterSafety, 2), fmt(r.surgeW / 1000, 1))
     const rows: string[][] = [
       [T.required, `${fmt(r.requiredInverterKw, 2)} kW`, invBasis],
-      [T.selected, `${r.inverterQty} × ${inv.brand} ${inv.model}`, T.invBasis({ kw: num(inv.ratedAcKw, 1), surge: num(inv.surgeKw, 1), pv: num(inv.maxPvInputKw, 1), mppt: String(inv.mpptCount), amps: num(inv.maxInputCurrentPerMppt, 1), vmin: fmt(inv.mpptMinV), vmax: fmt(inv.mpptMaxV), vabs: fmt(inv.maxPvVoltage) })],
+      [T.selected, `${r.inverterQty} × ${productName(inv)}`, T.invBasis({ kw: num(inv.ratedAcKw, 1), surge: num(inv.surgeKw, 1), pv: num(inv.maxPvInputKw, 1), mppt: String(inv.mpptCount), amps: num(inv.maxInputCurrentPerMppt, 1), vmin: fmt(inv.mpptMinV), vmax: fmt(inv.mpptMaxV), vabs: fmt(inv.maxPvVoltage) })],
       [T.dcac, fmt(dcac, 2), T.dcacBasis],
     ]
     if (st) {
@@ -418,7 +448,7 @@ export async function buildTechnicalPdf(p: Project, r: Results, companyIn: Compa
       rows.push([T.vmpHot, `${fmt(st.vmpHot)} V`, T.vmpBasis(fmt(p.site.ambientHighC + 31), fmt(inv.mpptMinV), st.vmpHot >= inv.mpptMinV)])
       rows.push([T.isc, `${num(st.stringIscA, 2)} A`, T.iscBasis(num(inv.maxInputCurrentPerMppt, 1), st.stringIscA <= inv.maxInputCurrentPerMppt)])
     }
-    y = pdf.table({ startY: y, head: [[T.param, T.value, T.basis]], body: rows, columnStyles: kv }) + 2.5
+    y = pdf.headedTable(T.inverter, y, { head: [[T.param, T.value, T.basis]], body: rows, columnStyles: kv }) + 2.5
     const notes = (lang === 'ar' && st?.notesAr?.length ? st.notesAr : st?.notes) ?? []
     for (const nt of notes) y = pdf.text(`• ${nt}`, pdf.x(pdf.M), y + 1, { size: 7.8, color: MUTED, maxWidth: pdf.contentW, align: pdf.start })
     y += 5
@@ -426,7 +456,6 @@ export async function buildTechnicalPdf(p: Project, r: Results, companyIn: Compa
 
   // Battery
   if (r.batteryQty > 0) {
-    y = pdf.heading(T.battery, y)
     const { battery } = batteryInfo(p, r)
     const auto = autonomyOf(p, r)
     const busV = p.design.systemVoltage === 'hv' ? (battery?.nominalVoltage ?? 'HV') : p.design.systemVoltage
@@ -436,19 +465,18 @@ export async function buildTechnicalPdf(p: Project, r: Results, companyIn: Compa
     const atLoads = backupLoads(r).map((kw) => L.pdf.backupAt(num(backupHoursAt(r, kw), 1), num(kw, 2))).join(lang === 'ar' ? '، ' : ', ')
     const rows: string[][] = [
       [T.required, `${fmt(r.batteryRequiredKwh, 2)} kWh`, battBasis],
-      [T.bank, `${r.batteryQty} × ${battery ? `${battery.brand} ${battery.model}` : '—'}`, T.bankBasis(String(r.batteryConfig.series), String(r.batteryConfig.parallel), fmt(r.batteryKwh, 2), fmt(r.batteryAh), String(busV))],
+      [T.bank, `${r.batteryQty} × ${battery ? productName(battery) : '—'}`, T.bankBasis(String(r.batteryConfig.series), String(r.batteryConfig.parallel), fmt(r.batteryKwh, 2), fmt(r.batteryAh), String(busV))],
       [T.usable, `${fmt(r.batteryUsableKwh, 2)} kWh`, auto ? (auto.offgrid || auto.hours > 72 ? L.pdf.autonomyDays(num(auto.days, 1)) : L.pdf.backupHours(num(auto.hours, 0))) : atLoads || '—'],
     ]
-    if (r.controller) rows.push([T.controller, `${r.controllerQty} × ${r.controller.brand} ${r.controller.model}`, T.ctrlBasis(fmt(r.requiredControllerA))])
+    if (r.controller) rows.push([T.controller, `${r.controllerQty} × ${productName(r.controller)}`, T.ctrlBasis(fmt(r.requiredControllerA))])
     if (r.generatorKva) rows.push([T.generator, `${num(r.generatorKva, 1)} kVA`, T.genBasis])
-    y = pdf.table({ startY: y, head: [[T.param, T.value, T.basis]], body: rows, columnStyles: kv }) + 7
+    y = pdf.headedTable(T.battery, y, { head: [[T.param, T.value, T.basis]], body: rows, columnStyles: kv }) + 7
   }
 
   // Cables & protection
-  y = pdf.heading(T.cables, y)
   const cables: CableResult[] = r.cableSchedule?.length ? r.cableSchedule : r.cables
-  y = pdf.table({
-    startY: y, head: [T.cableCols],
+  y = pdf.headedTable(T.cables, y, {
+    head: [T.cableCols],
     body: cables.map((c) => [cableLabel(c, lang, L), `${num(c.currentA, 1)} A`, `${fmt(c.voltage)} V`, `${num(c.lengthM, 1)} m`, cableSize(c, L), `${num(c.dropPct, 2)}%`, cableDevice(c, L)]),
     columnStyles: { 0: { cellWidth: 34 }, 1: { ...right, cellWidth: 16 }, 2: { ...right, cellWidth: 15 }, 3: { ...right, cellWidth: 13 }, 4: { cellWidth: 44 }, 5: { ...right, cellWidth: 14 } },
     didParseCell: (d) => { if (d.section === 'body' && cables[d.row.index]?.deviceStd === false) d.cell.styles.textColor = NEG },
@@ -458,10 +486,9 @@ export async function buildTechnicalPdf(p: Project, r: Results, companyIn: Compa
   // Protective devices (ratings that drive the BOM)
   const prot = protectionRows(r, L)
   if (prot.length) {
-    y = pdf.heading(T.protection, y)
     const pairs: string[][] = []
     for (let i = 0; i < prot.length; i += 2) pairs.push([prot[i][0], prot[i][1], prot[i + 1]?.[0] ?? '', prot[i + 1]?.[1] ?? ''])
-    y = pdf.table({ startY: y, body: pairs, columnStyles: { 0: { cellWidth: 46, textColor: MUTED }, 1: { cellWidth: 45, textColor: INK }, 2: { cellWidth: 46, textColor: MUTED }, 3: { cellWidth: 45, textColor: INK } } }) + 7
+    y = pdf.headedTable(T.protection, y, { body: pairs, columnStyles: { 0: { cellWidth: 46, textColor: MUTED }, 1: { cellWidth: 45, textColor: INK }, 2: { cellWidth: 46, textColor: MUTED }, 3: { cellWidth: 45, textColor: INK } } }) + 7
   }
 
   // Internal pricing summary (from the quote: matches the Pricing step and the Excel workbook)
@@ -483,21 +510,21 @@ export async function buildTechnicalPdf(p: Project, r: Results, companyIn: Compa
   }) + 7
 
   // Costed BOM
-  y = pdf.heading(T.costedBom, y, q.currency)
   const body: Body = []
   let n = 0
   for (const c of Array.from(new Set(q.lines.map((l) => l.category)))) {
     body.push([{ content: categoryName(c, L), colSpan: 8, styles: { fontStyle: 'bold', fillColor: tint(pdf.brand, 0.9), textColor: pdf.brand, halign: 'left' } }])
     for (const l of q.lines.filter((x) => x.category === c)) {
       n++
-      body.push([String(n), lineName(l, lang, L), qtyText(l.qty), unitName(l.unit, L), N(l.unitCost), N(l.totalCost), N(l.unitSell), N(l.totalSell)])
+      const onSite = existingQtyOf(r, l.id)
+      body.push([String(n), [lineName(l, lang, L), onSite > 0 ? L.pdf.existingLine(qtyText(onSite)) : ''].filter(Boolean).join(' · '), qtyText(l.qty), unitName(l.unit, L), N(l.unitCost), N(l.totalCost), N(l.unitSell), N(l.totalSell)])
     }
   }
   body.push([{ content: '', colSpan: 5 }, { content: N(q.costSubtotal), styles: strong }, '', { content: N(q.sellSubtotal), styles: strong }])
-  pdf.table({
-    startY: y, head: [T.costCols], body, styles: { fontSize: 7.6 }, alternateRowStyles: { fillColor: WHITE },
+  pdf.headedTable(T.costedBom, y, {
+    head: [T.costCols], body, styles: { fontSize: 7.6 }, alternateRowStyles: { fillColor: WHITE },
     columnStyles: { 0: { cellWidth: 7, halign: 'center', textColor: MUTED }, 1: { cellWidth: 57 }, 2: { cellWidth: 15, halign: 'right' }, 3: { cellWidth: 16 }, 4: { cellWidth: 21, halign: 'right' }, 5: { cellWidth: 22, halign: 'right' }, 6: { cellWidth: 21, halign: 'right' }, 7: { cellWidth: 23, halign: 'right' } },
-  })
+  }, q.currency)
 
   pdf.footer(company, L.pdf.page, L.brand)
   return pdf.blob()

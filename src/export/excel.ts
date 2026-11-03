@@ -9,7 +9,7 @@ import { buildQuote, roundTo } from '../engine/quote'
 import { DAYS_IN_MONTH } from '../engine/standards'
 import {
   labelsFor, fmtDate, num, systemName, phaseName, locationName, unitName, categoryName, lineName, lineSpec, loadName, loadCategory,
-  derateName, checkMessage, batteryInfo, autonomyOf, escalationPct, localizeCompany, cableLabel, cableSize, cableDevice, protectionRows, unitDecimals, INV_EFF_BATT,
+  derateName, checkMessage, batteryInfo, autonomyOf, escalationPct, docCompany, docTitle, productName, cableLabel, cableSize, cableDevice, protectionRows, unitDecimals, INV_EFF_BATT,
   sizingOf, existingQtyOf, type ExportLang,
 } from './common'
 
@@ -20,7 +20,7 @@ const INT = '#,##0', DEC = '#,##0.00', DEC3 = '#,##0.000', PCT = '0.0%'
 
 export async function buildExcel(p: Project, r: Results, companyIn: CompanySettings, lang: ExportLang, opts: { now?: Date } = {}): Promise<Blob> {
   const L = labelsFor(lang), X = L.xl, S = X.summary, Z = X.sz, U = X.u
-  const company = localizeCompany(companyIn, lang)
+  const company = docCompany(companyIn, lang)
   const q = buildQuote(p, r)
   const rtl = lang === 'ar'
   const now = opts.now ?? new Date()
@@ -34,7 +34,7 @@ export async function buildExcel(p: Project, r: Results, companyIn: CompanySetti
   const MONEY3 = cur === 'USD' ? '"$"#,##0.000' : `#,##0.000 "${cur}"`
 
   const wb = new ExcelJS.Workbook()
-  wb.creator = `${company.name} · DT+ Solar Planner`; wb.created = now
+  wb.creator = [company.name, 'DT+ Solar Planner'].filter((x) => x?.trim()).join(' · '); wb.created = now
   const sheet = (name: string) => wb.addWorksheet(name, {
     properties: { tabColor: { argb: BRAND } },
     pageSetup: { paperSize: 9, orientation: 'portrait', fitToPage: true, fitToWidth: 1, fitToHeight: 0 },
@@ -107,7 +107,7 @@ export async function buildExcel(p: Project, r: Results, companyIn: CompanySetti
   const { rCost, rSell, rMk, rDisc, rVat, rTot } = fillBom(b, X.bomSub)
 
   // ---------------------------------------------------------------- Summary
-  title(s, p.name, [company.name, p.reference, fmtDate(now), L.brand].filter((x) => x?.trim()).join(' · '))
+  title(s, docTitle(p, r, lang), [company.name, p.reference, fmtDate(now), L.brand].filter((x) => x?.trim()).join(' · '))
   s.columns = [{ width: 36 }, { width: 44 }, { width: 14 }, { width: 60 }]
   header(s, 4, [X.param, X.value, X.unit])
   const add = (k: string, v: Cell, u = '', fmtStr?: string) => {
@@ -125,16 +125,16 @@ export async function buildExcel(p: Project, r: Results, companyIn: CompanySetti
   if (noPv) add(S.array, X.noPv)
   else {
     add(S.derate, r.derate, '', PCT); add(S.requiredPv, r.requiredPvKwp, U.kwp, DEC3); add(S.array, r.arrayKwp, U.kwp)
-    add(S.panels, `${r.panelQty} × ${r.panel.brand} ${r.panel.model} (${r.panel.watts} W)`); add(S.area, r.arrayAreaM2, U.m2, '#,##0.0')
+    add(S.panels, `${r.panelQty} × ${productName(r.panel)} (${r.panel.watts} W)`); add(S.area, r.arrayAreaM2, U.m2, '#,##0.0')
     add(S.production, r.annualProductionKwh, U.kwhYr, INT); add(S.yield, r.specificYield, 'kWh/kWp', INT)
   }
   if (r.batteryQty > 0) {
     add(S.battery, r.batteryKwh, U.kwh)
-    add(S.battUnits, `${r.batteryQty} × ${battery ? `${battery.brand} ${battery.model}` : '—'} (${r.batteryConfig.series}S × ${r.batteryConfig.parallel}P)`)
+    add(S.battUnits, `${r.batteryQty} × ${battery ? productName(battery) : '—'} (${r.batteryConfig.series}S × ${r.batteryConfig.parallel}P)`)
     add(S.usable, r.batteryUsableKwh, U.kwh)
     if (auto && Number.isFinite(auto.days)) add(S.autonomy, Math.round(auto.days * 100) / 100, U.days)
   }
-  add(S.inverter, r.inverter ? `${r.inverterQty} × ${r.inverter.brand} ${r.inverter.model}` : '—'); add(S.invCap, r.inverterTotalKw, U.kw)
+  add(S.inverter, r.inverter ? `${r.inverterQty} × ${productName(r.inverter)}` : '—'); add(S.invCap, r.inverterTotalKw, U.kw)
   if (r.generatorKva) add(S.generator, r.generatorKva, U.kva)
   s.addRow([])
   s.addRow([S.pricing]).getCell(1).font = { bold: true, color: { argb: BRAND } }
@@ -241,7 +241,7 @@ export async function buildExcel(p: Project, r: Results, companyIn: CompanySetti
       reqPv = p.site.psh * tilt * r.derate > 0 ? daily / (p.site.psh * tilt * r.derate) * p.design.pvOversize : 0
       rReq = Zr(Z.requiredPv, f(`IF(B${rPsh}*B${rTilt}*B${rDer}>0,B${rDaily}/(B${rPsh}*B${rTilt}*B${rDer})*B${rOver},0)`, reqPv), U.kwp, `${Z.requiredPvNote} · ${X.planner(num(r.requiredPvKwp, 3))}`, DEC3)
     }
-    const rPw = Zr(Z.moduleW, r.panel.watts, 'W', `${r.panel.brand} ${r.panel.model}`, INT)
+    const rPw = Zr(Z.moduleW, r.panel.watts, 'W', productName(r.panel), INT)
     Zr(Z.panelsTheory, f(`CEILING(B${rReq}*1000/B${rPw},1)`, Math.ceil(Math.round((reqPv * 1000) / r.panel.watts * 1e6) / 1e6)), U.pcs, Z.panelsTheoryNote, INT)
     Zr(Z.panelsFinal, r.panelQty, U.pcs, r.strings ? Z.stringsNote(String(r.strings.strings), String(r.strings.panelsPerString)) : '', INT)
     Zr(Z.array, r.arrayKwp, U.kwp)
@@ -275,7 +275,7 @@ export async function buildExcel(p: Project, r: Results, companyIn: CompanySetti
     const rSaf = Zr(Z.safety, p.design.inverterSafety)
     Zr(Z.reqInv, f(`B${rPeak}*B${rSaf}`, (r.peakW / 1000) * p.design.inverterSafety), U.kw, X.planner(num(r.requiredInverterKw, 2)))
   }
-  Zr(Z.selInv, r.inverter ? `${r.inverterQty} × ${r.inverter.brand} ${r.inverter.model}` : '—', '', r.inverter ? Z.invNote(num(r.inverterTotalKw, 1), num(r.inverter.surgeKw * r.inverterQty, 1), num(r.inverter.maxPvInputKw * r.inverterQty, 1)) : '')
+  Zr(Z.selInv, r.inverter ? `${r.inverterQty} × ${productName(r.inverter)}` : '—', '', r.inverter ? Z.invNote(num(r.inverterTotalKw, 1), num(r.inverter.surgeKw * r.inverterQty, 1), num(r.inverter.maxPvInputKw * r.inverterQty, 1)) : '')
   if (r.strings && r.inverter) {
     z.addRow([]); bold(z.addRow([Z.strings]))
     Zr(Z.pps, r.strings.panelsPerString, U.pcs, '', INT)

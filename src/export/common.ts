@@ -62,12 +62,12 @@ export const categoryName = (c: string, L: ExportLabels) => L.cats[c] ?? c
 
 type NamedLine = Pick<BomLine, 'id' | 'name' | 'spec' | 'source'> & { nameAr?: string; specAr?: string }
 export function lineName(l: NamedLine, lang: ExportLang, L: ExportLabels) {
-  // Custom lines added from the catalogue carry the product's Arabic name; typed lines print as typed
-  if (l.source === 'custom') return ((lang === 'ar' && l.nameAr?.trim()) || l.name?.trim()) || '—'
+  // Custom lines added from the catalogue carry the product's Arabic name; typed lines print as typed (units spaced: "48 V")
+  if (l.source === 'custom') return unitSpace(((lang === 'ar' && l.nameAr?.trim()) || l.name?.trim()) || '—')
   if (L.services[l.id]) return L.services[l.id]
-  return (lang === 'ar' && l.nameAr) || l.name
+  return unitSpace((lang === 'ar' && l.nameAr) || l.name)
 }
-export const lineSpec = (l: NamedLine, lang: ExportLang) => (lang === 'ar' && l.specAr) || l.spec || ''
+export const lineSpec = (l: NamedLine, lang: ExportLang) => unitSpace((lang === 'ar' && l.specAr) || l.spec || '')
 
 const applianceByName = new Map(appliances.map((a) => [a.name.trim().toLowerCase(), a]))
 for (const a of appliances) if (a.nameAr) applianceByName.set(a.nameAr.trim(), a)
@@ -134,6 +134,13 @@ export function sizeSummary(r: Results) {
 }
 /** Units of a BOM line already on site (expansion projects), 0 when none. */
 export const existingQtyOf = (r: Results, id: string) => r.bom.find((b) => b.id === id)?.existingQty ?? 0
+/** Main-equipment lines entirely on site (qty 0, existingQty > 0): never priced; client documents list them in a note. */
+export const onSiteOnlyLines = (r: Results) => r.bom.filter((b) => !(b.qty > 0) && (b.existingQty ?? 0) > 0)
+/** "Existing equipment (not quoted): 4 × Jinko … already on site." — '' when nothing is entirely on site. */
+export function existingNote(r: Results, lang: ExportLang, L: ExportLabels) {
+  const xs = onSiteOnlyLines(r)
+  return xs.length ? L.pdf.existingNote(xs.map((b) => L.pdf.existingItem(qtyText(b.existingQty ?? 0), lineName(b, lang, L))).join(lang === 'ar' ? '، ' : '; ')) : ''
+}
 
 /** Roof / ground area to reserve (with row spacing when the engine reports the footprint). */
 export const footprintM2 = (r: Results) => (r.footprintM2 > 0 ? r.footprintM2 : r.arrayAreaM2 * 1.15)
@@ -148,15 +155,106 @@ const defaultsFor = (l: ExportLang) => ({
   tagline: norm(uiDefaults(l).defaultTagline) || (l === 'ar' ? '' : defaultCompany.tagline),
   terms: l === 'ar' ? norm(uiDefaults('ar').defaultTerms) || exportLabels.ar.pdf.defaultTerms : norm(uiDefaults('en').defaultTerms) || defaultCompany.terms,
 })
-const known = (k: 'name' | 'tagline' | 'terms') => new Set([norm(defaultCompany[k]), defaultsFor('en')[k], defaultsFor('ar')[k], k === 'terms' ? norm(exportLabels.ar.pdf.defaultTerms) : ''].filter(Boolean))
-export const isDefaultCompanyName = (c: CompanySettings) => !norm(c.name) || known('name').has(norm(c.name))
-/** Company settings with untouched placeholder texts swapped to the document language. */
+type CompanyText = 'name' | 'tagline' | 'terms'
+const known = (k: CompanyText) => new Set([norm(defaultCompany[k]), defaultsFor('en')[k], defaultsFor('ar')[k], k === 'terms' ? norm(exportLabels.ar.pdf.defaultTerms) : ''].filter(Boolean))
+const AR_KEY = { name: 'nameAr', tagline: 'taglineAr', terms: 'termsAr' } as const
+/** The company's own text for a document language: the Arabic field for Arabic documents, the main field for English, each falling back to the other; '' when only placeholders are left. */
+function ownText(c: CompanySettings, k: CompanyText, lang: ExportLang) {
+  const real = (v?: string | null) => (norm(v) && !known(k).has(norm(v)) ? norm(v) : '')
+  const main = real(c[k]), ar = real(c[AR_KEY[k]])
+  return lang === 'ar' ? ar || main : main || ar
+}
+/** true when the company has no name of its own (empty or the placeholder) in either language. */
+export const isDefaultCompanyName = (c: CompanySettings) => !ownText(c, 'name', 'en')
+/** Company name printed on a document in this language; '' while it is still the placeholder (documents then leave it off). */
+export const companyNameFor = (c: CompanySettings, lang: ExportLang) => ownText(c, 'name', lang)
+/**
+ * Company settings for a document language: Arabic name / tagline / terms for Arabic documents and the main ones for English
+ * (each falling back to the other), with untouched placeholder texts swapped to the document language.
+ */
 export function localizeCompany(c: CompanySettings, lang: ExportLang): CompanySettings {
   const d = defaultsFor(lang)
-  const pick = (k: 'name' | 'tagline' | 'terms') => (known(k).has(norm(c[k])) ? d[k] || c[k] : c[k])
+  const pick = (k: CompanyText) => ownText(c, k, lang) || d[k] || norm(c[k])
   return { ...c, name: pick('name'), tagline: pick('tagline'), terms: pick('terms') }
 }
+/**
+ * Company as printed on a document: localized, and without the placeholder name — a document never shows "Your Solar Company"
+ * (the header then has the logo and contact only). The placeholder tagline goes with the placeholder name.
+ */
+export function docCompany(c: CompanySettings, lang: ExportLang): CompanySettings {
+  const l = localizeCompany(c, lang)
+  const name = companyNameFor(c, lang)
+  return { ...l, name, tagline: name || ownText(c, 'tagline', lang) ? l.tagline : '' }
+}
 export const termsText = (c: CompanySettings, lang: ExportLang) => norm(localizeCompany(c, lang).terms)
+
+// ---- document identity: title, file names, savings section
+const DEFAULT_PROJECT_NAMES = new Set([uiEn.info.defaultName, uiAr.info.defaultName, uiEn.info.defaultQuoteName, uiAr.info.defaultQuoteName, 'New solar project'].map(norm))
+/** Empty or an untouched default project name ("New quote", «عرض سعر جديد» …). */
+export const isDefaultProjectName = (name?: string | null) => !norm(name) || DEFAULT_PROJECT_NAMES.has(norm(name))
+/** "5.8 kWp hybrid" / «نظام هجين 5.8 kWp» / "10 kWh battery backup"; '' for a product quote or an empty design. */
+export function systemDescriptor(p: Project, r: Results, L: ExportLabels) {
+  if (r.mode === 'items') return ''
+  if (r.arrayKwp > 0) return L.pdf.descriptor(num(Math.round(r.arrayKwp * 10) / 10, 1), L.pdf.sysShort[p.design.systemType] ?? p.design.systemType)
+  return r.batteryKwh > 0 ? L.pdf.descriptorBackup(num(Math.round(r.batteryKwh * 10) / 10, 1)) : ''
+}
+/**
+ * Project title printed on the documents and used for the file name: the project name, or — while it is still a default name —
+ * the client name with a short system descriptor ("Osman Ali — 5.8 kWp hybrid"), else the reference.
+ */
+export function docTitle(p: Project, r: Results, lang: ExportLang) {
+  if (!isDefaultProjectName(p.name)) return norm(p.name)
+  const client = norm(p.clientName), desc = systemDescriptor(p, r, labelsFor(lang))
+  if (client) return desc ? `${client} — ${desc}` : client
+  return norm(p.reference) || desc || '—'
+}
+/** File-name stem: reference + document title (the reference once when the title is the reference). */
+export function docFileStem(p: Project, r: Results, lang: ExportLang) {
+  const ref = norm(p.reference), title = docTitle(p, r, lang)
+  return !ref || title === ref ? fileStem(title === '—' ? '' : title) : `${fileStem(ref)}_${fileStem(title)}`
+}
+/** Longest download file name (UTF-8 bytes): well under the 255-byte limit of common file systems and share targets. */
+export const MAX_FILE_NAME_BYTES = 120
+// Measured decomposed (NFD): macOS and some share targets store names decomposed, and «ؤ», «أ» … take 2 more bytes there
+const utf8Len = (s: string) => new TextEncoder().encode(s.normalize('NFD')).length
+/** Cut to at most `max` UTF-8 bytes on a character boundary, without a dangling separator. */
+export function capBytes(s: string, max: number) {
+  if (utf8Len(s) <= max) return s
+  let out = '', n = 0
+  for (const ch of s) { const b = utf8Len(ch); if (n + b > max) break; out += ch; n += b }
+  return out.replace(/[_.\-\s]+$/, '')
+}
+/** Download file name: `<stem>-<suffix>.<ext>` (no suffix: `<stem>.<ext>`), the stem shortened so the whole name stays ≤ 120 bytes. */
+export function docFileName(p: Project, r: Results, lang: ExportLang, suffix: string, ext: string) {
+  const tail = `${suffix ? '-' + suffix : ''}.${ext}`
+  return `${capBytes(docFileStem(p, r, lang), MAX_FILE_NAME_BYTES - utf8Len(tail)) || 'solar-project'}${tail}`
+}
+/** Payback above this (years) hides savings and payback from the proposal in automatic mode. */
+export const FINANCE_MAX_PAYBACK_YEARS = 12
+export type FinanceReason = 'na' | 'off' | 'on' | 'ok' | 'no-savings' | 'payback'
+/**
+ * Does the client proposal show the savings and payback tiles, the cash flow and the financial note? `project.proposalFinance`:
+ * true / false, or missing → automatic: only when the system saves money and pays back within 12 years. Never without panels
+ * (battery backup only) or for a product quote.
+ */
+export function proposalFinance(p: Project, r: Results): { show: boolean; auto: boolean; reason: FinanceReason } {
+  const auto = p.proposalFinance == null
+  if (r.mode === 'items' || isBackupOnly(r) || !(r.annualProductionKwh > 0)) return { show: false, auto, reason: 'na' }
+  if (p.proposalFinance === true) return { show: true, auto, reason: 'on' }
+  if (p.proposalFinance === false) return { show: false, auto, reason: 'off' }
+  if (!(r.annualSavingsUsd > 0) || r.paybackYears == null || !Number.isFinite(r.paybackYears)) return { show: false, auto, reason: 'no-savings' }
+  return r.paybackYears <= FINANCE_MAX_PAYBACK_YEARS ? { show: true, auto, reason: 'ok' } : { show: false, auto, reason: 'payback' }
+}
+/** Cost per kWh the savings are valued at (USD): the blended avoided cost from the engine, else the grid tariff. */
+export const avoidedCostUsd = (p: Project, r: Results) => (Number.isFinite(r.avoidedCostUsdPerKwh) && r.avoidedCostUsdPerKwh > 0 ? r.avoidedCostUsdPerKwh : p.site.gridTariff)
+
+// Catalogue model names print units without a space ("580W", "51.2V 200Ah"): documents use "580 W". Only a number that does not
+// follow a letter is touched, so model codes such as JKM580N or SUN-8K stay as they are.
+const UNIT_GLUED = /(?<![A-Za-z0-9.,])(\d+(?:[.,]\d+)?)(kWp|kWh|kW|kVA|MWh|Wp|Wh|Ah|V|A|W)(?![A-Za-z0-9²³])/g
+/** "51.2V 200Ah" → "51.2 V 200 Ah" (catalogue names and specs on documents). */
+export const unitSpace = (s: string) => String(s ?? '').replace(UNIT_GLUED, '$1 $2')
+/** Brand + model of a catalogue product as printed on documents. */
+export const productName = (x: { brand: string; model: string }) => unitSpace(`${x.brand} ${x.model}`)
 
 // ---- cable schedule & protection (technical PDF and workbook)
 /** Circuit name (engine label in the document language), with the number of identical circuits. */
@@ -194,5 +292,6 @@ const CHECK_STEP: Record<string, StepKey> = {
 /** Step where a check is fixed: the engine's tag, else a sensible default. */
 export const checkStep = (c: Check): StepKey => c.step ?? CHECK_STEP[c.id] ?? (c.id.startsWith('fx') ? 'site' : c.id.startsWith('bom') ? 'bom' : 'design')
 
-/** File-name stem: keeps Arabic letters, drops characters that are illegal in file names. */
-export const fileStem = (name: string) => (name || 'solar-project').trim().replace(/[\\/:*?"<>|]+/g, '').replace(/[^\w؀-ۿ-]+/g, '_').replace(/^_+|_+$/g, '') || 'solar-project'
+/** File-name stem: keeps Arabic letters and decimal points ("5.8"), drops characters that are illegal in file names; ≤ 100 bytes. */
+export const fileStem = (name: string) => capBytes((name || 'solar-project').trim().replace(/[\\/:*?"<>|]+/g, '').replace(/(?<!\d)\.|\.(?!\d)/g, '_')
+  .replace(/[^\w؀-ۿ.-]+/g, '_').replace(/_+/g, '_').replace(/^_+|_+$/g, ''), 100) || 'solar-project'

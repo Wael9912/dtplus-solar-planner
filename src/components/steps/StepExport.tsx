@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ComponentType, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode } from 'react'
 import { FileSpreadsheet, FileText, FileJson, Wrench, Share2, Download, CircleCheck, CircleAlert, TriangleAlert, ArrowLeft, ArrowRight, LoaderCircle, Lock, Users, ReceiptText } from 'lucide-react'
 import { useT } from '../../i18n'
 import type { StepProps } from '../Wizard'
@@ -8,10 +8,14 @@ import { fmt } from '../../engine/format'
 import { formatQuoteMoney } from '../../engine/quote'
 import { download, shareFile, canShareFiles, isTouchDevice } from '../../export/download'
 import { exportLabels, type ExportLang } from '../../export/labels'
-import { checkMessage, checkStep, fileStem, isDefaultCompanyName, systemName, sizeSummary, sizingOf } from '../../export/common'
+import { checkMessage, checkStep, companyNameFor, docFileName, docTitle, proposalFinance, avoidedCostUsd, unitDecimals, systemName, sizeSummary, sizingOf } from '../../export/common'
 import { stepsFor } from '../wizardModel'
+import { Segmented } from '../ui'
+import { ConfirmDialog } from '../overlay'
 
 type DocKey = 'proposal' | 'quote' | 'tech' | 'excel' | 'json'
+/** Documents with cost prices: sharing them asks for confirmation first (download stays one tap). */
+const INTERNAL: DocKey[] = ['tech', 'excel']
 interface DocState { busy?: 'share' | 'download'; msg?: string; err?: string; pending?: { blob: Blob; name: string }; done?: boolean }
 type Icon = ComponentType<{ size?: number; className?: string }>
 
@@ -30,6 +34,14 @@ export function StepExport({ project: p, results: r, quote: q, update, goTo }: S
   const [docPick, setDocPick] = useState<{ ui: ExportLang; doc: ExportLang } | null>(null)
   const docLang: ExportLang = docPick?.ui === lang ? docPick.doc : lang
   const [st, setSt] = useState<Partial<Record<DocKey, DocState>>>({})
+  const [confirmShare, setConfirmShare] = useState<DocKey | null>(null)
+  // One file per tap: an action ignores repeat taps while it runs and for 600 ms after (a double tap never saves two files)
+  const lock = useRef<Partial<Record<DocKey, boolean>>>({})
+  const guard = async (k: DocKey, fn: () => Promise<void> | void) => {
+    if (lock.current[k]) return
+    lock.current[k] = true
+    try { await fn() } finally { window.setTimeout(() => { lock.current[k] = false }, 600) }
+  }
   const set = (k: DocKey, v: DocState) => setSt((s) => ({ ...s, [k]: v }))
   const canShare = useMemo(() => canShareFiles(), [])
   const shareFirst = useMemo(() => canShare && isTouchDevice(), [canShare])
@@ -52,6 +64,7 @@ export function StepExport({ project: p, results: r, quote: q, update, goTo }: S
   const bill = sizingOf(p).bill
   const profile = exportLabels[lang].pdf.profiles[bill.profile] ?? bill.profile
   const nLines = q.lines.length
+  const coName = companyNameFor(company, docLang)
   const demandItem = mode === 'items'
     ? { key: 'products', ok: nLines > 0, label: O.products, detail: nLines ? O.productsOk(nLines, formatQuoteMoney(q.total, q)) : O.productsMissing, fix: go('bom') }
     : mode === 'size'
@@ -64,26 +77,31 @@ export function StepExport({ project: p, results: r, quote: q, update, goTo }: S
     demandItem,
     { key: 'checks', ok: errors.length === 0, label: X.checks, detail: errors.length ? X.checksErr(errors.length) : X.checksOk, sub: errors.map((c) => ({ text: checkMessage(c, lang), go: go(checkStep(c)) })) },
     ...(nonUsd ? [{ key: 'fx', ok: fxOk, soft: true, label: X.fx, detail: fxOk ? X.fxOk(p.site.currency, fmt(p.site.fxRateToUsd, p.site.fxRateToUsd < 10 ? 4 : 2)) : X.fxMissing(p.site.currency), fix: go(mode === 'items' ? 'bom' : 'site') }] : []),
-    { key: 'company', ok: !isDefaultCompanyName(company), soft: true, label: X.company, detail: isDefaultCompanyName(company) ? X.companyMissing : X.companyOk(company.name), fix: () => setView('settings'), fixLabel: X.settings },
+    { key: 'company', ok: !!coName, soft: true, label: X.company, detail: coName ? X.companyOk(coName) : X.companyMissing, fix: () => setView('settings'), fixLabel: X.settings },
   ]
   const blocking = items.filter((i) => !i.ok && !i.soft).length
   const open = items.filter((i) => !i.ok).length
 
   // ---- file builders (export modules are loaded on demand so jsPDF / ExcelJS stay out of the main bundle)
-  const stem = `${p.reference ? fileStem(p.reference) + '_' : ''}${fileStem(p.name)}`
+  // File names: reference + project title (client and system while the project still has its default name) + document kind
+  // (capped at 120 bytes, the suffix kept)
+  const F = exportLabels[docLang].file
+  const fileName = (suffix: string, ext: string) => docFileName(p, r, docLang, suffix, ext)
+  const title = docTitle(p, r, docLang)
   const builders: Record<DocKey, () => Promise<{ blob: Blob; name: string }>> = {
-    proposal: async () => ({ blob: await (await import('../../export/pdf')).buildProposalPdf(p, r, company, docLang), name: `${stem}-proposal.pdf` }),
-    quote: async () => ({ blob: await (await import('../../export/pdf')).buildQuotationPdf(p, r, company, docLang), name: `${stem}-quotation.pdf` }),
-    tech: async () => ({ blob: await (await import('../../export/pdf')).buildTechnicalPdf(p, r, company, docLang), name: `${stem}-technical.pdf` }),
-    excel: async () => ({ blob: await (await import('../../export/excel')).buildExcel(p, r, company, docLang), name: `${stem}.xlsx` }),
-    json: async () => ({ blob: new Blob([JSON.stringify(p, null, 2)], { type: 'application/json' }), name: `${stem}.json` }),
+    proposal: async () => ({ blob: await (await import('../../export/pdf')).buildProposalPdf(p, r, company, docLang), name: fileName(F.proposal, 'pdf') }),
+    quote: async () => ({ blob: await (await import('../../export/pdf')).buildQuotationPdf(p, r, company, docLang), name: fileName(F.quotation, 'pdf') }),
+    tech: async () => ({ blob: await (await import('../../export/pdf')).buildTechnicalPdf(p, r, company, docLang), name: fileName(F.technical, 'pdf') }),
+    excel: async () => ({ blob: await (await import('../../export/excel')).buildExcel(p, r, company, docLang), name: fileName(F.workbook, 'xlsx') }),
+    json: async () => ({ blob: new Blob([JSON.stringify(p, null, 2)], { type: 'application/json' }), name: fileName('', 'json') }),
   }
-  const run = async (k: DocKey, mode: 'share' | 'download') => {
+  const run = (k: DocKey, mode: 'share' | 'download') => guard(k, () => runNow(k, mode))
+  const runNow = async (k: DocKey, mode: 'share' | 'download') => {
     set(k, { busy: mode })
     try {
       const { blob, name } = await builders[k]()
       if (mode === 'share') {
-        const res = await shareFile(blob, name, p.name)
+        const res = await shareFile(blob, name, title)
         if (res === 'shared') return set(k, { msg: X.shared, done: true })
         if (res === 'cancelled') return set(k, {})
         if (res === 'needs-gesture') return set(k, { pending: { blob, name } })
@@ -95,13 +113,13 @@ export function StepExport({ project: p, results: r, quote: q, update, goTo }: S
       console.error(e)
     }
   }
-  const sharePending = async (k: DocKey) => {
+  const sharePending = (k: DocKey) => guard(k, async () => {
     const pending = st[k]?.pending; if (!pending) return
-    const res = await shareFile(pending.blob, pending.name, p.name)
+    const res = await shareFile(pending.blob, pending.name, title)
     if (res === 'shared') set(k, { msg: X.shared, done: true })
     else if (res === 'cancelled') set(k, { pending })
     else { download(pending.blob, pending.name); set(k, { msg: X.downloaded(pending.name), done: true }) }
-  }
+  })
 
   // Render helpers (plain functions, not components, so buttons keep focus across re-renders)
   const actions = (k: DocKey, hero?: boolean) => {
@@ -112,11 +130,11 @@ export function StepExport({ project: p, results: r, quote: q, update, goTo }: S
     if (s.pending) return (
       <div className="flex flex-col gap-2 sm:flex-row">
         <button type="button" className="btn-primary min-h-11 flex-1 sm:flex-none" onClick={() => sharePending(k)} data-testid={`export-${k}-share-now`}><Share2 size={18} />{X.shareNow}</button>
-        <button type="button" className="btn-ghost min-h-11" onClick={() => { download(s.pending!.blob, s.pending!.name); set(k, { msg: X.downloaded(s.pending!.name), done: true }) }}><Download size={18} />{X.moreActions}</button>
+        <button type="button" className="btn-ghost min-h-11" onClick={() => { const pd = s.pending!; void guard(k, () => { download(pd.blob, pd.name); set(k, { msg: X.downloaded(pd.name), done: true }) }) }}><Download size={18} />{X.moreActions}</button>
       </div>
     )
     const shareBtn = canShare && (
-      <button type="button" disabled={busy} className={`${shareFirst ? primary : 'btn-secondary'} min-h-11 flex-1 sm:flex-none`} onClick={() => run(k, 'share')} data-testid={`export-${k}-share`}>
+      <button type="button" disabled={busy} className={`${shareFirst ? primary : 'btn-secondary'} min-h-11 flex-1 sm:flex-none`} onClick={() => (INTERNAL.includes(k) ? setConfirmShare(k) : run(k, 'share'))} data-testid={`export-${k}-share`}>
         {s.busy === 'share' ? spin : <Share2 size={18} />}{s.busy === 'share' ? X.preparing : X.share}
       </button>
     )
@@ -161,6 +179,30 @@ export function StepExport({ project: p, results: r, quote: q, update, goTo }: S
   )
   const notReady = blocking > 0 && <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">{X.proposalNotReady}</p>
 
+  // ---- savings & payback in the proposal: Auto (only when the payback helps the sale) / On / Off — project.proposalFinance
+  const fin = proposalFinance(p, r)
+  const finValue = p.proposalFinance == null ? 'auto' : p.proposalFinance ? 'on' : 'off'
+  const tariffLocal = avoidedCostUsd(p, r) * q.fx
+  const tariffText = formatQuoteMoney(tariffLocal, q, unitDecimals(tariffLocal))
+  const paybackText = r.paybackYears != null && Number.isFinite(r.paybackYears) ? fmt(r.paybackYears, 1) : '—'
+  const finHidden = fin.reason === 'payback' || fin.reason === 'no-savings'
+  const finNote = fin.reason === 'on' ? O.financeOnNote : fin.reason === 'off' ? O.financeOffNote : fin.reason === 'ok' ? O.financeAutoShown(paybackText)
+    : `${fin.reason === 'payback' ? O.financePayback(paybackText, tariffText) : O.financeNoSavings(tariffText)} ${O.financeHint[p.design.systemType] ?? ''}`.trim()
+  const financeControl = fin.reason !== 'na' && (
+    <div className="rounded-lg border border-slate-200 p-3" data-testid="export-finance">
+      <p className="text-sm font-medium text-slate-900" id="finance-label">{O.finance}</p>
+      <Segmented<'auto' | 'on' | 'off'> label={O.finance} className="mt-2" value={finValue}
+        onChange={(v) => update({ proposalFinance: v === 'auto' ? undefined : v === 'on' })}
+        options={(['auto', 'on', 'off'] as const).map((v) => ({ value: v, label: O.financeOpts[v], testId: `export-finance-${v}` }))} />
+      <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+        <p className={`min-w-0 flex-1 text-sm ${finHidden ? 'text-amber-800' : 'text-slate-600'}`} data-testid="export-finance-note" data-shown={fin.show}><bdi>{finNote}</bdi></p>
+        {finHidden && go('site') && (
+          <button type="button" className="btn-ghost min-h-11 shrink-0 px-3 text-brand-700" onClick={go('site')} data-testid="export-finance-fix">{O.financeFix}<Arrow size={16} aria-hidden="true" /></button>
+        )}
+      </div>
+    </div>
+  )
+
   return (
     <div className="space-y-4" data-testid="export-step">
       {/* Readiness checklist */}
@@ -179,7 +221,7 @@ export function StepExport({ project: p, results: r, quote: q, update, goTo }: S
                   <I size={20} className={`mt-0.5 shrink-0 ${tone}`} aria-hidden="true" />
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium text-slate-900">{it.label}</p>
-                    <p className="text-sm text-slate-600"><bdi>{it.detail}</bdi></p>
+                    <p className="min-w-0 text-sm text-slate-600 [overflow-wrap:anywhere]"><bdi>{it.detail}</bdi></p>
                   </div>
                   {!it.ok && it.fix && (
                     <button type="button" className="btn-ghost min-h-11 shrink-0 px-3 text-brand-700" onClick={it.fix} data-testid={`ready-${it.key}-fix`}>{it.fixLabel ?? X.fix}<Arrow size={16} aria-hidden="true" /></button>
@@ -189,7 +231,7 @@ export function StepExport({ project: p, results: r, quote: q, update, goTo }: S
                   <ul className="mt-1 space-y-1 ps-8">
                     {it.sub.map((s, i) => (
                       <li key={i} className="flex items-start justify-between gap-2">
-                        <span className="min-w-0 py-2 text-sm text-slate-700">{s.text}</span>
+                        <span className="min-w-0 py-2 text-sm text-slate-700 [overflow-wrap:anywhere]">{s.text}</span>
                         {s.go && <button type="button" className="btn-ghost min-h-11 shrink-0 px-3 text-brand-700" onClick={s.go} data-testid={`ready-check-fix-${i}`}>{X.fix}<Arrow size={16} aria-hidden="true" /></button>}
                       </li>
                     ))}
@@ -219,7 +261,7 @@ export function StepExport({ project: p, results: r, quote: q, update, goTo }: S
         <h3 className="eyebrow pt-2">{X.team}</h3>
         {docCard({ k: 'excel', icon: FileSpreadsheet, title: O.excelItems, help: O.excelItemsHelp, badge: internalBadge })}
       </> : <>
-        {docCard({ k: 'proposal', hero: true, icon: FileText, title: X.proposal, help: mode === 'size' ? O.proposalHelpSize : X.proposalHelp, badge: clientBadge, children: <>{notReady}{markQuoted('proposal')}</> })}
+        {docCard({ k: 'proposal', hero: true, icon: FileText, title: X.proposal, help: mode === 'size' ? O.proposalHelpSize : X.proposalHelp, badge: clientBadge, children: <>{financeControl}{notReady}{markQuoted('proposal')}</> })}
         <h3 className="eyebrow pt-2">{O.alsoForClient}</h3>
         {docCard({ k: 'quote', icon: ReceiptText, title: O.quotation, help: O.quotationHelp, badge: clientBadge, children: !st.proposal?.done ? markQuoted('quote') : undefined })}
         <h3 className="eyebrow pt-2">{X.team}</h3>
@@ -230,7 +272,13 @@ export function StepExport({ project: p, results: r, quote: q, update, goTo }: S
       </>}
       {docCard({ k: 'json', icon: FileJson, title: X.json, help: X.jsonHelp, badge: <span className="badge-neutral">{X.backup}</span> })}
 
-      <p className="text-sm text-slate-600"><span className="font-medium text-slate-700">{X.summary}: </span>{summary.map((s, i) => <span key={i}>{i > 0 && ' · '}<bdi>{s}</bdi></span>)}</p>
+      <p className="min-w-0 text-sm text-slate-600 [overflow-wrap:anywhere]"><span className="font-medium text-slate-700">{X.summary}: </span>{summary.map((s, i) => <span key={i}>{i > 0 && ' · '}<bdi>{s}</bdi></span>)}</p>
+
+      {/* Internal documents carry cost prices: confirm before they go to the share sheet */}
+      <ConfirmDialog open={!!confirmShare} onClose={() => setConfirmShare(null)} danger={false}
+        title={X.shareInternalTitle} confirmLabel={X.shareInternalConfirm}
+        body={confirmShare ? X.shareInternalBody(confirmShare === 'tech' ? X.tech : mode === 'items' ? O.excelItems : X.excel) : undefined}
+        onConfirm={() => { if (confirmShare) void run(confirmShare, 'share') }} />
     </div>
   )
 }
