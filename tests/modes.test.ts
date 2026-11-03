@@ -146,6 +146,17 @@ describe('equipment already on site (expansion)', () => {
     expect(r.totalUsd).toBeLessThan(base.totalUsd)
     expect(bomQty(r, 'end-clamp')).toBeLessThanOrEqual(bomQty(base, 'end-clamp')!)
   })
+  it('battery-only upgrade (array + inverter on site): only the battery, its interconnects and labour are quoted', () => {
+    const p = sized('hybrid', { pvKwp: 3.48, inverterKw: 5, batteryKwh: 10 })
+    const r0 = computeProject(p)
+    p.sizing = { ...p.sizing!, existing: { panels: r0.panelQty, batteries: 0, inverters: r0.inverterQty } }
+    const r = computeProject(p)
+    const ids = r.bom.filter((b) => b.qty > 0).map((b) => b.id)
+    expect(ids.some((id) => /^(dc-cable|mc4|dc-isolator|spd-dc|combiner|pv-fuse|ac-cable|ac-mcb|ac-mccb|rcd|spd-ac|db-board|changeover|ats|ct-meter|wifi|earth-rod|rail|mid-clamp)/.test(id))).toBe(false)
+    expect(ids).toContain(r.battery!.id)
+    expect(r.bom.find((b) => b.id === r.panel.id)).toMatchObject({ qty: 0, existingQty: r0.panelQty })
+    expect(r.totalUsd).toBeLessThan(r0.totalUsd * 0.6)
+  })
   it('more existing units than designed → warning, deduction capped', () => {
     const p = sized('hybrid', {}, (q) => { q.sizing = { ...q.sizing!, existing: { panels: 0, batteries: 99, inverters: 0 } } })
     const r = computeProject(p)

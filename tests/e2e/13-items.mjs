@@ -76,7 +76,9 @@ await scenario('13-items', async (c) => {
   if (q) {
     pdfPng(q, { last: 2 })
     if (!/5\s?%/.test(txt)) c.bad('quotation PDF shows no 5 % discount')
-    for (const n of names.filter(Boolean)) { const w = n.split(' ').slice(0, 2).join(' '); if (!txt.includes(w)) c.bad(`quotation PDF misses "${w}"`) }
+    // client documents drop the "Generic" placeholder brand and space units ("51.2 V"): compare without spaces
+    const flat = txt.replace(/\s/g, '')
+    for (const n of names.filter(Boolean)) { const w = n.replace(/^Generic\s+/i, '').split(' ').slice(0, 2).join(' '); if (!flat.includes(w.replace(/\s/g, ''))) c.bad(`quotation PDF misses "${w}"`) }
     if (/kWp|kWh\/yr|payback|الاسترداد/.test(txt)) c.warn('counter quotation mentions system figures (kWp / payback)')
   }
   const x = await grab(c, () => page.getByTestId('export-excel-download').click(), 'excel')

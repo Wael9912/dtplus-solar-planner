@@ -47,9 +47,10 @@ export function Wizard() {
   const tiny = useMediaQuery('(max-width: 399px)')
   const heading = useRef<HTMLHeadingElement>(null)
   const firstRun = useRef(true)
-  // A double tap on Next / Back moves one step, not two: ignore repeats within 450 ms of the last move
+  // A double tap on Next / Back moves one step, not two: the second click of a double click (detail ≥ 2) and repeats within
+  // 120 ms are ignored; deliberate taps in a row still move one step each
   const lastMove = useRef(0)
-  const move = (to: number) => { const now = Date.now(); if (now - lastMove.current < 450) return; lastMove.current = now; setStep(to) }
+  const move = (to: number, detail = 1) => { const now = Date.now(); if (detail > 1 || now - lastMove.current < 120) return; lastMove.current = now; setStep(to) }
 
   useEffect(() => { if (!project) setView('projects') }, [project, setView])
   useEffect(() => {
@@ -165,14 +166,14 @@ export function Wizard() {
       <div className="wizard-bar fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-4px_16px_-8px_rgb(15_23_42/0.15)] backdrop-blur" data-testid="wizard-bar">
         <div className="mx-auto flex max-w-7xl items-center gap-2 ps-[max(0.75rem,env(safe-area-inset-left))] pe-[max(0.75rem,env(safe-area-inset-right))] py-2 sm:gap-3 sm:px-6">
           {cur > 0
-            ? <button type="button" data-testid="nav-back" className="btn-secondary btn-icon h-12 w-12 sm:h-auto sm:w-auto sm:px-4" onClick={() => move(cur - 1)} aria-label={t.nav.back}><BackIc size={20} /><span className="hidden sm:inline">{t.nav.back}</span></button>
+            ? <button type="button" data-testid="nav-back" className="btn-secondary btn-icon h-12 w-12 sm:h-auto sm:w-auto sm:px-4" onClick={(e) => move(cur - 1, e.detail)} aria-label={t.nav.back}><BackIc size={20} /><span className="hidden sm:inline">{t.nav.back}</span></button>
             : <span className="hidden w-12 sm:block sm:w-[5.5rem]" />}
           <div className="min-w-0 flex-1 text-center sm:text-start" data-testid="bar-kpi">
             <div className="truncate text-xs text-slate-500 sm:text-xs">{kpi.cap}</div>
             <div className="truncate text-sm font-semibold text-slate-900 tabular-nums sm:text-base"><bdi>{kpi.val}</bdi></div>
           </div>
           {cur < STEPS.length - 1
-            ? <button type="button" data-testid="nav-next" className="btn-primary h-12 px-4 sm:h-auto" onClick={() => move(cur + 1)}>
+            ? <button type="button" data-testid="nav-next" className="btn-primary h-12 px-4 sm:h-auto" onClick={(e) => move(cur + 1, e.detail)}>
                 <span className="sm:hidden">{t.nav.next}</span><span className="hidden sm:inline">{t.nav.nextTo(t.steps[STEPS[cur + 1]])}</span><NextIc size={18} />
               </button>
             : <button type="button" data-testid="nav-finish" className="btn-primary h-12 px-4 sm:h-auto" title={t.nav.finishHelp} onClick={() => setView('projects')}><Check size={18} />{t.nav.finish}</button>}

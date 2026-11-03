@@ -8,7 +8,7 @@ import { describe, it, expect, beforeAll, beforeEach, vi } from 'vitest'
 import { computeProject, sizeCable } from '../src/engine/compute'
 import { buildQuote, effectivePercents, type Quote } from '../src/engine/quote'
 import { newProject, siteFromLocation, defaultDesign, defaultPricing, modeDefaults, defaultCompany } from '../src/engine/defaults'
-import { defaultSizing } from '../src/engine/sizing'
+import { defaultSizing, resolveSizing } from '../src/engine/sizing'
 import { cat, emptyPriceBook, resolveCatalog, withPriceBook } from '../src/engine/catalogContext'
 import { STD_PV_FUSE_A, STD_DC_FUSE_A, nextStd } from '../src/engine/standards'
 import {
@@ -424,10 +424,19 @@ function checkCase(c: Case, r: Results, q: Quote, V: Violations) {
   // 13. the BOM cable metres follow the cable schedule (the run lengths the design used, after the §15.1 guards)
   const lineQty = (id: string) => (pr.excludedIds.includes(id) || pr.qtyOverrides[id] != null ? null : r.bom.find((b) => b.id === id)?.qty ?? 0)
   const cores = p.design.phase === 3 ? 5 : 3
+  // §16.3 upgrades quote wiring only for new parts: an all-existing array / inverter / bank (and its circuits) is not re-cabled
+  const exq = resolveSizing(p).existing
+  const allExisting = (qty: number, n: number) => qty > 0 && n >= qty
+  const skip: Record<string, boolean> = {
+    'pv-string': allExisting(r.panelQty, exq.panels),
+    battery: allExisting(r.inverterQty, exq.inverters),
+    ac: !!r.inverter && allExisting(r.inverterQty, exq.inverters),
+  }
   for (const cb of r.cableSchedule) {
+    if (skip[cb.id ?? '']) continue
     const runs = cb.parallelRuns ?? 1
     const [id, want] = cb.id === 'pv-string' ? [`dc-cable-${cb.sizeMm2}`, (r.strings?.strings ?? 0) * cb.lengthM * 2 * runs]
-      : cb.id === 'battery' ? [`batt-cable-${cb.sizeMm2}`, 2 * cb.lengthM * runs * r.inverterQty]
+      : cb.id === 'battery' ? [`batt-cable-${cb.sizeMm2}`, 2 * cb.lengthM * runs * Math.max(0, r.inverterQty - Math.min(exq.inverters, r.inverterQty))]
         : cb.id === 'ac' ? [`ac-cable-${cb.sizeMm2}`, cb.lengthM * cores * runs] : ['', 0]
     if (!id) continue
     const got = lineQty(id)

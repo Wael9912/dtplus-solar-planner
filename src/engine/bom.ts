@@ -59,6 +59,13 @@ export function buildBom(p: Project, pr: PricingInput, c: BomCtx | null): { line
 
 function buildDesignBom(p: Project, pr: PricingInput, c: BomCtx, money: (qty: number, price: number) => number, custom: BomLine[]): { lines: BomLine[]; missing: string[] } {
   const { design: d, site: s } = p
+  // Upgrade (§16.3): wiring and accessories are quoted only for the parts that are new — a battery added to an existing inverter
+  // and array gets its modules, interconnects and labour, not new PV strings or a new AC board. Nothing existing → full system.
+  const ex = c.existing ?? { panels: 0, batteries: 0, inverters: 0 }
+  const newBatt = Math.max(0, c.batteryQty - ex.batteries), newInvQty = Math.max(0, c.inverterQty - ex.inverters)
+  const pvNew = !(c.panelQty > 0 && c.panelQty <= ex.panels)
+  const acNew = !(c.inverter && c.inverterQty > 0 && newInvQty === 0)
+  const battNew = newBatt > 0 || newInvQty > 0
   const drafts = new Map<string, Draft>()
   const missing: string[] = []
   const add = (x: Draft) => {
@@ -96,18 +103,17 @@ function buildDesignBom(p: Project, pr: PricingInput, c: BomCtx, money: (qty: nu
   }
   if (c.battery && c.batteryQty > 0) {
     const b = c.battery
-    if (b.formFactor === 'rack') addItem('battery-rack', ceilSafe(c.batteryQty / 4))
+    if (b.formFactor === 'rack') addItem('battery-rack', ceilSafe(newBatt / 4))
     else {
-      if (b.formFactor === 'floor' && b.chemistry !== 'LiFePO4' && b.chemistry !== 'NMC') addItem('battery-stand', ceilSafe(c.batteryQty / 4))
+      if (b.formFactor === 'floor' && b.chemistry !== 'LiFePO4' && b.chemistry !== 'NMC') addItem('battery-stand', ceilSafe(newBatt / 4))
       // Parallel strings (or several inverters sharing the bank) land on a busbar, not on the first battery's terminals
-      if (!c.hvBattery && (c.batteryParallel >= 2 || c.inverterQty > 1)) addItem('busbar-kit', Math.max(1, ceilSafe(c.batteryParallel / 8)))
+      if (!c.hvBattery && battNew && (c.batteryParallel >= 2 || c.inverterQty > 1)) addItem('busbar-kit', Math.max(1, ceilSafe(c.batteryParallel / 8)))
     }
     // CAN/RS485 link per module for LV lithium rack / wall units (generic floor batteries have no comms port)
-    if (!c.hvBattery && (b.chemistry === 'LiFePO4' || b.chemistry === 'NMC') && (b.formFactor === 'rack' || b.formFactor === 'wall')) addItem('bms-cable', c.batteryQty)
+    if (!c.hvBattery && (b.chemistry === 'LiFePO4' || b.chemistry === 'NMC') && (b.formFactor === 'rack' || b.formFactor === 'wall')) addItem('bms-cable', newBatt)
   }
 
   // ---- Mounting (2 rails × panel width per panel, rows of ~10, §9 / §12) — new panels only (existing ones are already mounted)
-  const ex = c.existing ?? { panels: 0, batteries: 0, inverters: 0 }
   const N = Math.max(0, c.panelQty - ex.panels), rows = ceilSafe(N / 10)
   const newKwp = (N * pn.watts) / 1000
   const railM = N * (pn.widthMm / 1000) * 2 * 1.05
@@ -128,7 +134,7 @@ function buildDesignBom(p: Project, pr: PricingInput, c: BomCtx, money: (qty: nu
 
   // ---- PV DC side
   const str = cab('pv-string')
-  if (str && c.strings) {
+  if (str && c.strings && pvNew) {
     const ns = c.strings.strings
     addItem(`dc-cable-${str.sizeMm2}`, ns * d.dcCableRunM * 2 * runs(str))
     addItem('mc4-pair', ns * 2 + 2)
@@ -150,10 +156,11 @@ function buildDesignBom(p: Project, pr: PricingInput, c: BomCtx, money: (qty: nu
 
   // ---- Battery side
   const bt = cab('battery')
-  if (bt && c.battery) {
-    addItem(`batt-cable-${bt.sizeMm2}`, d.batteryCableRunM * 2 * runs(bt) * c.inverterQty + c.batteryQty * 0.6)
-    addItem('cable-lug', c.batteryQty * 4 + 4 * runs(bt) * c.inverterQty)
-    addItem(`${c.hvBattery ? 'batt-fuse-hv' : 'batt-fuse'}-${bt.breakerA}`, c.inverterQty)
+  if (bt && c.battery && battNew) {
+    // feeders + fuses for each new inverter, interconnects + lugs for each new module
+    addItem(`batt-cable-${bt.sizeMm2}`, d.batteryCableRunM * 2 * runs(bt) * newInvQty + newBatt * 0.6)
+    addItem('cable-lug', newBatt * 4 + 4 * runs(bt) * newInvQty)
+    addItem(`${c.hvBattery ? 'batt-fuse-hv' : 'batt-fuse'}-${bt.breakerA}`, newInvQty)
   }
   const ccb = cab('cc-battery')
   if (ccb && c.controllerQty > 0) {
@@ -164,7 +171,7 @@ function buildDesignBom(p: Project, pr: PricingInput, c: BomCtx, money: (qty: nu
 
   // ---- AC side
   const ac = cab('ac')
-  if (ac && c.inverter) {
+  if (ac && c.inverter && acNew) {
     const acInv = cab('ac-inverter'), acGrid = cab('ac-grid'), acGen = cab('ac-generator')
     addItem(`ac-cable-${ac.sizeMm2}`, d.acCableRunM * cores * runs(ac))
     if (acInv) addItem(`ac-cable-${acInv.sizeMm2}`, AC_INV_TO_COMBINER_M * cores * runs(acInv) * c.inverterQty)
@@ -185,10 +192,13 @@ function buildDesignBom(p: Project, pr: PricingInput, c: BomCtx, money: (qty: nu
   }
 
   // ---- Earthing & misc
-  addItem('earth-rod', c.arrayKwp > 10 ? 2 : 1)
-  addItem('earth-cable', 20 + N * 1.2)
-  addItem('lightning-arrestor', c.arrayKwp > 20 ? 1 : 0)
-  addItem('conduit', (c.strings ? d.dcCableRunM : 0) + d.acCableRunM + (c.battery ? d.batteryCableRunM : 0))
+  // the site earth exists when neither new panels nor a new inverter are installed
+  if (N > 0 || newInvQty > 0 || !c.inverter) {
+    addItem('earth-rod', c.arrayKwp > 10 ? 2 : 1)
+    addItem('earth-cable', 20 + N * 1.2)
+    addItem('lightning-arrestor', c.arrayKwp > 20 ? 1 : 0)
+  }
+  addItem('conduit', (c.strings && pvNew ? d.dcCableRunM : 0) + (acNew ? d.acCableRunM : 0) + (c.battery && battNew ? d.batteryCableRunM : 0))
   addItem('cable-ties-labels', ceilSafe(N / 20) || 1)
   if (c.generatorKva) {
     const kva = c.generatorKva

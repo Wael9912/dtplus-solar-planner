@@ -35,7 +35,8 @@ await scenario('15-expansion', async (c) => {
   c.ok(`total ${full} → ${part} with existing equipment`)
   await page.getByTestId('view-cost').click(); await page.waitForTimeout(200)
   const rows = await page.locator('[data-line-id]').evaluateAll((els) => els.map((e) => ({
-    id: e.getAttribute('data-line-id'), qty: e.querySelector('input[inputmode=decimal]')?.value, badge: e.querySelector('[data-testid=bom-existing]')?.innerText ?? '',
+    // a line entirely on site has no quantity input (qty 0, price "—"); it only carries the badge
+    id: e.getAttribute('data-line-id'), qty: e.querySelector('input[inputmode=decimal]')?.value ?? (e.querySelector('[data-testid=bom-existing]') ? '0' : undefined), badge: e.querySelector('[data-testid=bom-existing]')?.innerText ?? '',
   })))
   const panel = rows.find((r) => /^pnl-/.test(r.id)), inv = rows.find((r) => /^inv-/.test(r.id)), batt = rows.find((r) => /^bat-/.test(r.id))
   c.ok(`panel ${JSON.stringify(panel)} inverter ${JSON.stringify(inv)} battery ${JSON.stringify(batt)}`)
