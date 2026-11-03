@@ -34,7 +34,7 @@ export const en = {
     design: 'Choose the equipment, or leave it on Auto and the planner recommends it. Engineering settings are under Advanced.',
     results: 'What the client gets, and the engineering behind it. Fix red items before quoting.',
     bom: 'Every item needed for installation with quantities and prices. Edit quantities and prices, add lines, set markup, discount and VAT.',
-    export: 'Download the client proposal, the quotation only, the technical report (PDF) or the Excel workbook, or save the project file.',
+    export: 'Download the client proposal, a quotation only, the technical report (PDF) or the Excel workbook, or save the project file.',
   },
   empty: {
     needLoadsTitle: 'Add the client’s appliances first', needLoadsBody: 'Sizing, pricing and the proposal are all calculated from the load list.', goLoads: 'Go to Loads',

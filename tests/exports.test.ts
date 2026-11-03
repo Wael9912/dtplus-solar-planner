@@ -404,27 +404,28 @@ describe('stress-test follow-ups: equipment entirely on site, long file names', 
   const text = async (b: Promise<Blob>) => pdfText(Buffer.from(await (await b).arrayBuffer()))
 
   it('a main-equipment line entirely on site (qty 0) is named in a note on client documents, never priced, and listed with qty 0 internally', async () => {
-    const p = ps.expansion, r0 = computeProject(p)
-    const batt = r0.bom.find((b) => b.category === 'Battery' && b.qty > 0)!
-    // the engine keeps a fully existing line with qty 0 and existingQty > 0
-    const r = { ...r0, bom: r0.bom.map((b) => (b.id === batt.id ? { ...b, qty: 0, totalUsd: 0, existingQty: 2 } : b)) }
+    // the engine keeps a fully existing main-equipment line in the BOM with qty 0 and its existingQty (here the battery)
+    const p = { ...ps.expansion, sizing: { ...ps.expansion.sizing!, existing: { ...ps.expansion.sizing!.existing, batteries: 99 } } }, r = computeProject(p)
+    const batt = r.bom.find((b) => b.category === 'Battery' && b.id === r.battery?.id)!
+    expect(batt).toMatchObject({ qty: 0, totalUsd: 0 }); expect(batt.existingQty).toBeGreaterThan(0)
+    const n = batt.existingQty!
     const q = buildQuote(p, r)
     expect(q.lines.find((l) => l.id === batt.id)?.totalSell).toBe(0)
     const name = batt.name.replace(/(\d)(V|Ah|W|kWh)\b/g, '$1 $2')
     for (const build of [buildQuotationPdf, buildProposalPdf]) {
       const t = await text(build(p, r, company, 'en', { fonts: null, now }))
-      expect(t).toContain('Existing equipment (not quoted): 2 × ')
+      expect(t).toContain(`Existing equipment (not quoted): ${n} × `)
       expect(t).toContain('already on site.')
       expect(t).toMatch(new RegExp(`TOTAL[^$]*\\$${q.total.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}`))
     }
     const prices = (await text(buildQuotationPdf(p, r, company, 'en', { fonts: null, now }))).split('Existing equipment')[0]
     expect(prices).not.toContain(name)
     const tech = await text(buildTechnicalPdf(p, r, company, 'en', { fonts: null, now }))
-    expect(tech).toContain('+2 already on site, not quoted')
+    expect(tech).toContain(`+${n} already on site, not quoted`)
     const wb = new ExcelJS.Workbook()
     await wb.xlsx.load(Buffer.from(await (await buildExcel(p, r, company, 'en', { now })).arrayBuffer()) as unknown as ArrayBuffer)
     let row: ExcelJS.Row | undefined
-    wb.getWorksheet('BOM')!.eachRow((x) => { if (String(x.getCell(4).value ?? '').includes('+2 already on site')) row = x })
+    wb.getWorksheet('BOM')!.eachRow((x) => { if (String(x.getCell(4).value ?? '').includes(`+${n} already on site`)) row = x })
     expect(row?.getCell(6).value).toBe(0)
     expect(await isPdf(await buildQuotationPdf(p, r, company, 'ar', { fonts, now }))).toMatchObject({ ok: true })
     // 1-page estimate
