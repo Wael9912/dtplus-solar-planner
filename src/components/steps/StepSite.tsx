@@ -16,7 +16,7 @@ const REGION_ORDER = ['Africa', 'Middle East', 'Asia', 'Europe', 'Americas', 'Oc
 const locName = (l: Location, lang: 'en' | 'ar') => (lang === 'ar' ? l.cityAr ?? cityName(l, lang) : l.city)
 const ctyName = (l: Location, lang: 'en' | 'ar') => (lang === 'ar' ? l.countryAr ?? countryName(l.country, lang) : l.country)
 
-export function StepSite({ project: p, update }: StepProps) {
+export function StepSite({ project: p, results: r, update }: StepProps) {
   const { t, lang, dir } = useT()
   const rtl = dir === 'rtl'
   const narrow = useMediaQuery('(max-width: 479px)')
@@ -41,6 +41,10 @@ export function StepSite({ project: p, update }: StepProps) {
   const local = s.currency !== 'USD'
   const fx = s.fxRateToUsd
   const offgrid = p.design.systemType === 'offgrid'
+  const hybrid = p.design.systemType === 'hybrid'
+  const outage = s.outageHoursPerDay ?? 0
+  const diesel = s.dieselCostUsdPerKwh ?? DEFAULT_DIESEL_USD_PER_KWH
+  const localUsd = (usd: number) => (local && fx > 0 ? `${fmt(usd * fx, 2)} ${s.currency}` : `${fmt(usd, 2)} USD`)
   const indicative = local && Math.abs(fx - defaultFx(s.currency)) < 1e-9
   const minP = Math.min(...s.monthlyPsh), maxP = Math.max(...s.monthlyPsh)
 
@@ -126,14 +130,25 @@ export function StepSite({ project: p, update }: StepProps) {
               </Field>
             )}
             {offgrid ? (
-              <Field label={t.site.diesel} className="col-span-2" help={<>{t.site.dieselHelp}{local && fx > 0 && <> <bdi>{t.site.tariffLocal(`${fmt((s.dieselCostUsdPerKwh ?? DEFAULT_DIESEL_USD_PER_KWH) * fx, 2)} ${s.currency}`)}</bdi></>}</>}>
-                <NumberInput value={s.dieselCostUsdPerKwh ?? DEFAULT_DIESEL_USD_PER_KWH} step={0.01} min={0} max={5} onChange={(v) => set({ dieselCostUsdPerKwh: v ?? DEFAULT_DIESEL_USD_PER_KWH })} suffix="USD" />
+              <Field label={t.site.diesel} className="col-span-2" help={<>{t.site.dieselHelp}{local && fx > 0 && <> <bdi>{t.site.tariffLocal(`${fmt(diesel * fx, 2)} ${s.currency}`)}</bdi></>}</>}>
+                <NumberInput value={diesel} step={0.01} min={0} max={5} onChange={(v) => set({ dieselCostUsdPerKwh: v ?? DEFAULT_DIESEL_USD_PER_KWH })} suffix="USD" data-testid="site-diesel" />
               </Field>
             ) : (
               <Field label={t.site.tariff} className="col-span-2" help={local && fx > 0 ? <bdi>{t.site.tariffLocal(`${fmt(s.gridTariff * fx, 2)} ${s.currency}`)}</bdi> : t.site.tariffHelp}>
-                <NumberInput value={s.gridTariff} step={0.01} min={0} max={5} onChange={(v) => set({ gridTariff: v ?? 0 })} suffix="USD" />
+                <NumberInput value={s.gridTariff} step={0.01} min={0} max={5} onChange={(v) => set({ gridTariff: v ?? 0 })} suffix="USD" data-testid="site-tariff" />
               </Field>
             )}
+            {hybrid && (
+              <Field label={t.inputs.site.outage} className="col-span-2 sm:col-span-1" help={t.inputs.site.outageHelp}>
+                <NumberInput value={outage} step={1} min={0} max={24} suffix="h" onChange={(v) => set({ outageHoursPerDay: v ?? 0 })} data-testid="site-outage" />
+              </Field>
+            )}
+            {hybrid && outage > 0 && (
+              <Field label={t.inputs.site.dieselHybrid} className="col-span-2 sm:col-span-1" help={<>{t.inputs.site.dieselHybridHelp}{local && fx > 0 && <> <bdi>{t.site.tariffLocal(`${fmt(diesel * fx, 2)} ${s.currency}`)}</bdi></>}</>}>
+                <NumberInput value={diesel} step={0.01} min={0} max={5} onChange={(v) => set({ dieselCostUsdPerKwh: v ?? DEFAULT_DIESEL_USD_PER_KWH })} suffix="USD" data-testid="site-diesel" />
+              </Field>
+            )}
+            {hybrid && outage > 0 && r.avoidedCostUsdPerKwh > 0 && <p className="col-span-2 text-sm text-slate-600" data-testid="site-blended"><bdi>{t.inputs.site.blended(localUsd(r.avoidedCostUsdPerKwh))}</bdi></p>}
           </div>
         </Section>
       </div>
