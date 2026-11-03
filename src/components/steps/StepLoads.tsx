@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Plus, Trash2, Search, Pencil, Library, Home, Building2, Store, Droplets, Stethoscope, PenLine, Check, ListChecks, ReceiptText } from 'lucide-react'
 import { useT, dicts } from '../../i18n'
 import { Field, NumberInput, Section, Stat, Switch, Disclosure, IconButton, Segmented, Choice } from '../ui'
@@ -18,7 +18,10 @@ type TplKey = (typeof loadTemplates)[number]['key']
 const TPL_ICON: Record<TplKey, typeof Home> = { tplSmallHome: Home, tplFamilyHome: Building2, tplShop: Store, tplFarm: Droplets, tplClinic: Stethoscope }
 const whDay = (l: LoadItem) => l.watts * l.qty * l.hoursPerDay
 
-export function StepLoads({ project: p, results: r, update }: StepProps) {
+/** Where the load editor is shown: a wizard step, or the load calculator (no Site step there). */
+export type LoadsContext = 'wizard' | 'calc'
+
+export function StepLoads({ project: p, results: r, update, context = 'wizard' }: StepProps & { context?: LoadsContext }) {
   const { t, lang } = useT()
   const demand = resolveSizing(p).demand
   const setDemand = (v: 'loads' | 'bill') => update((prev) => ({ sizing: { ...resolveSizing(prev), demand: v } }))
@@ -84,6 +87,10 @@ export function StepLoads({ project: p, results: r, update }: StepProps) {
   }
   const editing = editId ? p.loads.find((l) => l.id === editId) ?? null : null
   const nightPct = r.dailyWh ? (r.nightWh / r.dailyWh) * 100 : 0
+  // Table header: small type, wraps to two lines at most (Arabic labels are long), full text on hover
+  const head = (label: string, num = true, pad = 'px-2', title = label) => (
+    <th className={`${num ? 'num' : ''} ${pad} align-bottom leading-tight whitespace-normal`} title={title}><span className="line-clamp-2">{label.replace(/\//g, '/\u200B')}</span></th>
+  )
 
   const emptyView = (
       <section className="card p-4 sm:p-6" data-testid="loads-empty">
@@ -118,7 +125,7 @@ export function StepLoads({ project: p, results: r, update }: StepProps) {
           { value: 'bill', label: t.inputs.loads.demandBill, icon: <ReceiptText size={16} className="shrink-0" />, testId: 'demand-bill' },
         ]} />
       </div>
-      {demand === 'bill' ? <BillView project={p} results={r} update={update} /> : p.loads.length === 0 ? emptyView : <>
+      {demand === 'bill' ? <BillView project={p} results={r} update={update} context={context} /> : p.loads.length === 0 ? emptyView : <>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3" data-testid="load-kpis">
         <Stat tone="brand" className="col-span-2 sm:col-span-1" label={t.loads.totalDaily} value={fmt(r.dailyWh / 1000, 2)} unit="kWh" sub={<>{iso(`${fmt(r.monthlyKwh)} kWh`)} {t.loads.monthly}</>} />
         <Stat label={t.loads.peak} value={fmt(r.peakW / 1000, 2)} unit="kW" sub={isHybrid && r.sizingPeakW < r.peakW ? t.results.sizedFor(fmt(r.sizingPeakW / 1000, 2)) : <>{t.loads.surgeW}: {iso(`${fmt(r.surgeW / 1000, 1)} kW`)}</>} />
@@ -132,35 +139,36 @@ export function StepLoads({ project: p, results: r, update }: StepProps) {
       </>}>
         {wide ? (
           <div className="overflow-x-auto border-t border-slate-200">
-            <table className="table table-fixed" data-testid="loads-table" style={{ minWidth: `${45 + (three ? 5 : 0) + (isHybrid ? 5 : 0)}rem` }}>
+            {/* Fixed layout: compact numeric columns, the name column takes the rest (min ≈ 11 rem) and wraps to two lines; headers wrap too */}
+            <table className="table table-fixed" data-testid="loads-table" style={{ minWidth: `${43 + (three ? 4.5 : 0) + (isHybrid ? 5 : 0)}rem` }}>
               <colgroup>
-                <col /><col className="w-24" /><col className="w-24" /><col className="w-24" /><col className="w-24" /><col className="w-20" />
-                {three && <col className="w-20" />}{isHybrid && <col className="w-20" />}<col className="w-28" /><col className="w-14" />
+                <col /><col className="w-20" /><col className="w-16" /><col className="w-20" /><col className="w-20" /><col className="w-16" />
+                {three && <col className="w-[4.5rem]" />}{isHybrid && <col className="w-20" />}<col className="w-24" /><col className="w-14" />
               </colgroup>
               <thead><tr>
-                <th>{t.loads.name}</th><th className="num">{t.loads.watts}</th><th className="num">{t.loads.qty}</th><th className="num">{t.loads.hours}</th><th className="num">{t.loads.night}</th><th className="num">{t.loads.surge}</th>
-                {three && <th>{t.loads.phase}</th>}{isHybrid && <th title={t.loads.criticalHelp}>{t.loads.critical}</th>}<th className="num">{t.loads.daily}</th><th><span className="sr-only">{t.common.actions}</span></th>
+                {head(t.loads.name, false, 'px-3')}{head(t.loads.watts)}{head(t.loads.qty)}{head(t.loads.hours)}{head(t.loads.night)}{head(t.loads.surge)}
+                {three && head(t.loads.phase, false)}{isHybrid && head(t.loads.critical, false, 'px-2', t.loads.criticalHelp)}{head(t.loads.daily)}<th className="px-1"><span className="sr-only">{t.common.actions}</span></th>
               </tr></thead>
               <tbody>
                 {p.loads.map((l) => {
                   const nm = loadName(l, lang, t)
                   return (
                     <tr key={l.id} data-load-id={l.id} className="transition hover:bg-slate-50/60">
-                      <td><input className="input-quiet font-medium" dir="auto" value={matchAppliance(l.name) ? nm : l.name} placeholder={t.loads.namePh} aria-label={t.loads.name} onChange={(e) => patch(l.id, { name: e.target.value })} /></td>
-                      <td><NumberInput quiet align="end" value={l.watts} min={0} onChange={(v) => patch(l.id, { watts: v ?? 0 })} aria-label={`${t.loads.watts} — ${nm}`} /></td>
-                      <td><NumberInput quiet align="end" integer value={l.qty} min={0} onChange={(v) => patch(l.id, { qty: v ?? 0 })} aria-label={`${t.loads.qty} — ${nm}`} /></td>
-                      <td><NumberInput quiet align="end" value={l.hoursPerDay} min={0} max={24} step={0.5} onChange={(v) => patch(l.id, { hoursPerDay: v ?? 0 })} aria-label={`${t.loads.hours} — ${nm}`} /></td>
-                      <td><NumberInput quiet align="end" value={l.nightSharePct} min={0} max={100} step={10} onChange={(v) => patch(l.id, { nightSharePct: v ?? 0 })} aria-label={`${t.loads.night} — ${nm}`} /></td>
-                      <td><NumberInput quiet align="end" value={l.surgeFactor} min={1} max={10} step={0.5} onChange={(v) => patch(l.id, { surgeFactor: v ?? 1 })} aria-label={`${t.loads.surge} — ${nm}`} /></td>
-                      {three && <td><select className="input-quiet" value={l.phase} aria-label={`${t.loads.phase} — ${nm}`} onChange={(e) => patch(l.id, { phase: Number(e.target.value) as 1 | 3 })}><option value={1}>1φ</option><option value={3}>3φ</option></select></td>}
+                      <td className="ps-2 pe-1"><NameCell value={matchAppliance(l.name) ? nm : l.name} placeholder={t.loads.namePh} label={t.loads.name} onChange={(v) => patch(l.id, { name: v })} /></td>
+                      <td className="px-1"><NumberInput quiet align="end" value={l.watts} min={0} onChange={(v) => patch(l.id, { watts: v ?? 0 })} aria-label={`${t.loads.watts} — ${nm}`} /></td>
+                      <td className="px-1"><NumberInput quiet align="end" integer value={l.qty} min={0} onChange={(v) => patch(l.id, { qty: v ?? 0 })} aria-label={`${t.loads.qty} — ${nm}`} /></td>
+                      <td className="px-1"><NumberInput quiet align="end" value={l.hoursPerDay} min={0} max={24} step={0.5} onChange={(v) => patch(l.id, { hoursPerDay: v ?? 0 })} aria-label={`${t.loads.hours} — ${nm}`} /></td>
+                      <td className="px-1"><NumberInput quiet align="end" value={l.nightSharePct} min={0} max={100} step={10} onChange={(v) => patch(l.id, { nightSharePct: v ?? 0 })} aria-label={`${t.loads.night} — ${nm}`} /></td>
+                      <td className="px-1"><NumberInput quiet align="end" value={l.surgeFactor} min={1} max={10} step={0.5} onChange={(v) => patch(l.id, { surgeFactor: v ?? 1 })} aria-label={`${t.loads.surge} — ${nm}`} /></td>
+                      {three && <td className="px-1"><select className="input-quiet" value={l.phase} aria-label={`${t.loads.phase} — ${nm}`} onChange={(e) => patch(l.id, { phase: Number(e.target.value) as 1 | 3 })}><option value={1}>1φ</option><option value={3}>3φ</option></select></td>}
                       {isHybrid && <td className="text-center"><input type="checkbox" className="size-5 accent-brand-700" checked={l.critical} aria-label={`${t.loads.onBattery} — ${nm}`} onChange={(e) => patch(l.id, { critical: e.target.checked })} /></td>}
-                      <td className="num font-medium text-slate-900">{fmt(whDay(l))}</td>
-                      <td><IconButton label={`${t.common.delete} — ${nm}`} className="btn-ghost text-slate-500 hover:text-red-700" onClick={() => remove(l.id)} data-testid="load-delete"><Trash2 size={18} /></IconButton></td>
+                      <td className="num px-2 font-medium text-slate-900">{fmt(whDay(l))}</td>
+                      <td className="px-1"><IconButton label={`${t.common.delete} — ${nm}`} className="btn-ghost text-slate-500 hover:text-red-700" onClick={() => remove(l.id)} data-testid="load-delete"><Trash2 size={18} /></IconButton></td>
                     </tr>
                   )
                 })}
               </tbody>
-              <tfoot><tr className="font-semibold text-slate-900"><td colSpan={6 + (three ? 1 : 0) + (isHybrid ? 1 : 0)} className="text-end">{t.loads.totalDaily}</td><td className="num"><bdi>{fmt(r.dailyWh / 1000, 2)} kWh</bdi></td><td /></tr></tfoot>
+              <tfoot><tr className="font-semibold text-slate-900"><td colSpan={6 + (three ? 1 : 0) + (isHybrid ? 1 : 0)} className="text-end">{t.loads.totalDaily}</td><td className="num px-2"><bdi>{fmt(r.dailyWh / 1000, 2)} kWh</bdi></td><td /></tr></tfoot>
             </table>
           </div>
         ) : (
@@ -279,6 +287,25 @@ function LibrarySheet({ open, onClose, countOf, onAdd, onDec, onSet, onTemplate,
   )
 }
 
+/** Desktop table name: up to two lines of text (wraps between words, never cut off); a click or Enter turns it into a text field. */
+function NameCell({ value, placeholder, label, onChange }: { value: string; placeholder: string; label: string; onChange: (v: string) => void }) {
+  // While editing, the field shows what is typed (a library name is shown translated, so the stored text can differ)
+  const [draft, setDraft] = useState<string | null>(null)
+  const ref = useRef<HTMLInputElement>(null)
+  const editing = draft !== null
+  useEffect(() => { if (editing) ref.current?.focus() }, [editing])
+  if (editing) return (
+    <input ref={ref} className="input-quiet font-medium" dir="auto" value={draft} placeholder={placeholder} aria-label={label} data-testid="load-name-input"
+      onChange={(e) => { setDraft(e.target.value); onChange(e.target.value) }} onBlur={() => setDraft(null)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === 'Escape') e.currentTarget.blur() }} />
+  )
+  return (
+    <button type="button" onClick={() => setDraft(value)} title={value || undefined} aria-label={`${label}: ${value || placeholder}`} data-testid="load-name"
+      className="block min-h-9 w-full rounded-md border border-transparent px-2 py-1 text-start text-sm leading-snug font-medium text-slate-900 hover:border-slate-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500">
+      <span dir="auto" className={`line-clamp-2 text-start break-words ${value ? '' : 'font-normal text-slate-400'}`}>{value || placeholder}</span>
+    </button>
+  )
+}
+
 function LoadEditor({ load, isNew = false, three, hybrid, onChange, onClose, onAdd, onDelete }: { load: LoadItem | null; isNew?: boolean; three: boolean; hybrid: boolean; onChange: (x: Partial<LoadItem>) => void; onClose: () => void; onAdd?: () => void; onDelete?: () => void }) {
   const { t, lang } = useT()
   const nameRef = useRef<HTMLInputElement>(null)
@@ -326,9 +353,10 @@ function LibQty({ n, label, onSet }: { n: number; label: string; onSet: (n: numb
 }
 
 /** Demand from the electricity bill (methodology §15.1): monthly kWh (or the amount ÷ tariff), usage profile, optional peak and motor. */
-function BillView({ project: p, results: r, update }: Pick<StepProps, 'project' | 'results' | 'update'>) {
+function BillView({ project: p, results: r, update, context }: Pick<StepProps, 'project' | 'results' | 'update'> & { context: LoadsContext }) {
   const { t } = useT()
   const T = t.inputs.loads
+  const calc = context === 'calc' // the calculator has no Site step: the tariff is the selected city's typical one
   const b = resolveSizing(p).bill
   const setBill = (x: Partial<BillInput>) => update((prev) => { const sz = resolveSizing(prev); return { sizing: { ...sz, bill: { ...sz.bill, ...x } } } })
   const [amount, setAmount] = useState<number | null>(null)
@@ -347,7 +375,7 @@ function BillView({ project: p, results: r, update }: Pick<StepProps, 'project' 
             <NumberInput value={b.monthlyKwh || null} allowEmpty min={0} max={10000000} placeholder="0" suffix={T.kwhMonth} data-testid="bill-kwh"
               onChange={(v) => { setAmount(null); setBill({ monthlyKwh: v ?? 0 }) }} />
           </Field>
-          <Field label={T.amount(cur)} help={tariffLocal > 0 ? (amount ? T.amountHelp(tariffTxt, fmt(amount / tariffLocal)) : T.tariffIs(tariffTxt)) : T.amountNoTariff}>
+          <Field label={T.amount(cur)} help={tariffLocal > 0 ? (amount ? T.amountHelp(tariffTxt, fmt(amount / tariffLocal)) : calc ? T.tariffIsCalc(tariffTxt) : T.tariffIs(tariffTxt)) : calc ? T.amountNoTariffCalc : T.amountNoTariff}>
             <NumberInput value={amount} allowEmpty min={0} placeholder={T.amountPh} suffix={cur} disabled={!(tariffLocal > 0)} data-testid="bill-amount" onChange={fromAmount} />
           </Field>
         </div>

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useId, useMemo, useState, type ReactNode } from 'react'
 import { ArrowLeft, ArrowRight, Calculator, ChevronUp, CircleAlert, ClipboardCopy, Eraser, FileDown, FileText, LoaderCircle, Share2, TriangleAlert } from 'lucide-react'
 import { useAppStore } from '../store/useAppStore'
 import { toast } from '../store/useToast'
@@ -8,12 +8,12 @@ import { Sheet } from './overlay'
 import { useMediaQuery } from './hooks'
 import { useComputed } from './useEngine'
 import { StepLoads } from './steps/StepLoads'
-import { realIssues } from './wizardModel'
+import { realIssues, sortChecks } from './wizardModel'
 import { locations, regions } from '../data/locations'
 import { applySystemType, siteFromLocation } from '../engine/defaults'
 import { fmt } from '../engine/format'
 import { formatQuoteMoney, type Quote } from '../engine/quote'
-import { iso } from '../i18n/labels'
+import { checkText, iso } from '../i18n/labels'
 import { cityName, countryName } from '../i18n/places'
 import { summaryText, buildSummaryPdf, estimateFigures, short } from '../export/summaryPdf'
 import { download, shareFile, canShareFiles, isTouchDevice } from '../export/download'
@@ -146,7 +146,7 @@ export function QuickCalc() {
             </select>
           </Field>
         </section>
-        <StepLoads project={calc} results={r} quote={q} update={updateCalc} goTo={() => {}} />
+        <StepLoads project={calc} results={r} quote={q} update={updateCalc} goTo={() => {}} context="calc" />
         {!wide && <div className="h-0 sm:h-12" aria-hidden="true" />}
       </div>
 
@@ -212,6 +212,7 @@ function Row({ k, v, sub, testId }: { k: ReactNode; v: ReactNode; sub?: ReactNod
 function ResultPanel({ p, r, q, errors, onProposal, top }: { p: Project; r: Results; q: Quote; errors: number; onProposal: () => void; top?: ReactNode }) {
   const { t, lang, dir } = useT()
   const C = t.calc
+  const issuesId = useId()
   if (r.dailyWh <= 0) {
     return (
       <div className="flex flex-col items-center px-2 py-6 text-center" data-testid="calc-empty">
@@ -223,7 +224,9 @@ function ResultPanel({ p, r, q, errors, onProposal, top }: { p: Project; r: Resu
   }
   const f = estimateFigures(p, r, q)
   const Arrow = dir === 'rtl' ? ArrowLeft : ArrowRight
-  const warnings = realIssues(r.checks).filter((c) => c.level === 'warn').length
+  // Errors and warnings worth knowing before quoting ('no-loads' cannot happen with a result); top 3 here, the rest in the project
+  const issues = sortChecks(realIssues(r.checks).filter((c) => c.id !== 'no-loads'))
+  const warnings = issues.filter((c) => c.level === 'warn').length
   const vat = q.vatPct > 0 ? C.inclVat(fmt(q.vatPct, q.vatPct % 1 ? 1 : 0)) : null
   const a = f.auto
   const autoTxt = a ? (a.offgrid ? C.autonomy(short(a.days, 1)) : a.hours > 72 ? C.backupLong : C.backup(short(a.hours, 0))) : ''
@@ -235,14 +238,29 @@ function ResultPanel({ p, r, q, errors, onProposal, top }: { p: Project; r: Resu
         <p className="text-xs leading-5 text-slate-500">{[f.perWp > 0 ? C.perWp(formatQuoteMoney(f.perWp, q, 2)) : '', vat].filter(Boolean).join(' · ')}</p>
       </div>
       {top}
-      {errors > 0 ? (
-        <button type="button" onClick={onProposal} data-testid="calc-issues"
-          className="flex min-h-11 w-full items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-start text-sm font-medium text-red-800 transition hover:bg-red-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500">
-          <CircleAlert size={18} className="shrink-0" aria-hidden="true" /><span className="min-w-0 flex-1">{C.errors(errors)}</span><Arrow size={16} className="shrink-0" aria-hidden="true" />
-        </button>
-      ) : warnings > 0 ? (
-        <p className="flex items-start gap-2 text-sm text-amber-800" data-testid="calc-warnings"><TriangleAlert size={16} className="mt-0.5 shrink-0" aria-hidden="true" />{C.warnings(warnings)}</p>
-      ) : null}
+      {issues.length > 0 && (
+        <section className={`rounded-lg border px-3 py-2.5 ${errors > 0 ? 'border-red-200 bg-red-50' : 'border-amber-200 bg-amber-50'}`} aria-labelledby={issuesId} data-testid="calc-issues-list">
+          <h3 id={issuesId} className={`text-sm font-semibold ${errors > 0 ? 'text-red-800' : 'text-amber-900'}`}>
+            {[errors > 0 && C.toFix(errors), warnings > 0 && C.toReview(warnings)].filter(Boolean).join(' · ')}
+          </h3>
+          <ul className="mt-1.5 space-y-1.5">
+            {issues.slice(0, 3).map((c) => {
+              const Icon = c.level === 'error' ? CircleAlert : TriangleAlert
+              return (
+                <li key={c.id + c.message} className="flex items-start gap-2 text-sm leading-5 text-slate-800" data-level={c.level} data-testid="calc-issue">
+                  <Icon size={16} className={`mt-0.5 shrink-0 ${c.level === 'error' ? 'text-red-600' : 'text-amber-600'}`} aria-hidden="true" />
+                  <span className="min-w-0 [overflow-wrap:anywhere]"><span className="sr-only">{c.level === 'error' ? t.common.error : t.common.warn}: </span>{checkText(c, lang)}</span>
+                </li>
+              )
+            })}
+          </ul>
+          {issues.length > 3 && <p className="mt-1 ps-6 text-xs text-slate-600">{C.moreIssues(issues.length - 3)}</p>}
+          <button type="button" onClick={onProposal} data-testid="calc-issues"
+            className={`btn-link mt-1 min-h-10 ps-6 ${errors > 0 ? 'text-red-800' : 'text-amber-900'}`}>
+            {errors > 0 ? C.openToFix : C.openToReview}<Arrow size={16} className="shrink-0" aria-hidden="true" />
+          </button>
+        </section>
+      )}
       <section>
         <h3 className="eyebrow">{C.energy}</h3>
         <dl className="divide-y divide-slate-100">

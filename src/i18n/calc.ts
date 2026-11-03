@@ -42,8 +42,12 @@ export const calcEn = {
   production: 'Yearly production',
   demandYear: (v: string, pct: string) => `demand ${v} kWh/yr · ${pct}% covered`,
   assumptions: (city: string, psh: string) => `${city} · ${psh} sun-hours/day · indicative prices from your price list`,
-  errors: (n: number) => `${n} ${n === 1 ? 'issue' : 'issues'} — open as project to fix`,
-  warnings: (n: number) => `${n} ${n === 1 ? 'item' : 'items'} to review in the full project`,
+  // design checks in the result (top 3; the full list is in the project)
+  toFix: (n: number) => `${n} ${n === 1 ? 'issue' : 'issues'} to fix`,
+  toReview: (n: number) => `${n} ${n === 1 ? 'item' : 'items'} to review`,
+  moreIssues: (n: number) => `+ ${n} more in the full project`,
+  openToFix: 'Open as project to fix',
+  openToReview: 'Open as project to review',
   details: 'Show result details',
 
   // ---- actions
@@ -121,6 +125,12 @@ export const calcEn = {
     emptyBody: 'No projects yet. Pick how to start above — the load calculator is the quickest way to size a system.',
     stepStart: 'Pick how to start from the options above',
     noDemand: 'No demand yet',
+    // pipeline: per-status totals and superseded revisions
+    superseded: (rev: string) => `Superseded by ${rev}`,
+    supersededNewer: 'Superseded by a newer revision',
+    supersededHelp: 'A newer revision of this quote exists — it is not counted in the totals.',
+    totalsNote: (cur: string) => `Totals per status incl. VAT, in ${cur}. Superseded revisions are not counted.`,
+    totalsConverted: 'Projects in other currencies are converted at their own exchange rate (≈).',
   },
 }
 
@@ -162,8 +172,11 @@ export const calcAr: typeof calcEn = {
   production: 'الإنتاج السنوي',
   demandYear: (v: string, pct: string) => `الطلب ${I(v + ' kWh')} سنوياً · تغطية ${I(pct + '%')}`,
   assumptions: (city: string, psh: string) => `${city} · ${I(psh)} ساعة شمسية يومياً · أسعار تقريبية من قائمة أسعارك`,
-  errors: (n: number) => `ملاحظات يجب إصلاحها: ${n} — افتح الحساب كمشروع لإصلاحها`,
-  warnings: (n: number) => `بنود للمراجعة في المشروع الكامل: ${n}`,
+  toFix: (n: number) => `ملاحظات يجب إصلاحها: ${n}`,
+  toReview: (n: number) => `بنود للمراجعة: ${n}`,
+  moreIssues: (n: number) => `+ ${n} أخرى في المشروع الكامل`,
+  openToFix: 'افتح الحساب كمشروع لإصلاحها',
+  openToReview: 'افتح الحساب كمشروع لمراجعتها',
   details: 'عرض تفاصيل النتيجة',
 
   copy: 'نسخ', copyLong: 'نسخ الملخص', copied: 'نُسخ الملخص', copyFailed: 'تعذّر نسخ الملخص',
@@ -237,5 +250,10 @@ export const calcAr: typeof calcEn = {
     emptyBody: 'لا توجد مشاريع بعد. اختر طريقة البدء من الأعلى — حاسبة الأحمال أسرع طريقة لتحجيم نظام.',
     stepStart: 'اختر طريقة البدء من الخيارات أعلاه',
     noDemand: 'لا يوجد طلب بعد',
+    superseded: (rev: string) => `حلّت محلها المراجعة ${I(rev)}`,
+    supersededNewer: 'حلّت محلها مراجعة أحدث',
+    supersededHelp: 'توجد مراجعة أحدث لهذا العرض — لا يُحتسب في المجاميع.',
+    totalsNote: (cur: string) => `مجموع كل حالة شامل الضريبة بعملة ${I(cur)}. المراجعات القديمة لا تُحتسب.`,
+    totalsConverted: 'المشاريع بعملات أخرى محوّلة بسعر الصرف الخاص بكل مشروع (≈).',
   },
 }
