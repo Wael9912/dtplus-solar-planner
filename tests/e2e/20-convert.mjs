@@ -50,7 +50,7 @@ await scenario('20-convert', async (c) => {
     if (mode !== 'design') c.bad(`${ref}: card mode ${mode}`)
   }
   // a fresh known-size quote converted to full design with no loads: no NaN, empty-state guidance
-  await page.getByTestId('start-size').click(); await page.waitForTimeout(300)
+  await go(page, 'home'); await page.getByTestId('start-size').click(); await page.waitForTimeout(300)
   await goKey(page, 'size', 'info'); await convert(c, 'design')
   await goKey(page, 'design', 'results')
   if (!(await page.getByTestId('go-loads').isVisible())) c.bad('known size → full design without loads: Results do not ask for loads')

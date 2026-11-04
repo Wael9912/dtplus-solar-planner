@@ -1,5 +1,6 @@
 // Non-component helpers of the engineering tools: tool ids, number formatting, persisted inputs, the default site.
-import { useMemo } from 'react'
+import { useMemo, type ComponentType } from 'react'
+import { BatteryFull, Cable, Fuel, SolarPanel } from 'lucide-react'
 import { useAppStore } from '../../store/useAppStore'
 import { locations } from '../../data/locations'
 import { fmt } from '../../engine/format'
@@ -9,6 +10,7 @@ import { normalizeToolState } from './state'
 export const TOOL_IDS = ['strings', 'battery', 'cable', 'generator'] as const
 export type ToolId = (typeof TOOL_IDS)[number]
 export const isToolId = (x: unknown): x is ToolId => TOOL_IDS.includes(x as ToolId)
+export const TOOL_ICONS: Record<ToolId, ComponentType<{ size?: number; className?: string }>> = { strings: SolarPanel, battery: BatteryFull, cable: Cable, generator: Fuel }
 
 /** Number for display: rounded, Western digits, thousands separators; never NaN (dash). */
 export const num = (x: number | null | undefined, d = 0) => (x == null || !Number.isFinite(x) ? '–' : fmt(x, d))

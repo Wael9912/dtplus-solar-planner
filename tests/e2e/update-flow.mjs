@@ -11,14 +11,23 @@ import path from 'node:path'
 const PORT = 5181
 const URL = `http://localhost:${PORT}/`
 const STORE = 'dtplus-solar-planner-v1'
+// The version being released (package.json) — the "what's new" sheet of a v0.1 device lists every note since 0.2.0
+const VERSION = JSON.parse(fs.readFileSync(new globalThis.URL('../../package.json', import.meta.url), 'utf8')).version
+const VERSION_RE = VERSION.replace(/\./g, '\\.')
+const NOTES_SINCE_0_1 = 10 // 0.2.0: 6, 0.2.1: 1, 0.3.0: 3 — add the new version's notes when releasing
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'dt-update-'))
 const A = path.join(tmp, 'a'), B = path.join(tmp, 'b')
 for (const dir of [A, B]) execSync(`npx vite build --outDir ${dir} --emptyOutDir --logLevel error`, { stdio: 'inherit' })
 
 let root = A
+// version.json faked by the server itself (a page with the app's service worker is out of reach of Playwright's page.route in
+// WebKit): a build id that never arrives, or no answer at all (offline)
+let versionFake = null // null | { build } | 'offline'
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.ttf': 'font/ttf' }
 const server = http.createServer((req, res) => {
   const p = decodeURIComponent(new globalThis.URL(req.url, URL).pathname)
+  if (p === '/version.json' && versionFake === 'offline') { req.socket.destroy(); return }
+  if (p === '/version.json' && versionFake) { res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' }); res.end(JSON.stringify({ version: VERSION, build: versionFake.build })); return }
   let file = path.join(root, p === '/' ? 'index.html' : p)
   if (!file.startsWith(root) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) file = path.join(root, 'index.html') // SPA fallback, like Cloudflare Pages
   res.writeHead(200, { 'content-type': MIME[path.extname(file)] ?? 'application/octet-stream', 'cache-control': p === '/version.json' ? 'no-store' : 'max-age=0, must-revalidate' })
@@ -54,7 +63,7 @@ async function run(name, browserType, ctxOpts) {
     await page.goto(URL, { waitUntil: 'networkidle' })
     await sleep(2000)
     check(!(await page.locator('[data-testid=whats-new]').count()), `${name}: new device sees no "what's new"`)
-    check((await page.evaluate(() => localStorage.getItem('dtplus-seen-version'))) === '0.2.1', `${name}: version stored on a new device`)
+    check((await page.evaluate(() => localStorage.getItem('dtplus-seen-version'))) === VERSION, `${name}: version stored on a new device`)
 
     // 2. Device that ran v0.1 (store data, no stored version): release notes, in English then Arabic
     for (const lang of ['en', 'ar']) {
@@ -65,8 +74,8 @@ async function run(name, browserType, ctxOpts) {
       check(shown, `${name}/${lang}: returning v0.1 device sees "what's new"`)
       if (shown) {
         const txt = await sheet.innerText()
-        check(lang === 'en' ? /New in version 0\.2\.1/.test(txt) && /Load calculator/.test(txt) && /updates itself/.test(txt) : /الجديد في الإصدار/.test(txt) && /حاسبة الأحمال/.test(txt), `${name}/${lang}: notes cover v0.2.0 and v0.2.1`)
-        check((await sheet.locator('li').count()) === 7, `${name}/${lang}: 7 notes`)
+        check(lang === 'en' ? new RegExp(`New in version ${VERSION_RE}`).test(txt) && /Load calculator/.test(txt) && /updates itself/.test(txt) : /الجديد في الإصدار/.test(txt) && /حاسبة الأحمال/.test(txt), `${name}/${lang}: notes cover v0.2.0 to v${VERSION}`)
+        check((await sheet.locator('li').count()) === NOTES_SINCE_0_1, `${name}/${lang}: ${NOTES_SINCE_0_1} notes`)
         if (lang === 'ar') check((await page.evaluate(() => document.querySelector('[data-testid=whats-new]')?.closest('[dir]')?.getAttribute('dir'))) === 'rtl', `${name}/ar: sheet is RTL`)
         await page.screenshot({ path: path.join(tmp, `${name}-whatsnew-${lang}.png`) })
         await page.locator('[data-testid=whats-new-ok]').click()
@@ -75,7 +84,7 @@ async function run(name, browserType, ctxOpts) {
       await page.reload({ waitUntil: 'networkidle' }); await sleep(500)
       check(!(await sheet.count()), `${name}/${lang}: notes shown only once`)
     }
-    await page.evaluate((k) => { localStorage.clear(); localStorage.setItem(k, JSON.stringify({ state: { lang: 'en' }, version: 3 })); localStorage.setItem('dtplus-seen-version', '0.2.1') }, STORE)
+    await page.evaluate(([k, v]) => { localStorage.clear(); localStorage.setItem(k, JSON.stringify({ state: { lang: 'en' }, version: 3 })); localStorage.setItem('dtplus-seen-version', v) }, [STORE, VERSION])
     await page.reload({ waitUntil: 'networkidle' })
 
     // 3. New version published while the app is open; the user comes back to the tab → reloads by itself, data and screen kept
@@ -88,7 +97,7 @@ async function run(name, browserType, ctxOpts) {
     check(await reloaded(), `${name}: coming back to the tab after a publish reloads the app`)
     check((await bundle()) === bundleOf(B), `${name}: the new build is running`)
     await page.locator('[data-testid=toast]').first().waitFor({ timeout: 5000 }).catch(() => {})
-    check(/updated to version 0\.2\.1/.test(await toastText()), `${name}: "The app was updated" message shown`)
+    check(new RegExp(`updated to version ${VERSION_RE}`).test(await toastText()), `${name}: "The app was updated" message shown`)
     check(page.url().endsWith('#/settings'), `${name}: same screen after the update (${page.url()})`)
     check((await page.locator('[data-testid=settings-name]').inputValue()) === 'Update Test Co', `${name}: data kept through the update`)
 
@@ -116,7 +125,7 @@ async function run(name, browserType, ctxOpts) {
 
     // 6. Loop guard: version.json names a build the reload cannot deliver → one reload, then the banner, never a loop
     await sleep(GAP)
-    await page.route('**/version.json*', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ version: '0.2.1', build: 'never-arrives' }) }))
+    versionFake = { build: 'never-arrives' }
     let loads = 0
     page.on('load', () => loads++)
     await markPage(); await resume()
@@ -124,25 +133,25 @@ async function run(name, browserType, ctxOpts) {
     await sleep(4000)
     check(loads === 1, `${name}: exactly one reload for a build that never arrives (loads=${loads})`)
     check(await banner.isVisible(), `${name}: then the banner instead of another reload`)
-    await page.unroute('**/version.json*')
+    versionFake = null
 
     // 7. Settings → "Check for updates": up to date, and offline
     await page.goto(URL + '#/settings', { waitUntil: 'networkidle' })
     await page.locator('[data-testid=check-updates]').click()
     await page.locator('[data-testid=toast]').first().waitFor({ timeout: 5000 }).catch(() => {})
     check(/latest version/.test(await toastText()), `${name}: manual check says "latest version"`)
-    await page.route('**/version.json*', (r) => r.abort())
+    versionFake = 'offline'
     await page.locator('[data-testid=check-updates]').click()
     await page.waitForFunction(() => /Could not check/.test(document.body.innerText), null, { timeout: 5000 }).catch(() => {})
     check(/Could not check/.test(await toastText()), `${name}: manual check offline says so`)
-    await page.unroute('**/version.json*')
+    versionFake = null
     // Offline resume never reloads (a reload while offline would leave a browser error page)
     await sleep(GAP)
-    await page.route('**/version.json*', (r) => r.abort())
+    versionFake = 'offline'
     root = A
     await markPage(); await resume(); await sleep(2000)
     check(await page.evaluate(() => window.__same === 1), `${name}: offline resume does not reload`)
-    await page.unroute('**/version.json*')
+    versionFake = null
     check(!errors.length, `${name}: no page errors ${errors.join(' | ').slice(0, 300)}`)
   } catch (e) {
     issue(`${name}: crashed: ${e?.stack || e}`)

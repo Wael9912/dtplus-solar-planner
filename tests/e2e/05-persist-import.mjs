@@ -24,7 +24,7 @@ if ((await cards.count()) !== 5) issue('undo delete failed'); else pass('undo de
 await cards.nth(0).getByTestId('project-menu').click(); await page.getByTestId('project-delete').click(); await page.getByRole('button', { name: 'Yes, delete' }).click(); await page.waitForTimeout(150)
 // search + empty search message + status filter
 await page.getByPlaceholder('Search projects…').fill('khartoum'); await page.waitForTimeout(300)
-if ((await cards.count()) !== 1) issue(`search filter failed: ${JSON.stringify(await cards.locator('h3').allInnerTexts())}`)
+if ((await cards.count()) !== 1) issue(`search filter failed: ${JSON.stringify(await cards.locator('h2').allInnerTexts())}`)
 await page.getByPlaceholder('Search projects…').fill('zzzz'); await page.waitForTimeout(200)
 if (!/No projects match “zzzz”/.test(await page.locator('main').innerText())) issue('search: wrong empty-search message'); else pass('search: empty-search message')
 await page.getByRole('button', { name: 'Clear filters' }).click()

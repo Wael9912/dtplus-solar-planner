@@ -20,6 +20,11 @@ export const updatesEn = {
       'Daily power-cut hours now count in the savings of hybrid systems.',
     ],
     '0.2.1': ['The app now updates itself when a new version is published, and tells you what changed.'],
+    '0.3.0': [
+      'New home screen: every feature in one place — the load calculator and the four engineering calculators, quotes, and your company — with your latest work at the top.',
+      'History: every saved project and quote, one tap away from any screen (the clock button at the top).',
+      'Install as an app: tap “Install app” at the top of the Home screen (or in Company settings) to put the planner on your phone or computer. It opens full screen and works without internet.',
+    ],
   } as Record<string, readonly string[]>,
 }
 
@@ -40,5 +45,10 @@ export const updatesAr: typeof updatesEn = {
       'ساعات انقطاع الشبكة اليومية تُحسب الآن في توفير الأنظمة الهجينة.',
     ],
     '0.2.1': ['يتحدّث التطبيق الآن تلقائياً عند نشر إصدار جديد، ويخبرك بما تغيّر.'],
+    '0.3.0': [
+      'شاشة رئيسية جديدة: كل الميزات في مكان واحد — حاسبة الأحمال والحاسبات الهندسية الأربع، وعروض الأسعار، وبيانات شركتك — وأحدث أعمالك في الأعلى.',
+      'السجل: كل المشاريع وعروض الأسعار المحفوظة، على بُعد نقرة واحدة من أي شاشة (زر الساعة في الأعلى).',
+      'ثبّت التطبيق: اضغط «تثبيت التطبيق» أعلى الشاشة الرئيسية للتطبيق (أو في إعدادات الشركة) لوضع المخطط على هاتفك أو حاسوبك. يفتح بملء الشاشة ويعمل دون إنترنت.',
+    ],
   },
 }

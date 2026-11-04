@@ -87,11 +87,14 @@ export async function goStep(page, i) {
   await page.waitForTimeout(250)
 }
 
-/** Load the 4 sample projects (first-run card, or the Projects page ⋯ menu). */
+/** Load the 4 sample projects (first-run card on Home or History, or the History ⋯ menu) — ends on the History list. */
 export async function loadSamples(page) {
   const first = page.getByTestId('load-samples')
   if (await first.isVisible()) await first.click()
-  else { await page.getByTestId('projects-menu').click(); await page.getByTestId('menu-samples').click() }
+  else {
+    if (!(await page.getByTestId('projects-menu').isVisible())) await nav(page, 'projects')
+    await page.getByTestId('projects-menu').click(); await page.getByTestId('menu-samples').click()
+  }
   await page.waitForTimeout(300)
 }
 

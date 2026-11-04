@@ -1,32 +1,24 @@
 import { useMemo, useRef, useState, type ReactNode } from 'react'
-import { Plus, Copy, Trash2, Upload, Search, FolderOpen, Download, Building2, Sparkles, Check, X, Calculator, ArrowLeft, ArrowRight, GitBranchPlus } from 'lucide-react'
+import { Plus, Copy, Trash2, Upload, Search, FolderOpen, Download, Building2, Sparkles, Check, X, GitBranchPlus, House } from 'lucide-react'
 import { useAppStore, STATUSES } from '../store/useAppStore'
 import { useT } from '../i18n'
 import { computeProject } from '../engine/compute'
 import { buildQuote, formatQuoteMoney } from '../engine/quote'
 import { fmt, fxOf } from '../engine/format'
 import { projectMode } from '../engine/sizing'
-import { companyTitle, fmtDate, matchAppliance, projectTitle } from '../i18n/labels'
+import { companyTitle, fmtDate, projectTitle } from '../i18n/labels'
 import { Badge } from './ui'
 import { ConfirmDialog, Menu, Sheet } from './overlay'
 import { usePriceBook } from './useEngine'
 import { useStartActions, type StartAction } from './startMenu'
 import { hasDemand } from './wizardModel'
+import { localizedSamples, statusLevel } from './projectMeta'
 import type { Project } from '../engine/types'
-import { sampleProjects } from '../data/samples'
 import { download } from '../export/download'
 import { toast } from '../store/useToast'
 import { normalizeSearch } from '../data/searchKeywords'
 
 type Status = Project['status']
-const statusLevel: Record<Status, 'neutral' | 'info' | 'ok' | 'error'> = { draft: 'neutral', quoted: 'info', approved: 'ok', installed: 'ok', lost: 'error' }
-// Arabic display data for the bundled samples (keyed by quote reference)
-const SAMPLE_AR: Record<string, Partial<Project>> = {
-  'Q-2026-0112': { name: 'فيلا الرياض — نظام هجين 10 كيلوواط', clientName: 'أحمد الفهد', clientAddress: 'حي الياسمين، الرياض' },
-  'Q-2026-0098': { name: 'مزرعة الأبيض — مضخة منفصلة عن الشبكة', clientName: 'مريم عثمان', clientAddress: 'الأبيض، شمال كردفان' },
-  'Q-2026-0105': { name: 'صيدلية الخرطوم — نظام هجين احتياطي', clientName: 'صيدلية د. صلاح', clientAddress: 'شارع 15، العمارات، الخرطوم' },
-  'Q-2026-0120': { name: 'مستودع دبي — 100 كيلوواط متصل بالشبكة', clientName: 'الخليج للخدمات اللوجستية ذ.م.م', clientAddress: 'المنطقة الحرة بجبل علي' },
-}
 const revBase = (ref?: string) => (ref ?? '').trim().replace(/-R\d+$/, '')
 const revNo = (ref?: string) => Number(/-R(\d+)$/.exec((ref ?? '').trim())?.[1] ?? 1)
 /** Short money for the status chips: $12.4K, 1.2M SDG. */
@@ -77,23 +69,21 @@ function phoneMatch(phone: string, query: string): boolean {
   return d.length >= 7 ? ph.includes(d.slice(-9)) : ph.includes(d)
 }
 
-/** Home: start hub (every way to start work, the load calculator first) and the project list. */
+/** History: every saved project and quote — search, status filters with pipeline totals, revisions; new work starts from the home screen or the FAB. */
 export function ProjectsPage() {
-  const { t, lang, dir } = useT()
+  const { t, lang } = useT()
   const C = t.calc.home
   const projects = useAppStore((s) => s.projects)
   const company = useAppStore((s) => s.company)
-  const calc = useAppStore((s) => s.calc)
   const book = usePriceBook()
   const start = useStartActions()
-  const { openProject, deleteProject, restoreProject, duplicateProject, newRevision, importProject, importMany, setView, startCalc } = useAppStore.getState()
+  const { openProject, deleteProject, restoreProject, duplicateProject, newRevision, importProject, importMany, setView } = useAppStore.getState()
   const [q, setQ] = useState('')
   const [status, setStatus] = useState<Status | 'all'>('all')
   const [sort, setSort] = useState<'updated' | 'name' | 'value'>('updated')
   const [confirm, setConfirm] = useState<Project | null>(null)
   const [startSheet, setStartSheet] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
-  const Arrow = dir === 'rtl' ? ArrowLeft : ArrowRight
 
   // Card figures with the company price list; "value" = total in USD (comparable across currencies), 0 while there is nothing to price
   const enriched = useMemo(() => projects.map((p) => {
@@ -127,15 +117,6 @@ export function ProjectsPage() {
     return [...xs].sort((a, b) => sort === 'name' ? projectTitle(a.p.name, t).localeCompare(projectTitle(b.p.name, t), lang) : sort === 'value' ? b.value - a.value : b.p.updatedAt.localeCompare(a.p.updatedAt))
   }, [enriched, q, status, sort, t, lang])
 
-  // The load calculator's scratch work (kept until "Make full proposal" or Clear)
-  const scratch = useMemo(() => {
-    if (!calc) return null
-    if (calc.sizing?.demand === 'bill') return calc.sizing.bill.monthlyKwh > 0 ? C.continueBill(fmt(calc.sizing.bill.monthlyKwh)) : null
-    if (!calc.loads.length) return null
-    const kwh = calc.loads.reduce((s, l) => s + l.watts * l.qty * l.hoursPerDay, 0) / 1000
-    return C.continueLoads(calc.loads.length, fmt(kwh, 1))
-  }, [calc, C])
-
   const onImport = async (f: File) => {
     try {
       const p = importProject(JSON.parse(await f.text()))
@@ -143,11 +124,7 @@ export function ProjectsPage() {
     } catch { toast({ message: t.projects.importError, tone: 'err' }) }
   }
   const loadSamples = () => {
-    const xs = sampleProjects().map((p) => {
-      if (lang !== 'ar') return p
-      return { ...p, ...SAMPLE_AR[p.reference], loads: p.loads.map((l) => ({ ...l, name: matchAppliance(l.name)?.nameAr ?? l.name })) }
-    })
-    importMany(xs)
+    importMany(localizedSamples(lang))
     toast({ message: t.projects.samplesLoaded })
   }
   const doDelete = (p: Project) => {
@@ -166,43 +143,13 @@ export function ProjectsPage() {
   const runStart = (a: StartAction) => { setStartSheet(false); a.run() }
 
   return (
-    <div className="space-y-6 sm:space-y-8">
+    <div className="space-y-6 sm:space-y-8" data-testid="history-page">
       <input ref={fileRef} type="file" accept="application/json,.json" hidden data-testid="import-file" onChange={(e) => { const f = e.target.files?.[0]; if (f) onImport(f); e.target.value = '' }} />
-
-      {/* Start hub: every way to start work, in the order a sales desk reaches for them */}
-      <section aria-labelledby="start-title" data-testid="start-hub">
-        <h1 id="start-title" className="text-display text-slate-900">{C.title}</h1>
-        {scratch && (
-          <button type="button" onClick={() => startCalc()} data-testid="continue-calc"
-            className="mt-3 flex min-h-14 w-full items-center gap-3 rounded-xl border border-brand-300 bg-brand-50 px-3 py-2.5 text-start transition hover:bg-brand-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 sm:px-4">
-            <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-brand-700 text-white"><Calculator size={20} /></span>
-            <span className="min-w-0 flex-1">
-              <span className="block font-semibold text-brand-900">{C.continue}</span>
-              <span className="block truncate text-sm text-brand-800">{scratch}</span>
-            </span>
-            <Arrow size={20} className="shrink-0 text-brand-700" aria-hidden="true" />
-          </button>
-        )}
-        <ul className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 lg:grid-cols-5">
-          {start.map((a, i) => (
-            <li key={a.key} className={i === start.length - 1 && start.length % 2 ? 'col-span-2 sm:col-span-1' : ''}>
-              <button type="button" onClick={a.run} data-testid={`start-${a.key}`} title={a.help}
-                className="card flex h-full min-h-16 w-full items-center gap-3 p-3 text-start transition hover:border-brand-400 hover:bg-brand-50/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 sm:flex-col sm:items-start sm:gap-2 sm:p-4">
-                <span className={`grid size-10 shrink-0 place-items-center rounded-lg ${i < 2 ? 'bg-brand-700 text-white' : 'bg-brand-50 text-brand-700'}`}><a.icon size={20} /></span>
-                <span className="min-w-0">
-                  <span className="block text-sm leading-snug font-semibold text-slate-900 sm:text-[0.9375rem]">{a.label}</span>
-                  <span className="mt-1 hidden text-xs leading-5 text-slate-600 sm:block">{a.help}</span>
-                </span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      </section>
 
       <section aria-labelledby="projects-title" className="space-y-4">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h2 id="projects-title" className="text-[1.25rem] leading-7 font-semibold text-slate-900">{t.projects.title}</h2>
+            <h1 id="projects-title" className="text-display text-slate-900">{t.projects.title}</h1>
             {projects.length > 0 && <p className="mt-0.5 text-sm text-slate-500">{t.projects.count(projects.length)}</p>}
           </div>
           <div className="flex items-center gap-2">
@@ -217,10 +164,10 @@ export function ProjectsPage() {
         {projects.length === 0 ? (
           <section className="card p-5 sm:p-8" data-testid="get-started">
             <div className="flex items-center gap-3"><span className="grid size-12 shrink-0 place-items-center rounded-full bg-brand-50 text-brand-700"><FolderOpen size={24} /></span>
-              <div><h3 className="card-title">{t.projects.getStarted}</h3><p className="text-sm text-slate-600">{C.emptyBody}</p></div></div>
+              <div><h2 className="card-title">{t.projects.getStarted}</h2><p className="text-sm text-slate-600">{C.emptyBody}</p></div></div>
             <ol className="mt-5 space-y-2">
               <Step n={1} done={companyDone} label={t.projects.stepCompany} action={<button type="button" className="btn-secondary" onClick={() => setView('settings')}><Building2 size={18} />{t.nav.settings}</button>} />
-              <Step n={2} done={false} label={C.stepStart} />
+              <Step n={2} done={false} label={C.stepStart} action={<button type="button" className="btn-secondary" onClick={() => setView('home')} data-testid="go-home"><House size={18} />{C.goHome}</button>} />
               <Step n={3} done={false} label={t.projects.stepSamples} action={<button type="button" className="btn-secondary" onClick={loadSamples} data-testid="load-samples"><Sparkles size={18} />{t.projects.sample}</button>} />
             </ol>
           </section>
@@ -266,9 +213,9 @@ export function ProjectsPage() {
                     <li key={p.id} data-testid="project-card" data-mode={mode} className="card group relative flex flex-col p-4 transition hover:border-slate-300 hover:shadow-md focus-within:ring-2 focus-within:ring-brand-500">
                       <div className="flex items-start gap-2">
                         <div className="min-w-0 flex-1">
-                          <h3 className="font-semibold text-slate-900">
+                          <h2 className="font-semibold text-slate-900">
                             <button type="button" data-testid="project-open" onClick={() => openProject(p.id)} className="text-start after:absolute after:inset-0 after:rounded-xl after:content-[''] focus-visible:outline-none group-hover:text-brand-800"><bdi>{projectTitle(p.name, t)}</bdi></button>
-                          </h3>
+                          </h2>
                           <p className="mt-0.5 truncate text-sm text-slate-500"><bdi>{[p.clientName || '—', p.reference].filter(Boolean).join(' · ')}</bdi></p>
                           {old != null && <p className="mt-1"><span className="badge-neutral bg-white whitespace-normal text-slate-500" title={C.supersededHelp} data-testid="project-superseded">{old ? C.superseded(old) : C.supersededNewer}</span></p>}
                         </div>

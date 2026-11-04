@@ -6,7 +6,8 @@ for (const [vpName, vp] of [['desktop', DESKTOP], ['mobile', MOBILE]]) {
   await gotoApp(page); await clearStorage(page); await page.reload({ waitUntil: 'networkidle' })
   await shot(page, `01-${vpName}-empty`)
   const emptyTxt = await page.locator('body').innerText()
-  if (!/No projects yet/.test(emptyTxt)) issue(`${vpName}: empty state text missing`)
+  // first start opens the home screen with its "New here?" card; the history is empty until the samples load
+  if (!/New here\?/.test(emptyTxt)) issue(`${vpName}: empty state text missing`)
   await checkPage(page, `${vpName} empty`)
   await loadSamples(page)
   await shot(page, `01-${vpName}-samples`)
@@ -23,7 +24,7 @@ for (const [vpName, vp] of [['desktop', DESKTOP], ['mobile', MOBILE]]) {
   reportErrors(errors, `${vpName} projects page`)
 
   for (let i = 0; i < n; i++) {
-    const name = (await cards.nth(i).locator('h3').innerText()).trim()
+    const name = (await cards.nth(i).locator('h2').innerText()).trim()
     await openCard(page, i)
     for (let s = 0; s < 7; s++) {
       await goStep(page, s)

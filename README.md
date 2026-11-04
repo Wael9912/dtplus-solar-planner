@@ -9,12 +9,12 @@ Runs entirely in the browser (no backend); projects and the company price list a
 
 ## Features
 
-- Start hub — pick only what the job needs:
+- Home screen — every feature has its own tile, grouped by use (calculators · quotes & proposals · history & company), with the latest work on top; pick only what the job needs:
   - **Load calculator**: appliances (or monthly bill) → kWh/day, peak, recommended panels / battery / inverter and an indicative price on one screen; copy, WhatsApp share, 1-page PDF, "make full proposal"
   - **Quote a known size**: the client already chose e.g. 5 kWp + 5 kW + 10 kWh → priced quote without a load list; "no panels" (battery backup / UPS) and "no battery" options
   - **Product quote**: counter sale / spare parts — pick products from the catalogue, get a quotation
   - **Full design**: 7-step wizard Client → Loads (appliances or electricity bill) → Site & sun → System → Results → Pricing → Export
-  - **Engineering tools**: string checker, battery bank, cable & breaker, generator & inverter sizing — no project needed
+  - **Engineering calculators** (each its own tile): string checker, battery bank, cable & breaker, generator & inverter sizing — no project needed
 - Projects convert between modes; equipment already on site (upgrades) is designed but not quoted; daily grid-outage hours value hybrid savings at the diesel cost
 - Company price list: own prices, products not stocked (never auto-selected), own products with datasheet values, services rates; company file and full backup to share one setup across staff devices
 - Sent quotes keep the prices they were quoted with ("Use current prices" to re-price); Arabic company name, tagline and terms for Arabic documents
@@ -26,9 +26,9 @@ Runs entirely in the browser (no backend); projects and the company price list a
 - Design checks (OK / warning / error) explaining every issue
 - Bill of materials with editable prices and quantities, catalogue picker, custom lines, margin, discount, VAT, multi-currency
 - Exports: branded client proposal PDF, quotation-only PDF, technical design PDF, 1-page estimate PDF, Excel workbook with live formulas, project JSON
-- Pipeline: draft / quoted / approved / installed / lost, search by name, phone, email or reference, new revision (-R2, -R3 …)
+- History (one tap from any screen): draft / quoted / approved / installed / lost with per-status totals, search by name, phone, email or reference, new revision (-R2, -R3 …)
 - English / Arabic (RTL) interface; company branding (logo, colour, terms) for quotations
-- Works offline after first load; mobile friendly
+- Installable app (Android, iPhone/iPad, Windows, Mac): home-screen icon, full screen, works offline (the service worker caches the whole app, PDF and Excel export included) and updates itself when a new version is published; mobile friendly
 
 ## Development
 

@@ -237,7 +237,8 @@ export function validateBattery(x: BatteryBankInput): BatteryField[] {
     if (!within(x.hours, 0.01, 240)) bad.push('hours')
   } else {
     if (!within(x.energyKwh, 0.001, 100000)) bad.push('energy')
-    if (x.loadW != null && !within(x.loadW, 0, 1e7)) bad.push('loadW')
+    // optional load for the backup time: empty or 0 = none, else the load basis range (a 1e-300 W load gave Infinity hours)
+    if (x.loadW != null && x.loadW !== 0 && !within(x.loadW, 0.1, 1e7)) bad.push('loadW')
   }
   if (!within(m.nominalVoltage, 1, 2000)) bad.push('V')
   if (!within(m.capacityAh, 0.1, 100000)) bad.push('Ah')

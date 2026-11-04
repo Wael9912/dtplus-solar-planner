@@ -9,18 +9,18 @@ import { updatesEn } from './updates'
 export const en = {
   appName: 'DT+ Solar Planner', appShort: 'Solar Planner', tagline: 'Step-by-step solar design, sizing & quotation', by: 'Product developed by DT+',
   nav: {
-    projects: 'Projects', settings: 'Company settings', newProject: 'New project', newShort: 'New', back: 'Back', next: 'Next', finish: 'Finish', save: 'Saved', language: 'العربية',
-    languageLabel: 'Language', menu: 'Menu', allProjects: 'All projects',
+    projects: 'History', settings: 'Company settings', newProject: 'New project', newShort: 'New', back: 'Back', next: 'Next', finish: 'Finish', save: 'Saved', language: 'العربية',
+    languageLabel: 'Language', menu: 'Menu', allProjects: 'History',
     nextTo: (step: string) => `Next: ${step}`, stepOf: (i: number, n: number) => `Step ${i} of ${n}`, steps: 'Project steps', aboutStep: 'About this step',
     clientView: 'Client view', clientViewHelp: 'Hides cost prices and markup so you can show the screen to the client.', savedAuto: 'Saved automatically',
-    issues: (n: number) => `${n} ${n === 1 ? 'issue' : 'issues'}`, noIssues: 'No issues', finishHelp: 'Back to all projects',
+    issues: (n: number) => `${n} ${n === 1 ? 'issue' : 'issues'}`, noIssues: 'No issues', finishHelp: 'Back to history',
     home: 'Home', tools: 'Tools', prices: 'Price list', newMenu: 'Start something new',
     pricesLocked: (d: string) => `This quote keeps the prices it was sent with${d ? ` (${d})` : ''}. Your price list has changed since.`, useCurrentPrices: 'Use current prices',
   },
   /** Project modes and the start menu (home tiles, header "New" menu). */
   modes: {
     short: { design: 'Full design', size: 'Known size', items: 'Product quote' },
-    calc: 'Load calculator', calcHelp: 'List the appliances and get the system size and a rough price on one screen.',
+    calc: 'Load calculator', calcHelp: 'List the appliances — or enter the electricity bill — and get the system size and a rough price on one screen.',
     design: 'Full design', designHelp: 'Client, appliances or bill, site, equipment, pricing and proposal — every step.',
     size: 'Quote a known size', sizeHelp: 'The client already chose the system (e.g. 5 kW + 10 kWh): price it without a load list.',
     items: 'Product quote', itemsHelp: 'Counter sale or spare parts: pick products, get a priced quotation.',
@@ -141,7 +141,7 @@ export const en = {
     pdf: 'Client proposal (PDF)', pdfHelp: 'Branded quotation with system summary, savings, bill of materials and terms.', excel: 'Engineering workbook (Excel)', excelHelp: 'Loads, sizing, strings, cables, BOM with live formulas, monthly production.', json: 'Project file (JSON)', jsonHelp: 'Backup or share with a colleague; import from the Projects page.', print: 'Print', generating: 'Generating…', techPdf: 'Technical datasheet (PDF)', techHelp: 'Engineering-only report: string design, cable schedule, checks and loss breakdown.',
   },
   projects: {
-    title: 'Projects', empty: 'No projects yet. Create your first solar project.', search: 'Search projects…', import: 'Import project file (JSON)', duplicate: 'Duplicate', delete: 'Delete', open: 'Open', confirmDelete: 'Delete this project?', confirmDeleteBody: (name: string) => `“${name}” will be removed. You can undo right after.`,
+    title: 'History', empty: 'No projects yet. Create your first solar project.', search: 'Search projects…', import: 'Import project file (JSON)', duplicate: 'Duplicate', delete: 'Delete', open: 'Open', confirmDelete: 'Delete this project?', confirmDeleteBody: (name: string) => `“${name}” will be removed. You can undo right after.`,
     created: 'Created', updated: 'Updated', client: 'Client', size: 'Size', total: 'Total', yes: 'Yes, delete', no: 'Cancel', sample: 'Load sample projects',
     count: (n: number) => `${n} ${n === 1 ? 'project' : 'projects'}`, all: 'All', sort: 'Sort by', sortUpdated: 'Last updated', sortName: 'Name', sortValue: 'Value',
     noMatch: (q: string) => `No projects match “${q}”.`, noMatchStatus: 'No projects with this status.', clearSearch: 'Clear filters', importError: 'This file isn’t a project exported from this app (.json).',
@@ -152,8 +152,20 @@ export const en = {
   settings: {
     title: 'Company settings', company: 'Company name', tagline: 'Tagline', phone: 'Phone', email: 'Email', website: 'Website', address: 'Address', logo: 'Logo', upload: 'Upload logo', remove: 'Remove', color: 'Brand colour', validity: 'Quote validity (days)', terms: 'Terms & conditions', saved: 'Settings saved', currency: 'Default currency', fx: 'Default exchange rate', margin: 'Default markup on cost %', vat: 'Default VAT %',
     brand: 'Brand & contact', quoteDefaults: 'Quote defaults', quoteDefaultsHelp: 'Applied to every new project. Existing projects keep their own values.', autoSave: 'Changes save automatically.', preview: 'Quote header preview',
-    about: 'About', version: (v: string) => `Version ${v}`, defaultName: 'Your Solar Company', defaultTagline: 'Clean energy, engineered.', defaultTerms: 'Prices are valid for the stated period and subject to stock availability. 50% deposit on order, balance on commissioning. Equipment warranties as per manufacturer. Installation workmanship warranty: 2 years. Civil works, grid connection fees and permits are excluded unless stated.', location: 'Default location', colorHex: 'Hex colour',
+    about: 'About', version: (v: string) => `Version ${v}`, defaultName: 'Your Solar Company', defaultTagline: 'Clean energy, engineered.', defaultTerms: 'Prices are valid for the stated period and subject to stock availability. 50% deposit on order, balance on commissioning. Equipment warranties as per manufacturer. Installation workmanship warranty: 2 years. Civil works, grid connection fees and permits are excluded unless stated.', location: 'Default location', colorHex: 'Hex colour', logoError: 'This image could not be read. Use a PNG or JPEG file.',
   },
+  /** Installing the app (src/pwa.ts): home banner, menu item, Settings → About, steps for browsers without an install dialog. */
+  install: {
+    button: 'Install app', banner: 'Install it as an app: opens from its own icon, full screen, and works without internet.', close: 'Close',
+    installed: 'Installed on this device', settingsHelp: 'Put the planner on your phone’s home screen or your computer like any app: its own icon and window, and it works without internet.',
+    keep: 'Your projects stay on this device, and the app keeps updating itself.',
+    ios: { title: 'Add to Home Screen', steps: ['Tap the Share button (the square with an arrow) in the browser bar.', 'Scroll down and tap “Add to Home Screen”.', 'Tap “Add”. Open the planner from its icon from now on.'] },
+    mac: { title: 'Add to Dock', steps: ['In Safari, open the File menu (or tap the Share button).', 'Choose “Add to Dock”.', 'Click “Add”. Open the planner from the Dock from now on.'] },
+    other: { title: 'Install the app', steps: ['Open the browser menu (⋮ or ⋯).', 'Choose “Install app” or “Add to Home screen”.', 'Confirm. The planner opens in its own window from now on.'] },
+    otherNote: 'Works in Chrome, Edge and Samsung Internet on phones and computers, and in Safari on iPhone, iPad and Mac.',
+  },
+  /** Saving to this device failed (src/store/useSaveState.ts). */
+  storage: { full: 'Changes are not being saved: the app’s storage on this device is full. Download a backup, then delete old projects or a large logo.', backup: 'Backup', notSaved: 'Not saved' },
   common: {
     usd: 'USD', kwh: 'kWh', kw: 'kW', kwp: 'kWp', wh: 'Wh', w: 'W', v: 'V', a: 'A', m2: 'm²', kg: 'kg', day: '/day', ok: 'OK', warn: 'Review', error: 'Must fix', pcs: 'pcs', m: 'm', lot: 'lot',
     actions: 'Actions', remove: 'Remove', edit: 'Edit', close: 'Close', apply: 'Apply', cancel: 'Cancel', auto: 'auto', hours: 'h', days: 'd', errors: 'Errors', warnings: 'Warnings', undo: 'Undo', delete: 'Delete',

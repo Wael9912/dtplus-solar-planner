@@ -14,6 +14,7 @@ await scenario('22-abuse-nav', async (c) => {
   // ---- double taps
   await loadSamples(page)
   const nProj = await projectCards(page).count()
+  await go(page, 'home')
   await tap2(page.getByTestId('start-size')); await page.waitForTimeout(400)
   await go(page, 'projects')
   const nAfter = await projectCards(page).count()
@@ -82,8 +83,8 @@ await scenario('22-abuse-nav', async (c) => {
 
   // ---- refresh on every route (typed URL, then reload)
   const routes = [['#/calc', 'calc-page'], ['#/tools', 'tools-page'], ['#/tools/strings', 'tool-strings'], ['#/tools/battery', 'tool-battery'], ['#/prices', 'prices-page'],
-    ['#/settings', 'settings-currency'], ['#/projects', 'start-hub'], [`#/p/${id}/3`, 'site-location'], [`#/p/${id}/7`, 'export-step'],
-    [`#/p/${id}/99`, 'export-step'], ['#/p/does-not-exist/3', 'start-hub'], ['#/tools/nope', 'tools-page'], ['#/garbage', null], [`#/p/${id}/0`, null]]
+    ['#/settings', 'settings-currency'], ['#/projects', 'history-page'], ['#/history', 'history-page'], ['#/home', 'home-page'], [`#/p/${id}/3`, 'site-location'], [`#/p/${id}/7`, 'export-step'],
+    [`#/p/${id}/99`, 'export-step'], ['#/p/does-not-exist/3', 'history-page'], ['#/tools/nope', 'tools-page'], ['#/garbage', null], [`#/p/${id}/0`, null]]
   for (const [h, tid] of routes) {
     await page.goto('about:blank'); await page.goto(`${URL}${h}`, { waitUntil: 'networkidle' }); await page.waitForTimeout(300)
     await page.reload({ waitUntil: 'networkidle' }); await page.waitForTimeout(400)

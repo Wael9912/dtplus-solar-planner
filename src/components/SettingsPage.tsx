@@ -16,6 +16,8 @@ import { download } from '../export/download'
 import { toast } from '../store/useToast'
 import { checkForUpdate } from '../updates'
 import type { PriceBook, Phase, SystemType } from '../engine/types'
+import { InstallSetting } from './InstallApp'
+import { shrinkLogo } from './logo'
 
 /** Edited prices (catalogue products), not-stocked products and own products of a price list. */
 function bookCounts(b: PriceBook) {
@@ -82,7 +84,7 @@ export function SettingsPage() {
     const bc = c ? bookCounts(normalizePriceBook(c.priceBook)) : null
     return { file: tp.file.fileInfo(nm ? `${nm} (${pending.name})` : pending.name, when), counts: bc ? tp.file.fileCounts(bc.edited, bc.hidden, bc.own) : null }
   })()
-  const onLogo = (f: File) => { const r = new FileReader(); r.onload = () => setCompany({ logoDataUrl: String(r.result) }); r.readAsDataURL(f) }
+  const onLogo = (f: File) => { shrinkLogo(f).then((logoDataUrl) => setCompany({ logoDataUrl }), () => toast({ message: t.settings.logoError, tone: 'err' })) }
   // Preview in the UI language: the Arabic name / tagline in Arabic (each falling back to the other language)
   const nameAr = companyTitle(company.nameAr ?? ''), nameEn = companyTitle(company.name)
   const name = (lang === 'ar' ? nameAr ?? nameEn : nameEn ?? nameAr) ?? t.settings.defaultName
@@ -196,7 +198,7 @@ export function SettingsPage() {
         </button>
       </Section>
 
-      <Section title={tp.file.title} description={tp.file.help}>
+      <Section id="company-file" title={tp.file.title} description={tp.file.help} className="scroll-mt-20">
         <input ref={companyFileRef} type="file" accept="application/json,.json" hidden data-testid="import-company-file" onChange={(e) => { const f = e.target.files?.[0]; if (f) onCompanyFile(f); e.target.value = '' }} />
         <input ref={backupFileRef} type="file" accept="application/json,.json" hidden data-testid="restore-file" onChange={(e) => { const f = e.target.files?.[0]; if (f) onBackupFile(f); e.target.value = '' }} />
         <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -242,6 +244,7 @@ export function SettingsPage() {
           }}>
           <RefreshCw size={18} className={checking ? 'animate-spin' : ''} />{t.updates.check}
         </button>
+        <InstallSetting />
       </Section>
     </div>
   )

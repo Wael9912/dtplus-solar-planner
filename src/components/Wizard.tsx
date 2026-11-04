@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { ChevronLeft, ChevronRight, ChevronDown, Check, PlugZap, CloudCheck, Info, Lock } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ChevronDown, Check, PlugZap, CloudCheck, CloudAlert, Info, Lock } from 'lucide-react'
 import { useAppStore, useCurrentProject } from '../store/useAppStore'
 import { useT } from '../i18n'
 import { formatQuoteMoney, type Quote } from '../engine/quote'
@@ -19,6 +19,7 @@ import { ChecksList } from './Checks'
 import { stepsFor, stepStatuses, realIssues, hasDemand, type StepStatus } from './wizardModel'
 import { useComputed } from './useEngine'
 import type { Project, Results, StepKey } from '../engine/types'
+import { useSaveState } from '../store/useSaveState'
 
 export interface StepProps { project: Project; results: Results; quote: Quote; update: (patch: Partial<Project> | ((p: Project) => Partial<Project>)) => void; goTo: (s: StepKey) => void }
 function StatusCircle({ status, n, current }: { status: StepStatus; n: number; current: boolean }) {
@@ -33,6 +34,7 @@ const segCls: Record<StepStatus, string> = { done: 'bg-brand-600', todo: 'bg-sla
 
 export function Wizard() {
   const { t, dir } = useT()
+  const saveFailed = useSaveState((x) => x.failed)
   const project = useCurrentProject()
   const step = useAppStore((s) => s.step)
   const setStep = useAppStore((s) => s.setStep)
@@ -101,7 +103,9 @@ export function Wizard() {
             ? <button type="button" data-testid="issues-btn" className={`badge ${nErr ? 'badge-err' : 'badge-warn'} min-h-9 cursor-pointer px-3 text-sm`} onClick={() => setSheet('issues')}>{t.nav.issues(issues.length)}</button>
             : hasLoads ? <span className="badge-ok min-h-9 px-3 text-sm"><Check size={14} />{t.nav.noIssues}</span> : null}
           <Switch checked={clientView} onChange={setClientView} label={t.nav.clientView} data-testid="client-view" />
-          <span className="hidden items-center gap-1 text-xs text-slate-500 lg:inline-flex"><CloudCheck size={14} />{t.nav.savedAuto}</span>
+          {saveFailed
+            ? <span className="hidden items-center gap-1 text-xs font-medium text-red-700 lg:inline-flex" data-testid="not-saved"><CloudAlert size={14} />{t.storage.notSaved}</span>
+            : <span className="hidden items-center gap-1 text-xs text-slate-500 lg:inline-flex"><CloudCheck size={14} />{t.nav.savedAuto}</span>}
         </div>
       </div>
 

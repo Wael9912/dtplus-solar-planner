@@ -4,7 +4,7 @@ import path from 'node:path'
 import { RESULTS, COMBOS } from './lib.mjs'
 
 const ROWS = [['a', '10-calc'], ['b', '11-size'], ['c', '12-ups'], ['d', '13-items'], ['e', '14-bill'], ['f', '15-expansion'], ['g', '16-company'],
-  ['h', '17-pipeline'], ['i', '18-tools'], ['j', '19-outage'], ['k', '20-convert'], ['l', '21-migrate'], ['m', '22-abuse-nav'], ['m', '23-abuse-data']]
+  ['h', '17-pipeline'], ['i', '18-tools'], ['j', '19-outage'], ['k', '20-convert'], ['l', '21-migrate'], ['m', '22-abuse-nav'], ['m', '23-abuse-data'], ['n', '24-home'], ['o', '25-scale']]
 const read = (n) => { const f = path.join(RESULTS, `${n}.json`); return fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, 'utf8')) : {} }
 const cell = (r) => (!r ? '—' : r.status === 'PASS' ? (r.warnings?.length ? `PASS (${r.warnings.length}w)` : 'PASS') : `FAIL (${r.issues.length})`)
 const head = ['', 'script', ...COMBOS.map((c) => c.id)]

@@ -1,5 +1,6 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
+import { persist, createJSONStorage } from 'zustand/middleware'
+import { savingStorage } from './useSaveState'
 import type { Project, CompanySettings, PriceBook, ProjectMode, SystemType, Phase, CustomProducts, LoadItem, BomLine } from '../engine/types'
 import { defaultCompany, newProject, uid, siteFromLocation, modeDefaults, defaultDesign, defaultPricing } from '../engine/defaults'
 import { emptyPriceBook, normalizePriceBook } from '../engine/catalogContext'
@@ -7,8 +8,8 @@ import { defaultSizing, projectMode } from '../engine/sizing'
 import { en } from '../i18n/en'
 import { ar } from '../i18n/ar'
 
-/** projects = home (start tiles + project list); calc = load calculator; tools = engineering calculators (`toolId`); prices = company price list. */
-export type View = 'projects' | 'wizard' | 'settings' | 'tools' | 'calc' | 'prices'
+/** home = every feature grouped by use; projects = history (saved projects and quotes); calc = load calculator; tools = engineering calculators (`toolId`); prices = company price list. */
+export type View = 'home' | 'projects' | 'wizard' | 'settings' | 'tools' | 'calc' | 'prices'
 export type Lang = 'en' | 'ar'
 
 /** Quote defaults kept with the company profile and applied by createProject (they are not part of the engine's CompanySettings). */
@@ -185,7 +186,7 @@ const withLock = (p: Project, book: PriceBook): Project =>
 export const useAppStore = create<AppState>()(
   persist(
     (set, get) => ({
-      lang: initialLang(), view: 'projects', step: 0, projects: [], currentId: null, company: initialCompany, clientView: true, lastStep: {}, maxStep: {}, toolId: null, tools: {}, calc: null,
+      lang: initialLang(), view: 'home', step: 0, projects: [], currentId: null, company: initialCompany, clientView: true, lastStep: {}, maxStep: {}, toolId: null, tools: {}, calc: null,
       setLang: (lang) => set((s) => {
         // Untouched default texts follow the UI language (so the Arabic quote doesn't print English boilerplate)
         const from = lang === 'ar' ? en : ar, to = lang === 'ar' ? ar : en
@@ -321,7 +322,7 @@ export const useAppStore = create<AppState>()(
       },
     }),
     {
-      name: 'dtplus-solar-planner-v1', version: 3,
+      name: 'dtplus-solar-planner-v1', version: 3, storage: createJSONStorage(() => savingStorage),
       migrate: (persisted, version) => {
         let st = (persisted ?? {}) as Partial<AppState>
         if (version < 2) st = { ...st, clientView: true, lastStep: {}, company: { ...initialCompany, ...(st.company ?? {}) } }

@@ -1,3 +1,17 @@
 # Open copies of the app fetch this to learn that a new version was published (src/updates.ts)
 /version.json
   Cache-Control: no-store
+# The installed app's service worker and manifest: always revalidated, so a published build reaches installed apps
+/sw.js
+  Cache-Control: no-cache
+/manifest.webmanifest
+  Cache-Control: no-cache
+  Content-Type: application/manifest+json
+# Hashed build files never change
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+# Every response: no MIME sniffing, no framing by other sites, only the origin sent as referrer to other sites
+/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: SAMEORIGIN
+  Referrer-Policy: strict-origin-when-cross-origin

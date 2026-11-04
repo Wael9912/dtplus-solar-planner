@@ -1,9 +1,10 @@
-import { useEffect } from 'react'
-import { Sun, FolderOpen, Settings, Plus, ChevronLeft, ChevronRight, Presentation, Wrench, Tags } from 'lucide-react'
+import { useEffect, type ReactNode } from 'react'
+import { Sun, Settings, Plus, ChevronLeft, ChevronRight, Presentation, Wrench, Tags, History, House, Download } from 'lucide-react'
 import { useAppStore, useCurrentProject, type View } from './store/useAppStore'
 import { useT } from './i18n'
 import { companyTitle, projectTitle } from './i18n/labels'
 import { ProjectsPage } from './components/ProjectsPage'
+import { HomePage } from './components/HomePage'
 import { SettingsPage } from './components/SettingsPage'
 import { Wizard } from './components/Wizard'
 import { ToolsPage } from './components/tools/ToolsPage'
@@ -13,6 +14,9 @@ import { Menu, Toaster } from './components/overlay'
 import { useStartActions } from './components/startMenu'
 import { useMediaQuery } from './components/hooks'
 import { UpdateBanner, UpdateNotices } from './components/UpdateNotice'
+import { InstallSheet } from './components/InstallApp'
+import { SaveBanner } from './components/SaveBanner'
+import { install, useInstallWay } from './pwa'
 
 const YEAR = new Date().getFullYear()
 
@@ -32,16 +36,29 @@ export function LangSwitch() {
   )
 }
 
+/** Header destination: icon-only on phones and below 1280 px, labelled on wide screens; `aria-current` marks the open screen. */
+function NavButton({ to, icon, label, className }: { to: View; icon: ReactNode; label: string; className: string }) {
+  const active = useAppStore((s) => s.view === to)
+  const setView = useAppStore((s) => s.setView)
+  return (
+    <button type="button" data-testid={`nav-${to}`} aria-current={active ? 'page' : undefined} title={label} aria-label={label} onClick={() => setView(to)}
+      className={`btn-ghost btn-icon sm:w-auto sm:px-3 ${active ? 'bg-slate-100 text-slate-900' : ''} ${className}`}>
+      {icon}<span className="hidden xl:inline">{label}</span>
+    </button>
+  )
+}
+
 const hashFor = (s: { view: View; currentId: string | null; step: number; toolId: string | null }) =>
   s.view === 'wizard' && s.currentId ? `#/p/${encodeURIComponent(s.currentId)}/${s.step + 1}`
     : s.view === 'tools' ? (s.toolId ? `#/tools/${encodeURIComponent(s.toolId)}` : '#/tools')
-      : s.view === 'settings' || s.view === 'calc' || s.view === 'prices' ? `#/${s.view}` : '#/projects'
+      : s.view === 'settings' || s.view === 'calc' || s.view === 'prices' || s.view === 'home' ? `#/${s.view}` : '#/projects'
 function parseHash(h: string): { view: View; currentId?: string; step?: number; toolId?: string | null } | null {
   const m = /^#\/p\/([^/]+)\/(\d+)$/.exec(h)
   if (m) return { view: 'wizard', currentId: decodeURIComponent(m[1]), step: Math.max(0, Math.min(6, Number(m[2]) - 1)) }
   const tl = /^#\/tools(?:\/([^/]+))?$/.exec(h)
   if (tl) return { view: 'tools', toolId: tl[1] ? decodeURIComponent(tl[1]) : null }
-  return h === '#/settings' ? { view: 'settings' } : h === '#/calc' ? { view: 'calc' } : h === '#/prices' ? { view: 'prices' } : h === '#/projects' ? { view: 'projects' } : null
+  return h === '#/settings' ? { view: 'settings' } : h === '#/calc' ? { view: 'calc' } : h === '#/prices' ? { view: 'prices' }
+    : h === '#/projects' || h === '#/history' ? { view: 'projects' } : h === '#/home' || h === '#/' ? { view: 'home' } : null
 }
 
 export default function App() {
@@ -53,6 +70,7 @@ export default function App() {
   const clientView = useAppStore((s) => s.clientView)
   const setClientView = useAppStore((s) => s.setClientView)
   const project = useCurrentProject()
+  const installWay = useInstallWay()
   const inWizard = view === 'wizard' && !!project
   // The load calculator keeps its result in a bottom bar below 1280 px (side column above): toasts must clear it
   const calcBar = !useMediaQuery('(min-width: 1280px)') && view === 'calc'
@@ -93,7 +111,7 @@ export default function App() {
           {inWizard && (
             <button type="button" className="btn-ghost btn-icon -ms-1 sm:hidden" aria-label={t.nav.allProjects} title={t.nav.allProjects} data-testid="nav-back-projects" onClick={() => setView('projects')}><BackIcon size={22} /></button>
           )}
-          <button type="button" data-testid="brand" className={`${inWizard ? 'hidden sm:flex' : 'flex'} min-h-11 min-w-0 flex-1 items-center gap-2.5 rounded-lg text-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 sm:flex-none`} onClick={() => setView('projects')}>
+          <button type="button" data-testid="brand" title={t.nav.home} className={`${inWizard ? 'hidden sm:flex' : 'flex'} min-h-11 min-w-0 flex-1 items-center gap-2.5 rounded-lg text-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 sm:flex-none`} onClick={() => setView('home')}>
             {company.logoDataUrl
               ? <img src={company.logoDataUrl} alt="" className="h-9 w-9 shrink-0 rounded-lg border border-slate-200 bg-white object-contain p-0.5" />
               : <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-brand-700 text-sun-400"><Sun size={20} /></span>}
@@ -109,11 +127,13 @@ export default function App() {
             </div>
           )}
           <div className="hidden flex-1 sm:block" />
-          <nav className="hidden items-center gap-1 sm:flex" aria-label={t.nav.menu}>
-            <button type="button" data-testid="nav-projects" aria-current={view === 'projects' ? 'page' : undefined} className={`btn-ghost px-3 ${view === 'projects' ? 'bg-slate-100 text-slate-900' : ''}`} title={t.nav.projects} onClick={() => setView('projects')}><FolderOpen size={18} /><span className="hidden xl:inline">{t.nav.projects}</span></button>
-            <button type="button" data-testid="nav-tools" aria-current={view === 'tools' ? 'page' : undefined} className={`btn-ghost px-3 ${view === 'tools' ? 'bg-slate-100 text-slate-900' : ''}`} title={t.nav.tools} onClick={() => setView('tools')}><Wrench size={18} /><span className="hidden xl:inline">{t.nav.tools}</span></button>
-            <button type="button" data-testid="nav-prices" aria-current={view === 'prices' ? 'page' : undefined} className={`btn-ghost px-3 ${view === 'prices' ? 'bg-slate-100 text-slate-900' : ''}`} title={t.nav.prices} onClick={() => setView('prices')}><Tags size={18} /><span className="hidden xl:inline">{t.nav.prices}</span></button>
-            <button type="button" data-testid="nav-settings" aria-current={view === 'settings' ? 'page' : undefined} className={`btn-ghost px-3 ${view === 'settings' ? 'bg-slate-100 text-slate-900' : ''}`} title={t.nav.settings} onClick={() => setView('settings')}><Settings size={18} /><span className="hidden xl:inline">{t.nav.settings}</span></button>
+          {/* History stays one tap away on phones too (inside a project the back arrow already leads there) */}
+          <nav className="flex items-center gap-1" aria-label={t.nav.menu}>
+            <NavButton to="home" icon={<House size={18} />} label={t.nav.home} className="hidden sm:inline-flex" />
+            <NavButton to="projects" icon={<History size={20} />} label={t.nav.projects} className={inWizard ? 'hidden sm:inline-flex' : 'inline-flex'} />
+            <NavButton to="tools" icon={<Wrench size={18} />} label={t.nav.tools} className="hidden sm:inline-flex" />
+            <NavButton to="prices" icon={<Tags size={18} />} label={t.nav.prices} className="hidden sm:inline-flex" />
+            <NavButton to="settings" icon={<Settings size={18} />} label={t.nav.settings} className="hidden sm:inline-flex" />
           </nav>
           <LangSwitch />
           <div className="hidden sm:block">
@@ -123,17 +143,21 @@ export default function App() {
           </div>
           <div className="sm:hidden">
             <Menu label={t.nav.menu} testId="nav-menu" items={[
-              { label: t.nav.projects, icon: <FolderOpen size={18} />, onClick: () => setView('projects'), testId: 'menu-projects' },
+              { label: t.nav.home, icon: <House size={18} />, onClick: () => setView('home'), testId: 'menu-home' },
+              { label: t.nav.projects, icon: <History size={18} />, onClick: () => setView('projects'), testId: 'menu-projects' },
               ...start.map((a) => ({ label: a.label, icon: <a.icon size={18} />, onClick: a.run, testId: `menu-new-${a.key}` })),
               { label: t.nav.prices, icon: <Tags size={18} />, onClick: () => setView('prices'), testId: 'menu-prices' },
               { label: t.nav.settings, icon: <Settings size={18} />, onClick: () => setView('settings'), testId: 'menu-settings' },
+              { label: t.install.button, icon: <Download size={18} />, onClick: () => void install(), hidden: installWay === 'installed', testId: 'menu-install' },
               { label: t.nav.clientView, icon: <Presentation size={18} />, onClick: () => setClientView(!clientView), checked: clientView, hidden: !inWizard, testId: 'menu-client-view' },
             ]} />
           </div>
         </div>
         <UpdateBanner />
+        <SaveBanner />
       </header>
       <main className={`mx-auto w-full max-w-7xl flex-1 ps-[max(1rem,env(safe-area-inset-left))] pe-[max(1rem,env(safe-area-inset-right))] pt-4 sm:px-6 sm:pt-6 ${inWizard ? 'pb-28' : 'pb-24 sm:pb-10'}`}>
+        {view === 'home' && <HomePage />}
         {view === 'projects' && <ProjectsPage />}
         {view === 'settings' && <SettingsPage />}
         {view === 'wizard' && <Wizard />}
@@ -148,6 +172,7 @@ export default function App() {
       )}
       <Toaster raised={inWizard || calcBar} />
       <UpdateNotices />
+      <InstallSheet />
     </div>
   )
 }

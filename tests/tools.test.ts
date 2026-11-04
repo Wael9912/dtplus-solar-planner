@@ -165,6 +165,13 @@ describe('battery bank (§4)', () => {
     expect(bad.valid).toBe(false)
     if (!bad.valid) expect(bad.invalid).toEqual(expect.arrayContaining(['loadW', 'hours', 'V']))
   })
+  it('by energy: the optional load is empty, 0 or 0.1 W … 10 MW (a 5e-324 W load gave Infinity backup hours)', () => {
+    const at = (loadW: number | null) => sizeBatteryBank(battIn({ basis: 'energy', energyKwh: 10, loadW }))
+    expect(ok(at(null) as BatteryBank).backupHours).toBeNull()
+    expect(ok(at(0) as BatteryBank).backupHours).toBeNull()
+    expect(Number.isFinite(ok(at(0.1) as BatteryBank).backupHours)).toBe(true)
+    for (const w of [Number.MIN_VALUE, 1e-300, 0.05, -1, 2e7]) expect(at(w)).toEqual({ valid: false, invalid: ['loadW'] })
+  })
 })
 
 const cabIn = (over: Partial<CableToolInput> = {}): CableToolInput => ({

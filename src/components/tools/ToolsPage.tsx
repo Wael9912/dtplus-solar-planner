@@ -1,15 +1,14 @@
 // Engineering tools (view `tools`, #/tools and #/tools/<id>): standalone calculators that need no project and no load list.
 import type { ComponentType } from 'react'
-import { BatteryFull, Cable, ChevronLeft, ChevronRight, Fuel, SolarPanel } from 'lucide-react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useAppStore } from '../../store/useAppStore'
 import { useT } from '../../i18n'
-import { TOOL_IDS, isToolId, type ToolId } from './useTool'
+import { TOOL_ICONS, TOOL_IDS, isToolId, type ToolId } from './useTool'
 import { StringsTool } from './StringsTool'
 import { BatteryTool } from './BatteryTool'
 import { CableTool } from './CableTool'
 import { GeneratorTool } from './GeneratorTool'
 
-const ICONS: Record<ToolId, ComponentType<{ size?: number; className?: string }>> = { strings: SolarPanel, battery: BatteryFull, cable: Cable, generator: Fuel }
 const VIEWS: Record<ToolId, ComponentType> = { strings: StringsTool, battery: BatteryTool, cable: CableTool, generator: GeneratorTool }
 
 export function ToolsPage() {
@@ -31,7 +30,7 @@ function ToolList() {
       </div>
       <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
         {TOOL_IDS.map((id) => {
-          const Icon = ICONS[id]
+          const Icon = TOOL_ICONS[id]
           return (
             <li key={id}>
               <button type="button" onClick={() => openTool(id)} data-testid={`tool-card-${id}`}

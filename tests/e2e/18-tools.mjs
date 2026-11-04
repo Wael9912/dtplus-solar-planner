@@ -13,7 +13,7 @@ const GARBAGE = ['', '0', '-5', 'abc', '1e9', '99999999', '٣٫٥']
 
 await scenario('18-tools', async (c) => {
   const { page } = c
-  await page.getByTestId('start-tools').click(); await page.waitForTimeout(300)
+  await newVia(page, 'tools'); await page.waitForTimeout(300)
   if (!/#\/tools$/.test(page.url())) c.bad(`tools hash ${page.url()}`)
   await c.check('tools list', { shotName: 'list' })
   for (const id of ['strings', 'battery', 'cable', 'generator']) {
