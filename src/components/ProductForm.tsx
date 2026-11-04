@@ -351,7 +351,7 @@ export function ProductForm({ kind: kind0, initial, isNew, cur, onClose, onSave 
       </>}>
       <form id={formId} ref={formRef} noValidate onSubmit={(e) => { e.preventDefault(); submit() }} className="space-y-6 pb-2">
         {isNew && (
-          <div className="grid grid-cols-1 gap-4 rounded-xl bg-slate-50 p-3 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 rounded-lg bg-slate-50 p-3 sm:grid-cols-2">
             <Field label={tp.kind}>
               <select className="input" value={kind} data-testid="pf-kind" onChange={(e) => changeKind(e.target.value as ProductKind)}>
                 {KINDS.map((k) => <option key={k} value={k}>{tp.kinds[k]}</option>)}

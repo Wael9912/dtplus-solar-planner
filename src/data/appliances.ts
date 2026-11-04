@@ -180,7 +180,7 @@ export const appliances: Appliance[] = [
   "hoursPerDay": 8,
   "surgeFactor": 4.0,
   "phase": 1,
-  "nameAr": "ثلاجة صغيرة 150–250 لتر"
+  "nameAr": "ثلاجة صغيرة 150-250 لتر"
  },
  {
   "id": "fridge_large",
@@ -190,7 +190,7 @@ export const appliances: Appliance[] = [
   "hoursPerDay": 9,
   "surgeFactor": 4.0,
   "phase": 1,
-  "nameAr": "ثلاجة كبيرة 400–600 لتر"
+  "nameAr": "ثلاجة كبيرة 400-600 لتر"
  },
  {
   "id": "chest_freezer",
@@ -430,7 +430,7 @@ export const appliances: Appliance[] = [
   "hoursPerDay": 2,
   "surgeFactor": 1.0,
   "phase": 1,
-  "nameAr": "سخان مياه 50–80 لتر"
+  "nameAr": "سخان مياه 50-80 لتر"
  },
  {
   "id": "instant_water_heater",

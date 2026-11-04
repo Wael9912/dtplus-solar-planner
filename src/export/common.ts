@@ -205,7 +205,7 @@ export function systemDescriptor(p: Project, r: Results, L: ExportLabels) {
 export function docTitle(p: Project, r: Results, lang: ExportLang) {
   if (!isDefaultProjectName(p.name)) return norm(p.name)
   const client = norm(p.clientName), desc = systemDescriptor(p, r, labelsFor(lang))
-  if (client) return desc ? `${client} — ${desc}` : client
+  if (client) return desc ? `${client} · ${desc}` : client
   return norm(p.reference) || desc || '—'
 }
 /** File-name stem: reference + document title (the reference once when the title is the reference). */

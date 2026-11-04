@@ -14,7 +14,7 @@ const STORE = 'dtplus-solar-planner-v1'
 // The version being released (package.json) — the "what's new" sheet of a v0.1 device lists every note since 0.2.0
 const VERSION = JSON.parse(fs.readFileSync(new globalThis.URL('../../package.json', import.meta.url), 'utf8')).version
 const VERSION_RE = VERSION.replace(/\./g, '\\.')
-const NOTES_SINCE_0_1 = 10 // 0.2.0: 6, 0.2.1: 1, 0.3.0: 3 — add the new version's notes when releasing
+const NOTES_SINCE_0_1 = 13 // 0.2.0: 6, 0.2.1: 1, 0.3.0: 3, 0.4.0: 3; add the new version's notes when releasing
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'dt-update-'))
 const A = path.join(tmp, 'a'), B = path.join(tmp, 'b')
 for (const dir of [A, B]) execSync(`npx vite build --outDir ${dir} --emptyOutDir --logLevel error`, { stdio: 'inherit' })

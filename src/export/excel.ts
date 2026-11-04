@@ -15,7 +15,7 @@ import {
 
 type Cell = ExcelJS.CellValue
 const f = (formula: string, result: number): Cell => ({ formula, result } as ExcelJS.CellFormulaValue)
-const argb = (hex: string) => 'FF' + ((hex || '#0f766e').replace('#', '').padEnd(6, '0').slice(0, 6).toUpperCase())
+const argb = (hex: string) => 'FF' + ((hex || '#1c407c').replace('#', '').padEnd(6, '0').slice(0, 6).toUpperCase())
 const INT = '#,##0', DEC = '#,##0.00', DEC3 = '#,##0.000', PCT = '0.0%'
 
 export async function buildExcel(p: Project, r: Results, companyIn: CompanySettings, lang: ExportLang, opts: { now?: Date } = {}): Promise<Blob> {

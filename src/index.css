@@ -1,36 +1,40 @@
 @import "tailwindcss";
 
 /* ---------------------------------------------------------------------------
-   DT+ Solar Planner design tokens — "calm workspace, one loud number".
+   DT+ Solar Planner design tokens: a quiet, mostly neutral workspace with one accent and one loud number per screen.
    Colour roles: ink slate-900 · body slate-700 · muted slate-500 (never lighter for information)
-   brand = teal (primary actions, selection) · sun = data-viz only · amber = review · red = must fix.
+   brand = deep blue (primary action, selection, active nav) · sun = charts only · amber = review · red = must fix.
+   Surfaces are flat: white cards with a 1 px slate-200 border, no shadows except floating layers (menus, sheets, toasts).
    --------------------------------------------------------------------------- */
 @theme {
-  --color-brand-50: #f0fdfa;
-  --color-brand-100: #ccfbf1;
-  --color-brand-200: #99f6e4;
-  --color-brand-300: #5eead4;
-  --color-brand-500: #14b8a6;
-  --color-brand-600: #0d9488;
-  --color-brand-700: #0f766e;
-  --color-brand-800: #115e59;
-  --color-brand-900: #134e4a;
+  /* Accent: a deep, desaturated blue. Used for the primary action, selection, links and the active nav item only. */
+  --color-brand-50: #eef3fb;
+  --color-brand-100: #d9e4f6;
+  --color-brand-200: #b6c9ec;
+  --color-brand-300: #86a6dd;
+  --color-brand-400: #557fc9;
+  --color-brand-500: #2f61b3;
+  --color-brand-600: #234f98;
+  --color-brand-700: #1c407c;
+  --color-brand-800: #183564;
+  --color-brand-900: #142a4e;
+  /* Data only (charts): sun amber */
   --color-sun-300: #fcd34d;
   --color-sun-400: #fbbf24;
   --color-sun-500: #f59e0b;
 
-  /* Role-based type scale */
-  --text-display: 1.625rem;
-  --text-display--line-height: 2.125rem;
-  --text-display--letter-spacing: -0.015em;
-  --text-display--font-weight: 650;
-  --text-title: 1.0625rem;
+  /* Role-based type scale (14 px body on desktop, see below) */
+  --text-display: 1.5rem;
+  --text-display--line-height: 2rem;
+  --text-display--letter-spacing: -0.02em;
+  --text-display--font-weight: 600;
+  --text-title: 1rem;
   --text-title--line-height: 1.5rem;
   --text-title--font-weight: 600;
   --text-kpi: 1.875rem;
   --text-kpi--line-height: 2.25rem;
   --text-kpi--letter-spacing: -0.02em;
-  --text-kpi--font-weight: 650;
+  --text-kpi--font-weight: 600;
   --text-kpi-sm: 1.25rem;
   --text-kpi-sm--line-height: 1.75rem;
   --text-kpi-sm--font-weight: 600;
@@ -38,8 +42,8 @@
   --font-sans: "Inter", "IBM Plex Sans Arabic", "Segoe UI", system-ui, -apple-system, sans-serif;
   --font-arabic: "IBM Plex Sans Arabic", "Inter", "Segoe UI", "Geeza Pro", system-ui, sans-serif;
 
-  --shadow-card: 0 1px 2px 0 rgb(15 23 42 / 0.05);
-  --shadow-float: 0 10px 30px -8px rgb(15 23 42 / 0.25);
+  --shadow-card: 0 0 0 0 transparent;
+  --shadow-float: 0 12px 32px -12px rgb(15 23 42 / 0.28), 0 0 0 1px rgb(15 23 42 / 0.06);
 
   --animate-sheet-up: sheet-up 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
   --animate-fade-in: fade-in 0.18s ease-out;
@@ -50,7 +54,8 @@
 }
 
 html { color-scheme: light; -webkit-text-size-adjust: 100%; }
-body { @apply bg-slate-50 text-slate-700 antialiased; margin: 0; font-family: var(--font-sans); }
+body { @apply bg-slate-50 text-slate-700 antialiased; margin: 0; font-family: var(--font-sans); font-size: 0.9375rem; }
+@media (min-width: 640px) and (pointer: fine) { body { font-size: 0.875rem; } }
 [dir="rtl"] body, body:where([dir="rtl"] *) { font-family: var(--font-arabic); }
 [dir="rtl"] body { line-height: 1.65; }
 /* Numbers and Latin model codes inside Arabic text: keep them in Inter for a crisp look */
@@ -60,16 +65,16 @@ body { @apply bg-slate-50 text-slate-700 antialiased; margin: 0; font-family: va
 .recharts-wrapper:focus, .recharts-surface:focus, .recharts-wrapper *:focus { outline: none; }
 
 @layer components {
-  .card { @apply rounded-xl border border-slate-200 bg-white shadow-[var(--shadow-card)]; }
+  .card { @apply rounded-lg border border-slate-200 bg-white; }
   .card-title { @apply text-title text-slate-900; }
 
   /* Buttons: 44px on touch / phones, 40px with a mouse */
   .btn, .btn-primary, .btn-secondary, .btn-ghost, .btn-danger, .btn-danger-solid {
-    @apply inline-flex min-h-11 select-none items-center justify-center gap-2 rounded-lg px-4 text-sm font-medium whitespace-nowrap transition-colors
+    @apply inline-flex min-h-11 select-none items-center justify-center gap-2 rounded-md px-4 text-sm font-medium whitespace-nowrap transition-colors
       disabled:cursor-not-allowed disabled:opacity-50
       focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2;
   }
-  .btn-primary { @apply bg-brand-700 text-white shadow-sm hover:bg-brand-800 active:bg-brand-900; }
+  .btn-primary { @apply bg-brand-600 text-white hover:bg-brand-700 active:bg-brand-800; }
   .btn-secondary { @apply border border-slate-300 bg-white text-slate-800 hover:bg-slate-50 active:bg-slate-100; }
   .btn-ghost { @apply text-slate-700 hover:bg-slate-100 hover:text-slate-900 active:bg-slate-200; }
   .btn-danger { @apply border border-red-200 bg-white text-red-700 hover:bg-red-50; }
@@ -82,7 +87,7 @@ body { @apply bg-slate-50 text-slate-700 antialiased; margin: 0; font-family: va
   .error-text { @apply mt-1.5 block text-xs leading-5 font-medium text-red-700; }
 
   /* Inputs: 16px text on phones/touch (no iOS zoom), 44px tall */
-  .input { @apply block min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-base text-slate-900 shadow-none placeholder:text-slate-400
+  .input { @apply block min-h-11 w-full rounded-md border border-slate-300 bg-white px-3 text-base text-slate-900 shadow-none placeholder:text-slate-400
       focus:border-brand-600 focus:outline-none focus:ring-3 focus:ring-brand-500/20
       disabled:bg-slate-50 disabled:text-slate-500
       aria-[invalid=true]:border-red-500 aria-[invalid=true]:ring-red-500/20; }
@@ -94,19 +99,22 @@ body { @apply bg-slate-50 text-slate-700 antialiased; margin: 0; font-family: va
       hover:border-slate-300 focus:border-brand-600 focus:bg-white focus:outline-none focus:ring-3 focus:ring-brand-500/20
       aria-[invalid=true]:border-red-500; }
 
-  .eyebrow { @apply text-xs font-medium uppercase tracking-wide text-slate-500; }
+  .eyebrow { @apply text-xs font-medium text-slate-500; }
   .table { @apply w-full text-sm; }
-  .table th { @apply border-b border-slate-200 bg-slate-50 px-3 py-2.5 text-start text-xs font-medium tracking-wide whitespace-nowrap text-slate-500 uppercase; }
+  .table th { @apply border-b border-slate-200 bg-slate-50 px-3 py-2 text-start text-xs font-medium whitespace-nowrap text-slate-500; }
   .table td { @apply border-b border-slate-100 px-3 py-1.5 align-middle; }
   .table td.num, .table th.num { @apply text-end whitespace-nowrap tabular-nums; }
 
   /* KPI tiles (Stat): one hero per screen */
-  .stat, .stat-hero { @apply min-w-0 rounded-xl border border-slate-200 bg-white p-3 sm:p-4; }
-  .stat-hero { @apply border-brand-200 bg-brand-50; }
+  .stat, .stat-hero { @apply min-w-0 rounded-lg border border-slate-200 bg-white p-3 sm:p-4; }
+  .stat-hero { @apply border-slate-900 bg-slate-900; }
   .stat-value { @apply text-kpi-sm break-words text-slate-900 tabular-nums; }
-  .stat-hero .stat-value { @apply text-[1.5rem] leading-8 font-semibold sm:text-kpi; }
+  .stat-hero .stat-value { @apply text-[1.5rem] leading-8 font-semibold text-white sm:text-kpi; }
+  .stat-hero .stat-value span { @apply text-slate-400; }
   .stat-label { @apply mt-0.5 text-sm text-slate-600; }
+  .stat-hero .stat-label { @apply text-slate-300; }
   .stat-sub { @apply mt-0.5 text-xs text-slate-500; }
+  .stat-hero .stat-sub { @apply text-slate-400; }
 
   .badge, .badge-ok, .badge-warn, .badge-err, .badge-neutral, .badge-info { @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap ring-1 ring-inset; }
   .badge-ok { @apply bg-emerald-50 text-emerald-700 ring-emerald-200; }
@@ -116,7 +124,15 @@ body { @apply bg-slate-50 text-slate-700 antialiased; margin: 0; font-family: va
   .badge-info { @apply bg-sky-50 text-sky-800 ring-sky-200; }
 
   .chip { @apply inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-full border border-slate-300 bg-white px-3 text-sm font-medium whitespace-nowrap text-slate-700 hover:bg-slate-50
-      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 aria-pressed:border-slate-900 aria-pressed:bg-slate-900 aria-pressed:text-white; }
+      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 aria-pressed:border-brand-600 aria-pressed:bg-brand-50 aria-pressed:text-brand-800; }
+
+  /* Sidebar navigation (desktop) */
+  .nav-item { @apply flex min-h-9 w-full items-center gap-2.5 rounded-md px-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 hover:text-slate-900
+      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 aria-[current=page]:bg-brand-50 aria-[current=page]:text-brand-800; }
+  .nav-item > svg { @apply shrink-0 text-slate-500; }
+  .nav-item[aria-current="page"] > svg { @apply text-brand-700; }
+  .nav-group { @apply mt-5 mb-1 px-2.5 text-[0.6875rem] font-semibold tracking-wide text-slate-400 uppercase; }
+  [dir="rtl"] .nav-group { letter-spacing: 0; text-transform: none; font-size: 0.75rem; }
 
   .disclosure > summary { @apply flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 text-sm font-medium text-slate-700 select-none hover:text-slate-900; }
   .disclosure > summary::-webkit-details-marker { display: none; }
@@ -125,7 +141,7 @@ body { @apply bg-slate-50 text-slate-700 antialiased; margin: 0; font-family: va
 
 /* Arabic: no uppercase / letter-spacing (breaks cursive joining), slightly larger small labels */
 @layer components {
-  [dir="rtl"] .eyebrow, [dir="rtl"] .table th { letter-spacing: 0; text-transform: none; font-size: 0.8125rem; }
+  [dir="rtl"] .eyebrow, [dir="rtl"] .table th { font-size: 0.8125rem; }
   [dir="rtl"] .help, [dir="rtl"] .stat-sub { line-height: 1.6; }
 }
 
@@ -147,7 +163,7 @@ body { @apply bg-slate-50 text-slate-700 antialiased; margin: 0; font-family: va
 
 @layer components {
   /* Input with adornments (unit suffix, ± key, −/+ stepper). The group carries the border; the inner input is bare. */
-  .input-group { @apply flex min-h-11 w-full min-w-0 items-stretch overflow-hidden rounded-lg border border-slate-300 bg-white
+  .input-group { @apply flex min-h-11 w-full min-w-0 items-stretch overflow-hidden rounded-md border border-slate-300 bg-white
       focus-within:border-brand-600 focus-within:ring-3 focus-within:ring-brand-500/20
       has-[input[aria-invalid=true]]:border-red-500 has-[input:disabled]:bg-slate-50; }
   .input-group > input { @apply w-full min-w-0 flex-1 border-0 bg-transparent px-3 text-base text-slate-900 tabular-nums outline-none placeholder:text-slate-400 disabled:text-slate-500; }

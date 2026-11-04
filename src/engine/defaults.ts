@@ -95,7 +95,7 @@ export function loadFromAppliance(a: Appliance, qty = 1): LoadItem {
 }
 
 export const defaultCompany: CompanySettings = {
-  name: 'Your Solar Company', tagline: 'Clean energy, engineered.', phone: '', email: '', website: '', address: '', logoDataUrl: null, primaryColor: '#0f766e',
+  name: 'Your Solar Company', tagline: 'Clean energy, engineered.', phone: '', email: '', website: '', address: '', logoDataUrl: null, primaryColor: '#1c407c',
   quoteValidityDays: 30, currency: 'USD', fxRateToUsd: 1, nameAr: '', taglineAr: '', termsAr: '',
   terms: 'Prices are valid for the stated period and subject to stock availability. 50% deposit on order, balance on commissioning. Equipment warranties as per manufacturer. Installation workmanship warranty: 2 years. Civil works, grid connection fees and permits are excluded unless stated.',
 }

@@ -75,7 +75,7 @@ function buildDesignBom(p: Project, pr: PricingInput, c: BomCtx, money: (qty: nu
   }
   const addItem = (id: string, qty: number) => {
     const it: CatalogItem | undefined = cat().items.find((i) => i.id === id)
-    if (!it) { missing.push(id); add({ id, category: 'Accessories', name: id, spec: 'not in catalogue — price manually', unit: 'pcs', qty, price: 0 }); return }
+    if (!it) { missing.push(id); add({ id, category: 'Accessories', name: id, spec: 'not in catalogue, price manually', unit: 'pcs', qty, price: 0 }); return }
     add({ id: it.id, category: it.category, name: it.name, spec: it.spec ?? '', nameAr: it.nameAr, specAr: it.specAr, unit: it.unit, qty, price: it.approxPriceUsd })
   }
   const cab = (id: string) => c.schedule.find((x) => x.id === id)

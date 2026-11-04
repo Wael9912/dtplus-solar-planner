@@ -110,10 +110,10 @@ export function Menu({ label, items, icon, buttonClassName = 'btn-ghost btn-icon
         {children ?? icon ?? <EllipsisVertical size={20} />}
       </button>
       {open && (
-        <div ref={list} role="menu" aria-label={label} className={`absolute top-full z-40 mt-1 w-max max-w-[min(20rem,calc(100vw-2rem))] min-w-56 animate-pop-in rounded-xl border border-slate-200 bg-white p-1 shadow-[var(--shadow-float)] ${align === 'end' ? 'end-0' : 'start-0'}`}>
+        <div ref={list} role="menu" aria-label={label} className={`absolute top-full z-40 mt-1 w-max max-w-[min(20rem,calc(100vw-2rem))] min-w-56 animate-pop-in rounded-lg border border-slate-200 bg-white p-1 shadow-[var(--shadow-float)] ${align === 'end' ? 'end-0' : 'start-0'}`}>
           {shown.map((it) => (
             <button key={it.label} type="button" role={it.checked != null ? 'menuitemcheckbox' : 'menuitem'} aria-checked={it.checked} data-testid={it.testId}
-              className={`flex min-h-11 w-full items-center gap-3 rounded-lg px-3 text-start text-sm font-medium focus-visible:outline-none ${it.danger ? 'text-red-700 hover:bg-red-50 focus-visible:bg-red-50' : 'text-slate-800 hover:bg-slate-100 focus-visible:bg-slate-100'}`}
+              className={`flex min-h-11 w-full items-center gap-3 rounded-md px-3 text-start text-sm font-medium focus-visible:outline-none ${it.danger ? 'text-red-700 hover:bg-red-50 focus-visible:bg-red-50' : 'text-slate-800 hover:bg-slate-100 focus-visible:bg-slate-100'}`}
               onClick={() => { setOpen(false); it.onClick() }}>
               {it.icon && <span className="shrink-0 text-slate-500">{it.icon}</span>}
               <span className="min-w-0 flex-1">{it.label}</span>
@@ -132,9 +132,9 @@ export function Toaster({ raised }: { raised: boolean }) {
   const toasts = useToast((s) => s.toasts)
   const dismiss = useToast((s) => s.dismiss)
   return (
-    <div role="status" aria-live="polite" className={`pointer-events-none fixed inset-x-0 z-[60] flex flex-col items-center gap-2 px-4 ${raised ? 'bottom-[calc(env(safe-area-inset-bottom)+5.25rem)]' : 'bottom-[calc(env(safe-area-inset-bottom)+1rem)]'}`}>
+    <div role="status" aria-live="polite" className={`pointer-events-none fixed start-0 end-0 z-[60] flex flex-col items-center gap-2 px-4 lg:start-60 lg:items-end lg:px-8 ${raised ? 'bottom-[calc(env(safe-area-inset-bottom)+5.25rem)]' : 'bottom-[calc(env(safe-area-inset-bottom)+1rem)]'}`}>
       {toasts.map((x) => (
-        <div key={x.id} data-testid="toast" className={`pointer-events-auto flex w-full max-w-md animate-sheet-up items-center gap-2 rounded-xl px-4 py-2 text-sm text-white shadow-[var(--shadow-float)] ${x.tone === 'err' ? 'bg-red-700' : 'bg-slate-900'}`}>
+        <div key={x.id} data-testid="toast" className={`pointer-events-auto flex w-full max-w-md animate-sheet-up items-center gap-2 rounded-lg px-4 py-2 text-sm text-white shadow-[var(--shadow-float)] ${x.tone === 'err' ? 'bg-red-700' : 'bg-slate-900'}`}>
           <span className="min-w-0 flex-1 py-1.5">{x.message}</span>
           {x.action && <button type="button" className="min-h-10 shrink-0 rounded-md px-2 font-semibold text-brand-200 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white" onClick={() => { x.action!.run(); dismiss(x.id) }}>{x.action.label}</button>}
           <button type="button" aria-label={t.common.close} className="-me-2 grid size-11 shrink-0 place-items-center rounded-md text-slate-300 hover:text-white" onClick={() => dismiss(x.id)}><X size={16} /></button>

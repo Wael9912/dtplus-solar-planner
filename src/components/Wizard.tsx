@@ -24,11 +24,11 @@ import { useSaveState } from '../store/useSaveState'
 export interface StepProps { project: Project; results: Results; quote: Quote; update: (patch: Partial<Project> | ((p: Project) => Partial<Project>)) => void; goTo: (s: StepKey) => void }
 function StatusCircle({ status, n, current }: { status: StepStatus; n: number; current: boolean }) {
   const base = 'inline-grid size-6 shrink-0 place-items-center rounded-full text-xs font-semibold'
-  if (current) return <span className={`${base} bg-white/20 text-white`}>{status === 'error' || status === 'warn' ? '!' : n}</span>
+  if (current) return <span className={`${base} bg-slate-900 text-white`}>{status === 'error' || status === 'warn' ? '!' : n}</span>
   if (status === 'error') return <span className={`${base} bg-red-600 text-white`}>!</span>
   if (status === 'warn') return <span className={`${base} bg-amber-400 text-amber-950`}>!</span>
-  if (status === 'done') return <span className={`${base} bg-brand-100 text-brand-700`}><Check size={14} strokeWidth={3} /></span>
-  return <span className={`${base} bg-slate-100 text-slate-600`}>{n}</span>
+  if (status === 'done') return <span className={`${base} bg-brand-600 text-white`}><Check size={14} strokeWidth={3} /></span>
+  return <span className={`${base} border border-slate-300 bg-white text-slate-500`}>{n}</span>
 }
 const segCls: Record<StepStatus, string> = { done: 'bg-brand-600', todo: 'bg-slate-200', warn: 'bg-amber-400', error: 'bg-red-500' }
 
@@ -110,14 +110,14 @@ export function Wizard() {
       </div>
 
       {/* Desktop/tablet stepper */}
-      <nav aria-label={t.nav.steps} className="hidden sm:block">
-        <ol className="card flex gap-1 p-1.5">
+      <nav aria-label={t.nav.steps} className="hidden border-b border-slate-200 sm:block">
+        <ol className="flex">
           {STEPS.map((s, i) => (
             <li key={s} className="min-w-0 flex-1">
               <button type="button" data-testid={`step-${i}`} aria-current={i === cur ? 'step' : undefined} title={`${t.steps[s]} · ${t.stepStatus[status[s]]}`} onClick={() => setStep(i)}
-                className={`flex min-h-10 w-full items-center justify-center gap-2 rounded-lg px-2 text-sm font-medium whitespace-nowrap transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 lg:justify-start ${i === cur ? 'bg-brand-700 text-white' : 'text-slate-700 hover:bg-slate-100'}`}>
+                className={`-mb-px flex min-h-11 w-full items-center justify-center gap-2 border-b-2 px-2 text-sm whitespace-nowrap transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-500 xl:justify-start ${i === cur ? 'border-slate-900 font-semibold text-slate-900' : 'border-transparent font-medium text-slate-500 hover:border-slate-300 hover:text-slate-900'}`}>
                 <StatusCircle status={status[s]} n={i + 1} current={i === cur} />
-                <span className={`min-w-0 truncate ${i === cur ? '' : 'hidden lg:inline'}`}>{t.steps[s]}</span>
+                <span className={`min-w-0 truncate ${i === cur ? '' : 'hidden xl:inline'}`}>{t.steps[s]}</span>
               </button>
             </li>
           ))}
@@ -126,7 +126,7 @@ export function Wizard() {
 
       {/* Phone: compact progress header that opens the step list */}
       <div className="sm:hidden">
-        <button type="button" data-testid="step-sheet-btn" aria-haspopup="dialog" onClick={() => setSheet('steps')} className="flex min-h-14 w-full items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-start shadow-[var(--shadow-card)]">
+        <button type="button" data-testid="step-sheet-btn" aria-haspopup="dialog" onClick={() => setSheet('steps')} className="card flex min-h-14 w-full items-center gap-3 px-4 py-2.5 text-start">
           <span className="min-w-0 flex-1">
             <span className="block text-xs text-slate-500">{t.nav.stepOf(cur + 1, STEPS.length)}</span>
             <span className="block truncate text-base font-semibold text-slate-900">{t.steps[key]}</span>
@@ -134,7 +134,7 @@ export function Wizard() {
           {issues.length > 0 && <span className={nErr ? 'badge-err' : 'badge-warn'}>{t.nav.issues(issues.length)}</span>}
           <ChevronDown size={20} className="shrink-0 text-slate-500" />
         </button>
-        <div className="mt-2 flex gap-1 px-0.5" aria-hidden="true">{STEPS.map((s, i) => <span key={s} className={`h-1.5 flex-1 rounded-full ${i === cur ? 'bg-brand-800' : segCls[status[s]]}`} />)}</div>
+        <div className="mt-2 flex gap-1 px-0.5" aria-hidden="true">{STEPS.map((s, i) => <span key={s} className={`h-1 flex-1 rounded-full ${i === cur ? 'bg-slate-900' : segCls[status[s]]}`} />)}</div>
       </div>
 
       <div>
@@ -143,7 +143,7 @@ export function Wizard() {
       </div>
 
       {lockedStale && (
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900" role="status" data-testid="prices-locked">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900" role="status" data-testid="prices-locked">
           <Lock size={18} className="shrink-0" aria-hidden="true" />
           <span className="min-w-0 flex-1">{t.nav.pricesLocked(project.lockedAt ? fmtDate(project.lockedAt) : '')}</span>
           <button type="button" className="btn-secondary min-h-10" data-testid="apply-current-prices" onClick={() => applyCurrentPrices(project.id)}>{t.nav.useCurrentPrices}</button>
@@ -167,8 +167,8 @@ export function Wizard() {
       )}
 
       {/* Sticky action bar: Back · live headline figure · Next */}
-      <div className="wizard-bar fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-4px_16px_-8px_rgb(15_23_42/0.15)] backdrop-blur" data-testid="wizard-bar">
-        <div className="mx-auto flex max-w-7xl items-center gap-2 ps-[max(0.75rem,env(safe-area-inset-left))] pe-[max(0.75rem,env(safe-area-inset-right))] py-2 sm:gap-3 sm:px-6">
+      <div className="wizard-bar fixed start-0 end-0 bottom-0 z-30 border-t border-slate-200 bg-white pb-[env(safe-area-inset-bottom)] lg:start-60" data-testid="wizard-bar">
+        <div className="mx-auto flex max-w-6xl items-center gap-2 ps-[max(0.75rem,env(safe-area-inset-left))] pe-[max(0.75rem,env(safe-area-inset-right))] py-2 sm:gap-3 sm:px-6 lg:px-8">
           {cur > 0
             ? <button type="button" data-testid="nav-back" className="btn-secondary btn-icon h-12 w-12 sm:h-auto sm:w-auto sm:px-4" onClick={(e) => move(cur - 1, e.detail)} aria-label={t.nav.back}><BackIc size={20} /><span className="hidden sm:inline">{t.nav.back}</span></button>
             : <span className="hidden w-12 sm:block sm:w-[5.5rem]" />}
@@ -189,10 +189,10 @@ export function Wizard() {
           {STEPS.map((s, i) => (
             <li key={s}>
               <button type="button" data-testid={`sheet-step-${i}`} aria-current={i === cur ? 'step' : undefined} onClick={() => { setSheet(null); setStep(i) }}
-                className={`flex min-h-13 w-full items-center gap-3 rounded-xl px-3 text-start transition ${i === cur ? 'bg-brand-700 text-white' : 'hover:bg-slate-100'}`}>
+                className={`flex min-h-13 w-full items-center gap-3 rounded-lg px-3 text-start transition ${i === cur ? 'bg-slate-100 text-slate-900' : 'hover:bg-slate-50'}`}>
                 <StatusCircle status={status[s]} n={i + 1} current={i === cur} />
                 <span className="min-w-0 flex-1 font-medium">{t.steps[s]}</span>
-                <span className={`text-xs ${i === cur ? 'text-white/80' : status[s] === 'error' ? 'text-red-700' : status[s] === 'warn' ? 'text-amber-700' : 'text-slate-500'}`}>{i === cur ? t.stepStatus.current : t.stepStatus[status[s]]}</span>
+                <span className={`text-xs ${i === cur ? 'text-slate-600' : status[s] === 'error' ? 'text-red-700' : status[s] === 'warn' ? 'text-amber-700' : 'text-slate-500'}`}>{i === cur ? t.stepStatus.current : t.stepStatus[status[s]]}</span>
               </button>
             </li>
           ))}

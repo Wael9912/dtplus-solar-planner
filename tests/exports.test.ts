@@ -305,25 +305,25 @@ describe('document names, company, titles, savings section (owner review)', () =
 
   it('a default project name is replaced by the client and the system on the documents and in the file name', async () => {
     const p = { ...ps.size, name: 'New quote', clientName: 'Osman Ali' }, r = computeProject(p)
-    expect(docTitle(p, r, 'en')).toBe('Osman Ali — 5.2 kWp hybrid')
+    expect(docTitle(p, r, 'en')).toBe('Osman Ali · 5.2 kWp hybrid')
     expect(docFileStem(p, r, 'en')).toBe('Q-2026-0200_Osman_Ali_5.2_kWp_hybrid')
-    expect(docTitle({ ...p, name: 'عرض سعر جديد' }, r, 'ar')).toBe('Osman Ali — نظام هجين 5.2 kWp')
+    expect(docTitle({ ...p, name: 'عرض سعر جديد' }, r, 'ar')).toBe('Osman Ali · نظام هجين 5.2 kWp')
     expect(docTitle({ ...p, name: 'New solar project', clientName: '' }, r, 'en')).toBe('Q-2026-0200')
     expect(docFileStem({ ...p, name: 'New solar project', clientName: '' }, r, 'en')).toBe('Q-2026-0200')
     expect(docTitle({ ...p, name: 'Al-Fahad villa' }, r, 'en')).toBe('Al-Fahad villa')
     expect(docTitle(ps.backup, computeProject(ps.backup), 'en')).toBe('Known size')
-    expect(docTitle({ ...ps.backup, name: 'New quote' }, computeProject(ps.backup), 'en')).toBe('Client A — 10.2 kWh battery backup')
+    expect(docTitle({ ...ps.backup, name: 'New quote' }, computeProject(ps.backup), 'en')).toBe('Client A · 10.2 kWh battery backup')
     for (const build of [buildQuotationPdf, buildProposalPdf, buildTechnicalPdf]) {
       const t = await text(build(p, r, company, 'en', { fonts: null, now }))
       expect(t).not.toContain('New quote')
-      expect(t).toContain('Osman Ali - 5.2 kWp hybrid')
+      expect(t).toContain('Osman Ali · 5.2 kWp hybrid')
     }
     const ar = await textU(buildQuotationPdf({ ...p, name: 'عرض سعر جديد' }, r, company, 'ar', { fonts, now }))
     expect(ar).not.toContain(vis('عرض سعر جديد'))
     const wb = new ExcelJS.Workbook()
     await wb.xlsx.load(Buffer.from(await (await buildExcel(p, r, company, 'en', { now })).arrayBuffer()) as unknown as ArrayBuffer)
-    expect(wb.getWorksheet('Summary')!.getCell('A1').value).toBe('Osman Ali — 5.2 kWp hybrid')
-    expect(fileStem('Ahmed — 5.8 kWp hybrid')).toBe('Ahmed_5.8_kWp_hybrid')
+    expect(wb.getWorksheet('Summary')!.getCell('A1').value).toBe('Osman Ali · 5.2 kWp hybrid')
+    expect(fileStem('Ahmed · 5.8 kWp hybrid')).toBe('Ahmed_5.8_kWp_hybrid')
     expect(fileStem('a.b / c.')).toBe('a_b_c')
   })
 

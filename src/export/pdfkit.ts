@@ -108,7 +108,7 @@ export class Pdf {
   constructor(o: { rtl: boolean; brandHex: string; fonts: PdfFontData | null }) {
     this.doc = new jsPDF({ unit: 'mm', format: 'a4', compress: true })
     this.rtl = o.rtl
-    this.brand = hex2rgb(o.brandHex || '#0f766e')
+    this.brand = hex2rgb(o.brandHex || '#1c407c')
     let has = latin1, family = 'helvetica', unicode = false
     if (o.fonts) {
       try {

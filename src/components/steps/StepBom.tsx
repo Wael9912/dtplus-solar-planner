@@ -112,11 +112,11 @@ export function StepBom({ project: p, results: r, quote, update, goTo }: StepPro
   const name = (l: QuoteLine) => (l.source === 'custom' && lang === 'ar' && l.nameAr) || bomLineName(l, lang, t)
   const existingBadge = (id: string) => { const n = onSite.get(id); return n ? <span className="badge-info mt-1 whitespace-normal" data-testid="bom-existing"><bdi>{O.existing(n)}</bdi></span> : null }
   const qtyInput = (l: QuoteLine, cls = '', quiet = false) => (
-    <NumberInput quiet={quiet} align={quiet ? 'end' : 'start'} className={cls} value={l.qty} min={0} onChange={(v) => setQty(l, v)} aria-label={`${t.bom.qty} — ${name(l)}`} suffix={quiet ? undefined : unitLabel(l.unit, t)} />
+    <NumberInput quiet={quiet} align={quiet ? 'end' : 'start'} className={cls} value={l.qty} min={0} onChange={(v) => setQty(l, v)} aria-label={`${t.bom.qty}: ${name(l)}`} suffix={quiet ? undefined : unitLabel(l.unit, t)} />
   )
   const priceCell = (l: QuoteLine, quiet = false) => clientView
     ? <span className="block text-end font-medium text-slate-900 tabular-nums"><bdi>{m(l.unitSell)}</bdi></span>
-    : <NumberInput quiet={quiet} align={quiet ? 'end' : 'start'} value={l.unitCost} min={0} step={0.5} onChange={(v) => setPrice(l, v)} aria-label={`${t.bom.costIn(cur)} — ${name(l)}`} />
+    : <NumberInput quiet={quiet} align={quiet ? 'end' : 'start'} value={l.unitCost} min={0} step={0.5} onChange={(v) => setPrice(l, v)} aria-label={`${t.bom.costIn(cur)}: ${name(l)}`} />
   const toolbar = (
     <div className="flex flex-wrap items-center gap-2">
       <Segmented label={t.nav.clientView} value={clientView ? 'client' : 'cost'} onChange={(v) => setClientView(v === 'client')} options={[{ value: 'client', label: t.bom.clientPrices, testId: 'view-client' }, { value: 'cost', label: t.bom.costView, testId: 'view-cost' }]} />
@@ -138,8 +138,8 @@ export function StepBom({ project: p, results: r, quote, update, goTo }: StepPro
       <table className="table" data-testid="bom-table">
         <thead><tr>
           <th className="w-12 text-center"><span className="sr-only">{t.bom.included}</span></th><th className="w-10">#</th><th>{t.bom.item}</th>
-          <th className="num w-32">{t.bom.qty}</th><th className="w-16">{t.bom.unit}</th>
-          <th className="num w-36">{clientView ? t.bom.priceIn(cur) : t.bom.costIn(cur)}</th><th className="num w-36">{t.bom.totalIn(cur)}</th><th className="w-12"><span className="sr-only">{t.common.actions}</span></th>
+          <th className="num w-32 min-w-28">{t.bom.qty}</th><th className="w-16">{t.bom.unit}</th>
+          <th className="num w-36 min-w-32">{clientView ? t.bom.priceIn(cur) : t.bom.costIn(cur)}</th><th className="num w-36 min-w-28">{t.bom.totalIn(cur)}</th><th className="w-12"><span className="sr-only">{t.common.actions}</span></th>
         </tr></thead>
         <tbody>
           {categories.map((cat) => [
@@ -172,7 +172,7 @@ export function StepBom({ project: p, results: r, quote, update, goTo }: StepPro
                   <td>{only ? dash : priceCell(l, true)}</td>
                   <td className="num font-semibold text-slate-900">{only ? dash : <bdi>{m(clientView ? l.totalSell : l.totalCost)}</bdi>}</td>
                   <td>
-                    {custom ? <IconButton label={`${t.bom.removeLine} — ${name(l)}`} className="btn-ghost text-slate-500 hover:text-red-700" onClick={() => removeCustom(l.id)}><Trash2 size={18} /></IconButton>
+                    {custom ? <IconButton label={`${t.bom.removeLine}: ${name(l)}`} className="btn-ghost text-slate-500 hover:text-red-700" onClick={() => removeCustom(l.id)}><Trash2 size={18} /></IconButton>
                       : ed ? <IconButton label={t.bom.resetLine} className="btn-ghost text-amber-700" onClick={() => resetLine(l.id)}><RotateCcw size={18} /></IconButton> : null}
                   </td>
                 </tr>
@@ -189,7 +189,7 @@ export function StepBom({ project: p, results: r, quote, update, goTo }: StepPro
       {categories.map((cat) => {
         const ls = lines.filter((l) => l.category === cat)
         return (
-          <details key={cat} open className="disclosure group rounded-xl border border-slate-200 bg-white">
+          <details key={cat} open className="disclosure group rounded-lg border border-slate-200 bg-white">
             <summary className="px-3">
               <span className="min-w-0 flex-1 font-semibold text-brand-800">{bomCatLabel(cat, t)} <span className="font-normal text-slate-500">· {ls.length}</span></span>
               <bdi className="shrink-0 font-semibold text-slate-800 tabular-nums">{m(catTotal(cat), 0)}</bdi>
@@ -224,7 +224,7 @@ export function StepBom({ project: p, results: r, quote, update, goTo }: StepPro
                       <label className={`block min-w-0 ${ex ? 'opacity-60' : ''}`}><span className="mb-1 block text-xs text-slate-500">{t.bom.qty}</span>{qtyInput(l, "[&_input]:px-2")}</label>
                       <label className={`block min-w-0 ${ex ? 'opacity-60' : ''}`}><span className="mb-1 block text-xs text-slate-500">{clientView ? t.bom.unitPrice : t.bom.costIn(cur)}</span>{clientView ? <span className="flex min-h-11 items-center"><bdi className="font-medium tabular-nums">{m(l.unitSell)}</bdi></span> : priceCell(l)}</label>
                       <div className="flex items-center">
-                        {custom ? <IconButton label={`${t.bom.removeLine} — ${name(l)}`} className="btn-ghost text-slate-500 hover:text-red-700" onClick={() => removeCustom(l.id)}><Trash2 size={18} /></IconButton>
+                        {custom ? <IconButton label={`${t.bom.removeLine}: ${name(l)}`} className="btn-ghost text-slate-500 hover:text-red-700" onClick={() => removeCustom(l.id)}><Trash2 size={18} /></IconButton>
                           : <>
                             {ed && <IconButton label={t.bom.resetLine} className="btn-ghost text-amber-700" onClick={() => resetLine(l.id)}><RotateCcw size={18} /></IconButton>}
                             <Switch checked={!ex} onChange={() => toggle(l.id)} label={<span className="sr-only">{t.bom.includeItem(name(l))}</span>} data-testid="bom-include" />
@@ -333,7 +333,7 @@ function PricingControls({ quote: q, p, clientView, setPr, setSite, items, goSit
         {/* A product quote has no Site step: currency and rate are set here */}
         <Field label={O.currency} className={local ? '' : 'col-span-2'}>
           <select className="input" value={s.currency} onChange={(e) => { const c = e.target.value; setSite({ currency: c, fxRateToUsd: c === 'USD' ? 1 : defaultFx(c) }) }} data-testid="bom-currency">
-            {currencies.map((c) => <option key={c.code} value={c.code}>{`${c.code} — ${currencyName(c.code, lang)}`}</option>)}
+            {currencies.map((c) => <option key={c.code} value={c.code}>{`${c.code} · ${currencyName(c.code, lang)}`}</option>)}
             {!currencies.some((c) => c.code === s.currency) && <option value={s.currency}>{s.currency}</option>}
           </select>
         </Field>

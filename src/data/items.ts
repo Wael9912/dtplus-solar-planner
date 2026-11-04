@@ -25,19 +25,19 @@ const ATS: Record<number, number> = { 40: 180, 63: 220, 100: 320, 125: 380, 160:
 const breakerSpec = (a: number): [string, string] =>
   a <= 63 ? ['2P / 4P C-curve 6 kA', `2P / 4P منحنى C، ${RLM}6 kA`]
     : a <= 125 ? ['2P / 4P C-curve 10 kA', `2P / 4P منحنى C، ${RLM}10 kA`]
-      : a <= 400 ? ['3P / 4P MCCB 25–36 kA, adjustable thermal trip', `3P / 4P، ${RLM}25–36 kA، فصل حراري قابل للضبط`]
-        : a <= 800 ? ['3P / 4P MCCB 36–50 kA, electronic trip', `3P / 4P، ${RLM}36–50 kA، وحدة فصل إلكترونية`]
+      : a <= 400 ? ['3P / 4P MCCB 25-36 kA, adjustable thermal trip', `3P / 4P، ${RLM}25-36 kA، فصل حراري قابل للضبط`]
+        : a <= 800 ? ['3P / 4P MCCB 36-50 kA, electronic trip', `3P / 4P، ${RLM}36-50 kA، وحدة فصل إلكترونية`]
           : ['3P / 4P ACB / MCCB 50 kA, electronic trip', `3P / 4P قاطع هوائي ACB أو MCCB، ${RLM}50 kA`]
 
 export const items: CatalogItem[] = [
   // ---------------- Mounting
   item('rail', 'Mounting', 'Aluminium mounting rail', '40×40 mm anodised, 4.2 m lengths', 'm', 4.5, 'سكة تثبيت ألومنيوم', 'مقطع 40×40 مم مؤكسد (أنودايز)، أطوال 4.2 م'),
-  item('mid-clamp', 'Mounting', 'Mid clamp', '30–40 mm frame, aluminium + SS bolt', 'pcs', 0.9, 'مشبك وسطي', 'لإطار 30–40 مم، ألومنيوم + مسمار ستانلس'),
+  item('mid-clamp', 'Mounting', 'Mid clamp', '30-40 mm frame, aluminium + SS bolt', 'pcs', 0.9, 'مشبك وسطي', 'لإطار 30-40 مم، ألومنيوم + مسمار ستانلس'),
   item('end-clamp', 'Mounting', 'End clamp', '35 mm frame, aluminium + SS bolt', 'pcs', 0.9, 'مشبك طرفي', 'لإطار 35 مم، ألومنيوم + مسمار ستانلس'),
   item('rail-splice', 'Mounting', 'Rail splice / connector', 'Internal splice kit', 'pcs', 1.5, 'وصلة سكة', 'طقم وصل داخلي'),
   item('l-foot', 'Mounting', 'L-foot / tin-roof clamp', 'With EPDM washer & self-drilling screw', 'pcs', 1.8, 'قاعدة L / مشبك سقف صاج', 'مع حلقة مانعة EPDM ومسمار ذاتي الحفر'),
   item('tile-hook', 'Mounting', 'Tile roof hook', 'Stainless steel, adjustable', 'pcs', 4, 'خطاف سقف قرميد', 'ستانلس ستيل، قابل للضبط'),
-  item('triangle-frame', 'Mounting', 'Flat-roof tilt frame', 'Adjustable 10–30° triangle, per panel', 'pcs', 18, 'حامل مائل للأسطح المستوية', 'مثلث قابل للضبط 10–30°، لكل لوح'),
+  item('triangle-frame', 'Mounting', 'Flat-roof tilt frame', 'Adjustable 10-30° triangle, per panel', 'pcs', 18, 'حامل مائل للأسطح المستوية', 'مثلث قابل للضبط 10-30°، لكل لوح'),
   item('ballast-block', 'Mounting', 'Ballast / concrete footing', '~20 kg block or chemical anchor', 'pcs', 3, 'ثقل خرساني / قاعدة تثبيت', 'بلوك ~20 كجم أو مثبّت كيميائي'),
   item('ground-structure', 'Mounting', 'Ground-mount structure', 'Galvanised steel, incl. foundations, per kWp', 'kWp', 110, 'هيكل تركيب أرضي', 'حديد مجلفن شامل القواعد، لكل kWp'),
 
@@ -74,7 +74,7 @@ export const items: CatalogItem[] = [
     item(`batt-fuse-hv-${a}`, 'Protection', `HV battery fuse ${a} A + holder`, 'DC fuse gR/gPV or DC MCCB, 1000 V DC (HV bank)', 'pcs', Math.round(usd * 2.2 * 100) / 100,
       `فيوز بطارية جهد عالٍ ${a} A مع حامل`, `فيوز DC ‏(gR/gPV) أو قاطع MCCB للتيار المستمر، ${RLM}1000 V DC`),
   ]),
-  item('battery-rack', 'Battery', 'Battery rack / cabinet', '19" rack, 4–6 modules, with busbars', 'pcs', 160, 'رف / كابينة بطاريات', 'رف 19 بوصة، 4–6 وحدات، مع قضبان توصيل (Busbar)'),
+  item('battery-rack', 'Battery', 'Battery rack / cabinet', '19" rack, 4-6 modules, with busbars', 'pcs', 160, 'رف / كابينة بطاريات', 'رف 19 بوصة، 4-6 وحدات، مع قضبان توصيل (Busbar)'),
   item('battery-stand', 'Battery', 'Battery stand (lead acid)', 'Steel 2-tier stand for 4 × 12 V', 'pcs', 60, 'حامل بطاريات (رصاص حمضي)', 'حامل حديد بطابقين لـ 4 × 12 V'),
   item('busbar-kit', 'Battery', 'Battery busbar kit', 'Insulated +/− copper busbars for up to 8 units in parallel', 'pcs', 45, 'طقم قضبان توصيل (Busbar) للبطاريات', 'قضبان نحاسية موجبة/سالبة معزولة حتى 8 وحدات على التوازي'),
   item('bms-cable', 'Battery', 'BMS communication cable', 'CAN / RS485 link, RJ45, per battery unit', 'pcs', 6, 'كابل اتصال نظام إدارة البطارية (BMS)', 'رابط CAN / RS485، ‏RJ45، لكل وحدة بطارية'),
@@ -92,9 +92,9 @@ export const items: CatalogItem[] = [
   item('rcd-relay', 'Protection', 'Earth-leakage relay 30 mA + core-balance CT', 'Trips the output MCCB via shunt trip (outputs above 100 A)', 'pcs', 120,
     'مرحّل تسرّب أرضي 30 mA + محوّل تيار حلقي', 'يفصل قاطع الخرج MCCB عبر ملف فصل (للخرج الأكبر من 100 A)'),
   item('spd-ac', 'Protection', 'AC surge protector', 'Type 2, 275 V, 40 kA, 2P/4P', 'pcs', 28, 'واقي الجهد الزائد AC (SPD)', 'النوع 2، 275 V، 40 kA، 2P/4P'),
-  item('db-board', 'Protection', 'Distribution board (AC/DC)', 'IP65 enclosure, 12–24 way, busbars, labels', 'pcs', 45, 'لوحة توزيع (AC/DC)', 'صندوق IP65، 12–24 خطاً، قضبان توصيل، ملصقات'),
-  ...Object.entries(CHANGEOVER).map(([a, usd]) => item(`changeover-${a}`, 'Protection', `Changeover switch ${a} A`, 'Manual 2P / 4P grid–solar–off (maintenance bypass)', 'pcs', usd,
-    `مفتاح تحويل ${a} A`, 'يدوي 2P / 4P (شبكة – شمسي – فصل) للتجاوز أثناء الصيانة')),
+  item('db-board', 'Protection', 'Distribution board (AC/DC)', 'IP65 enclosure, 12-24 way, busbars, labels', 'pcs', 45, 'لوحة توزيع (AC/DC)', 'صندوق IP65، 12-24 خطاً، قضبان توصيل، ملصقات'),
+  ...Object.entries(CHANGEOVER).map(([a, usd]) => item(`changeover-${a}`, 'Protection', `Changeover switch ${a} A`, 'Manual 2P / 4P grid / solar / off (maintenance bypass)', 'pcs', usd,
+    `مفتاح تحويل ${a} A`, 'يدوي 2P / 4P (شبكة / شمسي / فصل) للتجاوز أثناء الصيانة')),
   ...Object.entries(ATS).map(([a, usd]) => item(`ats-${a}`, 'Protection', `Automatic transfer switch (ATS) ${a} A`, '4P, controller with generator auto-start', 'pcs', usd,
     `مفتاح تحويل آلي (ATS) ‏${a} A`, '4P، مع وحدة تحكم وتشغيل آلي للمولد')),
   item('ct-meter', 'Monitoring', 'Energy meter / CT clamp', 'For export limit & self-consumption (1 CT per phase)', 'pcs', 45, 'عداد طاقة / محوّل تيار (CT)', 'للتحكم في حد التصدير والاستهلاك الذاتي (محوّل لكل طور)'),
@@ -105,7 +105,7 @@ export const items: CatalogItem[] = [
   item('earth-cable', 'Earthing', 'Earth cable 6 mm² green/yellow', 'Cu PVC', 'm', 1.0, 'كابل تأريض 6 مم² أخضر/أصفر', 'نحاس PVC'),
   item('earth-clip', 'Earthing', 'Module earthing clip', 'Stainless WEEB-type bonding clip, 1 per panel', 'pcs', 0.5, 'مشبك تأريض للوح', 'مشبك ربط ستانلس من نوع WEEB، واحد لكل لوح'),
   item('lightning-arrestor', 'Earthing', 'Lightning arrestor / air terminal', 'With down-conductor', 'pcs', 120, 'مانعة صواعق / رأس التقاط', 'مع موصل نزول'),
-  item('conduit', 'Cabling', 'Conduit / cable trunking', 'UV-resistant 25–40 mm + fittings', 'm', 1.6, 'مواسير / مجاري كابلات', 'مقاومة للأشعة فوق البنفسجية 25–40 مم + ملحقات'),
+  item('conduit', 'Cabling', 'Conduit / cable trunking', 'UV-resistant 25-40 mm + fittings', 'm', 1.6, 'مواسير / مجاري كابلات', 'مقاومة للأشعة فوق البنفسجية 25-40 مم + ملحقات'),
   item('cable-ties-labels', 'Accessories', 'Consumables kit', 'UV cable ties, labels, glands, screws, tape (per 20 panels)', 'kit', 25, 'طقم مستهلكات', 'رباطات كابلات مقاومة للأشعة، ملصقات، جلندات، براغي، شريط (لكل 20 لوحاً)'),
   // Priced per kVA by buildBom (generatorPriceUsd); approxPriceUsd here is only a fallback
   item('generator', 'Generator', 'Diesel generator', 'Silent canopy, ATS-ready', 'pcs', 0, 'مولد ديزل', 'بكاتم صوت، جاهز لمفتاح التحويل الآلي ATS'),

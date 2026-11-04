@@ -11,8 +11,8 @@ export function UpdateBanner() {
   const available = useUpdates((s) => s.available)
   if (available == null) return null
   return (
-    <div className="border-t border-brand-200 bg-brand-50" data-testid="update-banner">
-      <div className="mx-auto flex min-h-12 max-w-7xl items-center gap-2 py-1 ps-[max(0.75rem,env(safe-area-inset-left))] pe-[max(0.5rem,env(safe-area-inset-right))] text-sm text-brand-900 sm:px-6">
+    <div className="border-b border-brand-200 bg-brand-50" data-testid="update-banner">
+      <div className="mx-auto flex min-h-12 max-w-6xl items-center gap-2 py-1 ps-[max(0.75rem,env(safe-area-inset-left))] pe-[max(0.5rem,env(safe-area-inset-right))] text-sm text-brand-900 sm:px-6">
         <RefreshCw size={18} className="shrink-0 text-brand-700" aria-hidden="true" />
         <span className="min-w-0 flex-1">{t.updates.ready}</span>
         <button type="button" className="btn-primary shrink-0 px-3" data-testid="update-now" onClick={() => applyUpdate()}>{t.updates.update}</button>

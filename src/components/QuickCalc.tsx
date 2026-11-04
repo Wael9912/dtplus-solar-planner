@@ -139,7 +139,7 @@ export function QuickCalc() {
             <select className="input" value={calc.site.locationId} onChange={(e) => pickCity(e.target.value)} data-testid="calc-city">
               {grouped.map((g) => (
                 <optgroup key={g.rg} label={t.site.regions[g.rg] ?? g.rg}>
-                  {g.items.map((l) => <option key={l.id} value={l.id}>{`${locName(l, lang)}${lang === 'ar' ? '، ' : ', '}${ctyName(l, lang)} — ${iso(t.site.pshShort(fmt(l.annualPsh, 1)))}`}</option>)}
+                  {g.items.map((l) => <option key={l.id} value={l.id}>{`${locName(l, lang)}${lang === 'ar' ? '، ' : ', '}${ctyName(l, lang)} · ${iso(t.site.pshShort(fmt(l.annualPsh, 1)))}`}</option>)}
                 </optgroup>
               ))}
               {calc.site.locationId === 'custom' && <option value="custom">{calc.site.customName || t.site.custom}</option>}
@@ -151,7 +151,7 @@ export function QuickCalc() {
       </div>
 
       {wide ? (
-        <aside className="sticky top-[4.5rem] max-h-[calc(100dvh-5.5rem)] overflow-y-auto rounded-xl" aria-labelledby="calc-result-title" data-testid="calc-result">
+        <aside className="sticky top-[4.5rem] max-h-[calc(100dvh-5.5rem)] overflow-y-auto rounded-lg" aria-labelledby="calc-result-title" data-testid="calc-result">
           <div className="card space-y-4 p-4">
             <h2 id="calc-result-title" className="card-title">{C.result}</h2>
             <ResultPanel p={calc} r={r} q={q} errors={errors} onProposal={onProposal} top={has ? actions() : null} />
@@ -232,7 +232,7 @@ function ResultPanel({ p, r, q, errors, onProposal, top }: { p: Project; r: Resu
   const autoTxt = a ? (a.offgrid ? C.autonomy(short(a.days, 1)) : a.hours > 72 ? C.backupLong : C.backup(short(a.hours, 0))) : ''
   return (
     <div className="space-y-4" data-testid="calc-result-body">
-      <div className="rounded-xl border border-brand-200 bg-brand-50 p-4">
+      <div className="rounded-lg border border-brand-200 bg-brand-50 p-4">
         <p className="text-sm text-slate-600">{C.price}</p>
         <p className="mt-0.5 text-[1.75rem] leading-9 font-semibold text-slate-900 tabular-nums" data-testid="calc-total">{C.approx(formatQuoteMoney(q.total, q, 0))}</p>
         <p className="text-xs leading-5 text-slate-500">{[f.perWp > 0 ? C.perWp(formatQuoteMoney(f.perWp, q, 2)) : '', vat].filter(Boolean).join(' · ')}</p>

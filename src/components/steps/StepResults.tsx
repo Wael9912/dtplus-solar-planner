@@ -77,11 +77,11 @@ export function StepResults({ project: p, results: r, quote, goTo }: StepProps) 
           <ChecksList checks={issues} current="results" onGo={goTo} />
         </Section>
       ) : (
-        <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800" data-testid="checks-ok"><CircleCheck size={20} />{t.results.allOk}</div>
+        <div className="flex items-center gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800" data-testid="checks-ok"><CircleCheck size={20} />{t.results.allOk}</div>
       )}
 
       {(noDemand || r.demand === 'bill') && (
-        <div className="flex items-start gap-3 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900" data-testid="results-basis">
+        <div className="flex items-start gap-3 rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900" data-testid="results-basis">
           <Info size={20} className="mt-0.5 shrink-0" aria-hidden="true" />
           <div className="min-w-0 space-y-0.5">
             {noDemand ? <>
@@ -142,7 +142,7 @@ export function StepResults({ project: p, results: r, quote, goTo }: StepProps) 
                 <YAxis orientation={rtl ? 'right' : 'left'} width={40} tick={axisTick} tickLine={false} axisLine={false} tickFormatter={(v) => compact.format(Number(v))} />
                 <Tooltip cursor={{ fill: '#f1f5f9' }} wrapperStyle={{ pointerEvents: 'none' }} labelFormatter={(_, pl) => String(pl?.[0]?.payload?.full ?? '')} formatter={(v, name) => [`${fmt(Number(v))} kWh`, String(name)]} />
                 {!noDemand && <Legend wrapperStyle={{ fontSize: 12 }} iconSize={10} />}
-                <Bar dataKey="production" name={t.results.production} fill="#0d9488" radius={[4, 4, 0, 0]} isAnimationActive={false} />
+                <Bar dataKey="production" name={t.results.production} fill="#2f61b3" radius={[3, 3, 0, 0]} isAnimationActive={false} />
                 {!noDemand && <Line dataKey="demand" name={t.results.demand} type="monotone" stroke="#475569" strokeDasharray="5 4" strokeWidth={2} dot={false} isAnimationActive={false} />}
               </ComposedChart>
             </ResponsiveContainer>
@@ -157,7 +157,7 @@ export function StepResults({ project: p, results: r, quote, goTo }: StepProps) 
                 <YAxis orientation={rtl ? 'right' : 'left'} width={44} tick={axisTick} tickLine={false} axisLine={false} tickFormatter={(v) => compact.format(Number(v))} />
                 <Tooltip wrapperStyle={{ pointerEvents: 'none' }} formatter={(v) => [formatQuoteMoney(Number(v), quote, 0), t.results.cashflow]} labelFormatter={(l) => t.results.yearN(Number(l))} />
                 <ReferenceLine y={0} stroke="#64748b" />
-                <Area dataKey="v" stroke="#0d9488" strokeWidth={2} fill="#14b8a6" fillOpacity={0.15} isAnimationActive={false} />
+                <Area dataKey="v" stroke="#234f98" strokeWidth={2} fill="#2f61b3" fillOpacity={0.12} isAnimationActive={false} />
               </AreaChart>
             </ResponsiveContainer>
           </div>

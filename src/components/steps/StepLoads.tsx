@@ -102,7 +102,7 @@ export function StepLoads({ project: p, results: r, update, context = 'wizard' }
               const kwh = tp.build().reduce((s, l) => s + whDay(l), 0) / 1000
               return (
                 <button key={tp.key} type="button" data-testid={`tpl-${tp.key}`} onClick={() => applyTemplate(tp.key, 'replace')}
-                  className="flex min-h-14 items-center gap-3 rounded-xl border border-slate-200 bg-white p-3 text-start transition hover:border-brand-400 hover:bg-brand-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 lg:flex-col lg:items-start">
+                  className="flex min-h-14 items-center gap-3 rounded-lg border border-slate-200 bg-white p-3 text-start transition hover:border-brand-400 hover:bg-brand-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 lg:flex-col lg:items-start">
                   <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-brand-50 text-brand-700"><Icon size={20} /></span>
                   <span className="min-w-0"><span className="block font-medium text-slate-900">{t.loads[tp.key]}</span><span className="block text-xs text-slate-500"><bdi>{t.loads.approxDay(fmt(kwh, 1))}</bdi></span></span>
                 </button>
@@ -155,15 +155,15 @@ export function StepLoads({ project: p, results: r, update, context = 'wizard' }
                   return (
                     <tr key={l.id} data-load-id={l.id} className="transition hover:bg-slate-50/60">
                       <td className="ps-2 pe-1"><NameCell value={matchAppliance(l.name) ? nm : l.name} placeholder={t.loads.namePh} label={t.loads.name} onChange={(v) => patch(l.id, { name: v })} /></td>
-                      <td className="px-1"><NumberInput quiet align="end" value={l.watts} min={0} onChange={(v) => patch(l.id, { watts: v ?? 0 })} aria-label={`${t.loads.watts} — ${nm}`} /></td>
-                      <td className="px-1"><NumberInput quiet align="end" integer value={l.qty} min={0} onChange={(v) => patch(l.id, { qty: v ?? 0 })} aria-label={`${t.loads.qty} — ${nm}`} /></td>
-                      <td className="px-1"><NumberInput quiet align="end" value={l.hoursPerDay} min={0} max={24} step={0.5} onChange={(v) => patch(l.id, { hoursPerDay: v ?? 0 })} aria-label={`${t.loads.hours} — ${nm}`} /></td>
-                      <td className="px-1"><NumberInput quiet align="end" value={l.nightSharePct} min={0} max={100} step={10} onChange={(v) => patch(l.id, { nightSharePct: v ?? 0 })} aria-label={`${t.loads.night} — ${nm}`} /></td>
-                      <td className="px-1"><NumberInput quiet align="end" value={l.surgeFactor} min={1} max={10} step={0.5} onChange={(v) => patch(l.id, { surgeFactor: v ?? 1 })} aria-label={`${t.loads.surge} — ${nm}`} /></td>
-                      {three && <td className="px-1"><select className="input-quiet" value={l.phase} aria-label={`${t.loads.phase} — ${nm}`} onChange={(e) => patch(l.id, { phase: Number(e.target.value) as 1 | 3 })}><option value={1}>1φ</option><option value={3}>3φ</option></select></td>}
-                      {isHybrid && <td className="text-center"><input type="checkbox" className="size-5 accent-brand-700" checked={l.critical} aria-label={`${t.loads.onBattery} — ${nm}`} onChange={(e) => patch(l.id, { critical: e.target.checked })} /></td>}
+                      <td className="px-1"><NumberInput quiet align="end" value={l.watts} min={0} onChange={(v) => patch(l.id, { watts: v ?? 0 })} aria-label={`${t.loads.watts}: ${nm}`} /></td>
+                      <td className="px-1"><NumberInput quiet align="end" integer value={l.qty} min={0} onChange={(v) => patch(l.id, { qty: v ?? 0 })} aria-label={`${t.loads.qty}: ${nm}`} /></td>
+                      <td className="px-1"><NumberInput quiet align="end" value={l.hoursPerDay} min={0} max={24} step={0.5} onChange={(v) => patch(l.id, { hoursPerDay: v ?? 0 })} aria-label={`${t.loads.hours}: ${nm}`} /></td>
+                      <td className="px-1"><NumberInput quiet align="end" value={l.nightSharePct} min={0} max={100} step={10} onChange={(v) => patch(l.id, { nightSharePct: v ?? 0 })} aria-label={`${t.loads.night}: ${nm}`} /></td>
+                      <td className="px-1"><NumberInput quiet align="end" value={l.surgeFactor} min={1} max={10} step={0.5} onChange={(v) => patch(l.id, { surgeFactor: v ?? 1 })} aria-label={`${t.loads.surge}: ${nm}`} /></td>
+                      {three && <td className="px-1"><select className="input-quiet" value={l.phase} aria-label={`${t.loads.phase}: ${nm}`} onChange={(e) => patch(l.id, { phase: Number(e.target.value) as 1 | 3 })}><option value={1}>1φ</option><option value={3}>3φ</option></select></td>}
+                      {isHybrid && <td className="text-center"><input type="checkbox" className="size-5 accent-brand-700" checked={l.critical} aria-label={`${t.loads.onBattery}: ${nm}`} onChange={(e) => patch(l.id, { critical: e.target.checked })} /></td>}
                       <td className="num px-2 font-medium text-slate-900">{fmt(whDay(l))}</td>
-                      <td className="px-1"><IconButton label={`${t.common.delete} — ${nm}`} className="btn-ghost text-slate-500 hover:text-red-700" onClick={() => remove(l.id)} data-testid="load-delete"><Trash2 size={18} /></IconButton></td>
+                      <td className="px-1"><IconButton label={`${t.common.delete}: ${nm}`} className="btn-ghost text-slate-500 hover:text-red-700" onClick={() => remove(l.id)} data-testid="load-delete"><Trash2 size={18} /></IconButton></td>
                     </tr>
                   )
                 })}
@@ -176,7 +176,7 @@ export function StepLoads({ project: p, results: r, update, context = 'wizard' }
             {p.loads.map((l) => {
               const nm = loadName(l, lang, t)
               return (
-                <li key={l.id} data-load-id={l.id} data-testid="load-card" className="rounded-xl border border-slate-200 bg-white p-3 transition">
+                <li key={l.id} data-load-id={l.id} data-testid="load-card" className="rounded-lg border border-slate-200 bg-white p-3 transition">
                   <div className="flex items-start gap-3">
                     {/* Full name (wraps, never cut off); tap opens the editor for the less-used fields */}
                     <button type="button" className="min-w-0 flex-1 rounded-md text-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500" onClick={() => setEditId(l.id)} data-testid="load-card-edit">
@@ -188,10 +188,10 @@ export function StepLoads({ project: p, results: r, update, context = 'wizard' }
                     <div className="shrink-0 text-end leading-tight"><div className="font-semibold text-slate-900 tabular-nums">{fmt(whDay(l))}</div><div className="text-xs text-slate-500">{t.loads.daily}</div></div>
                   </div>
                   <div className="mt-2.5 grid grid-cols-[repeat(3,minmax(0,1fr))_auto] items-end gap-2">
-                    <label className="block min-w-0"><span className="mb-1 block text-xs leading-tight text-slate-500">{t.loads.watts}</span><NumberInput className="[&_input]:px-2" value={l.watts} min={0} onChange={(v) => patch(l.id, { watts: v ?? 0 })} aria-label={`${t.loads.watts} — ${nm}`} /></label>
-                    <label className="block min-w-0"><span className="mb-1 block text-xs leading-tight text-slate-500">{t.loads.hoursCompact}</span><NumberInput className="[&_input]:px-2" value={l.hoursPerDay} min={0} max={24} step={0.5} onChange={(v) => patch(l.id, { hoursPerDay: v ?? 0 })} aria-label={`${t.loads.hours} — ${nm}`} /></label>
-                    <label className="block min-w-0"><span className="mb-1 block text-xs leading-tight text-slate-500">{t.loads.qty}</span><NumberInput className="[&_input]:px-2" integer value={l.qty} min={0} onChange={(v) => patch(l.id, { qty: v ?? 0 })} aria-label={`${t.loads.qty} — ${nm}`} /></label>
-                    <IconButton label={`${t.common.delete} — ${nm}`} className="btn-ghost text-slate-500 hover:text-red-700" onClick={() => remove(l.id)} data-testid="load-delete"><Trash2 size={18} /></IconButton>
+                    <label className="block min-w-0"><span className="mb-1 block text-xs leading-tight text-slate-500">{t.loads.watts}</span><NumberInput className="[&_input]:px-2" value={l.watts} min={0} onChange={(v) => patch(l.id, { watts: v ?? 0 })} aria-label={`${t.loads.watts}: ${nm}`} /></label>
+                    <label className="block min-w-0"><span className="mb-1 block text-xs leading-tight text-slate-500">{t.loads.hoursCompact}</span><NumberInput className="[&_input]:px-2" value={l.hoursPerDay} min={0} max={24} step={0.5} onChange={(v) => patch(l.id, { hoursPerDay: v ?? 0 })} aria-label={`${t.loads.hours}: ${nm}`} /></label>
+                    <label className="block min-w-0"><span className="mb-1 block text-xs leading-tight text-slate-500">{t.loads.qty}</span><NumberInput className="[&_input]:px-2" integer value={l.qty} min={0} onChange={(v) => patch(l.id, { qty: v ?? 0 })} aria-label={`${t.loads.qty}: ${nm}`} /></label>
+                    <IconButton label={`${t.common.delete}: ${nm}`} className="btn-ghost text-slate-500 hover:text-red-700" onClick={() => remove(l.id)} data-testid="load-delete"><Trash2 size={18} /></IconButton>
                   </div>
                   {isHybrid && (
                     <label className="mt-1 -mb-1.5 inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-lg text-sm text-slate-700">
@@ -201,7 +201,7 @@ export function StepLoads({ project: p, results: r, update, context = 'wizard' }
                 </li>
               )
             })}
-            <li className="flex items-center justify-between rounded-xl px-2 py-2 text-sm font-semibold text-slate-900 md:col-span-2"><span>{t.loads.totalDaily}</span><bdi className="tabular-nums">{fmt(r.dailyWh / 1000, 2)} kWh</bdi></li>
+            <li className="flex items-center justify-between rounded-lg px-2 py-2 text-sm font-semibold text-slate-900 md:col-span-2"><span>{t.loads.totalDaily}</span><bdi className="tabular-nums">{fmt(r.dailyWh / 1000, 2)} kWh</bdi></li>
           </ul>
         )}
         <div className="border-t border-slate-200 px-4 sm:px-5">
@@ -271,12 +271,12 @@ function LibrarySheet({ open, onClose, countOf, onAdd, onDec, onSet, onTemplate,
               </button>
               {n > 0 ? (
                 <div className="flex shrink-0 items-center rounded-lg border border-brand-200 bg-brand-50">
-                  <button type="button" className="grid size-11 place-items-center text-brand-800" aria-label={`${t.loads.decrease} — ${applianceName(a, lang)}`} onClick={() => onDec(a)}>−</button>
-                  <LibQty n={n} label={`${t.loads.qty} — ${applianceName(a, lang)}`} onSet={(x) => onSet(a, x)} />
-                  <button type="button" className="grid size-11 place-items-center text-brand-800" aria-label={`${t.loads.increase} — ${applianceName(a, lang)}`} onClick={() => onAdd(a)}><Plus size={16} /></button>
+                  <button type="button" className="grid size-11 place-items-center text-brand-800" aria-label={`${t.loads.decrease}: ${applianceName(a, lang)}`} onClick={() => onDec(a)}>−</button>
+                  <LibQty n={n} label={`${t.loads.qty}: ${applianceName(a, lang)}`} onSet={(x) => onSet(a, x)} />
+                  <button type="button" className="grid size-11 place-items-center text-brand-800" aria-label={`${t.loads.increase}: ${applianceName(a, lang)}`} onClick={() => onAdd(a)}><Plus size={16} /></button>
                 </div>
               ) : (
-                <button type="button" className="btn-secondary btn-icon" aria-label={`${t.loads.add} — ${applianceName(a, lang)}`} onClick={() => onAdd(a)} data-testid="library-add"><Plus size={18} /></button>
+                <button type="button" className="btn-secondary btn-icon" aria-label={`${t.loads.add}: ${applianceName(a, lang)}`} onClick={() => onAdd(a)} data-testid="library-add"><Plus size={18} /></button>
               )}
             </li>
           )

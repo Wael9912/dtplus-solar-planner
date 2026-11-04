@@ -178,7 +178,7 @@ export function ProjectsPage() {
                 <Search size={18} className="pointer-events-none absolute inset-y-0 start-3 my-auto text-slate-400" />
                 <input className="input ps-10" type="search" dir="auto" placeholder={t.projects.search} aria-label={t.projects.search} value={q} onChange={(e) => setQ(e.target.value)} data-testid="projects-search" />
               </div>
-              <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-0.5 [scrollbar-width:none] sm:mx-0 sm:px-0" role="group" aria-label={t.projects.statusFilter}>
+              <div className="-mx-4 flex min-w-0 gap-2 overflow-x-auto px-4 pb-0.5 [scrollbar-width:none] sm:mx-0 sm:px-0 lg:flex-1" role="group" aria-label={t.projects.statusFilter}>
                 <button type="button" className="chip" aria-pressed={status === 'all'} onClick={() => setStatus('all')} data-testid="filter-all">{t.projects.all} <span className="opacity-70">{projects.length}</span></button>
                 {STATUSES.map((s) => { const v = statusValue(s); return (
                   <button key={s} type="button" className="chip" aria-pressed={status === s} onClick={() => setStatus(s)} data-testid={`filter-${s}`}>
@@ -214,7 +214,7 @@ export function ProjectsPage() {
                       <div className="flex items-start gap-2">
                         <div className="min-w-0 flex-1">
                           <h2 className="font-semibold text-slate-900">
-                            <button type="button" data-testid="project-open" onClick={() => openProject(p.id)} className="text-start after:absolute after:inset-0 after:rounded-xl after:content-[''] focus-visible:outline-none group-hover:text-brand-800"><bdi>{projectTitle(p.name, t)}</bdi></button>
+                            <button type="button" data-testid="project-open" onClick={() => openProject(p.id)} className="text-start after:absolute after:inset-0 after:rounded-lg after:content-[''] focus-visible:outline-none group-hover:text-brand-800"><bdi>{projectTitle(p.name, t)}</bdi></button>
                           </h2>
                           <p className="mt-0.5 truncate text-sm text-slate-500"><bdi>{[p.clientName || '—', p.reference].filter(Boolean).join(' · ')}</bdi></p>
                           {old != null && <p className="mt-1"><span className="badge-neutral bg-white whitespace-normal text-slate-500" title={C.supersededHelp} data-testid="project-superseded">{old ? C.superseded(old) : C.supersededNewer}</span></p>}
@@ -266,7 +266,7 @@ export function ProjectsPage() {
           {start.map((a) => (
             <li key={a.key}>
               <button type="button" onClick={() => runStart(a)} data-testid={`sheet-start-${a.key}`}
-                className="flex min-h-14 w-full items-center gap-3 rounded-xl px-2 py-2 text-start transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500">
+                className="flex min-h-14 w-full items-center gap-3 rounded-lg px-2 py-2 text-start transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500">
                 <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-brand-50 text-brand-700"><a.icon size={20} /></span>
                 <span className="min-w-0 flex-1">
                   <span className="block font-medium text-slate-900">{a.label}</span>
@@ -293,7 +293,7 @@ function Fig({ k, v, className = '', title }: { k: string; v: string; className?
 
 function Step({ n, done, label, action }: { n: number; done: boolean; label: string; action?: ReactNode }) {
   return (
-    <li className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 p-3">
+    <li className="flex flex-wrap items-center gap-3 rounded-lg border border-slate-200 p-3">
       <span className={`grid size-8 shrink-0 place-items-center rounded-full text-sm font-semibold ${done ? 'bg-brand-100 text-brand-700' : 'bg-slate-100 text-slate-600'}`}>{done ? <Check size={16} /> : n}</span>
       <span className={`min-w-[10rem] flex-1 text-sm font-medium ${done ? 'text-slate-500 line-through' : 'text-slate-800'}`}>{label}</span>
       {!done && action && <span className="w-full sm:w-auto [&>button]:w-full">{action}</span>}

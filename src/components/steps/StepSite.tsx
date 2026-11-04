@@ -56,7 +56,7 @@ export function StepSite({ project: p, results: r, update }: StepProps) {
             <select className="input" value={s.locationId} onChange={(e) => pick(e.target.value)} data-testid="site-location">
               {grouped.map((g) => (
                 <optgroup key={g.rg} label={t.site.regions[g.rg] ?? g.rg}>
-                  {g.items.map((l) => <option key={l.id} value={l.id}>{`${locName(l, lang)}${lang === 'ar' ? '، ' : ', '}${ctyName(l, lang)} — ${iso(t.site.pshShort(fmt(l.annualPsh, 1)))}`}</option>)}
+                  {g.items.map((l) => <option key={l.id} value={l.id}>{`${locName(l, lang)}${lang === 'ar' ? '، ' : ', '}${ctyName(l, lang)} · ${iso(t.site.pshShort(fmt(l.annualPsh, 1)))}`}</option>)}
                 </optgroup>
               ))}
               <option value="custom">{t.site.custom}</option>
@@ -108,7 +108,7 @@ export function StepSite({ project: p, results: r, update }: StepProps) {
                 {s.monthlyPsh.map((v, i) => (
                   <label key={i} className="block min-w-0">
                     <span className="mb-1 block text-xs font-medium text-slate-600">{t.months[i]}</span>
-                    <NumberInput value={v} step={0.1} min={0} max={12} onChange={(x) => setMonth(i, x)} aria-label={`${t.site.monthly} — ${t.months[i]}`} />
+                    <NumberInput value={v} step={0.1} min={0} max={12} onChange={(x) => setMonth(i, x)} aria-label={`${t.site.monthly}: ${t.months[i]}`} />
                   </label>
                 ))}
               </div>
@@ -120,7 +120,7 @@ export function StepSite({ project: p, results: r, update }: StepProps) {
           <div className="grid grid-cols-2 gap-x-3 gap-y-4 sm:gap-x-4">
             <Field label={t.site.currency} className={`col-span-2 ${local ? 'sm:col-span-1' : ''}`}>
               <select className="input" value={s.currency} onChange={(e) => setCurrency(e.target.value)} data-testid="site-currency">
-                {currencies.map((c) => <option key={c.code} value={c.code}>{`${c.code} — ${currencyName(c.code, lang)}`}</option>)}
+                {currencies.map((c) => <option key={c.code} value={c.code}>{`${c.code} · ${currencyName(c.code, lang)}`}</option>)}
                 {!currencies.some((c) => c.code === s.currency) && <option value={s.currency}>{s.currency}</option>}
               </select>
             </Field>

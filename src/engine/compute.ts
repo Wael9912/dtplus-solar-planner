@@ -347,10 +347,10 @@ function computeCore(p: Project): Results {
 
   // ---- Input guards (no NaN / Infinity can leave the engine)
   if (s.psh > 24) s.psh = 24 // physical ceiling (hostile / mistyped input; real sites are 2–8 h)
-  if (!(s.psh >= 0.5)) { checks.push(mk('psh', 'error', 'site', 'Peak sun hours must be at least 0.5 h — enter the site irradiation.', 'يجب ألا تقل ساعات الذروة الشمسية عن 0.5 ساعة — أدخل قيمة الإشعاع الشمسي للموقع.')); s.psh = 0 }
+  if (!(s.psh >= 0.5)) { checks.push(mk('psh', 'error', 'site', 'Peak sun hours must be at least 0.5 h. Enter the site irradiation.', 'يجب ألا تقل ساعات الذروة الشمسية عن 0.5 ساعة. أدخل قيمة الإشعاع الشمسي للموقع.')); s.psh = 0 }
   if (!(s.soilingLossPct >= 0 && s.soilingLossPct <= 95) || !(s.shadingLossPct >= 0 && s.shadingLossPct <= 95)) {
-    checks.push(mk('losses', 'error', 'site', `Soiling ${s.soilingLossPct}% / shading ${s.shadingLossPct}% must each be between 0 and 95 % — values were limited.`,
-      `يجب أن تكون خسائر الأتربة (${s.soilingLossPct}%) والتظليل (${s.shadingLossPct}%) بين 0 و95% لكلٍّ منهما — تم حصر القيم.`))
+    checks.push(mk('losses', 'error', 'site', `Soiling ${s.soilingLossPct}% / shading ${s.shadingLossPct}% must each be between 0 and 95 %. The values were limited.`,
+      `يجب أن تكون خسائر الأتربة (${s.soilingLossPct}%) والتظليل (${s.shadingLossPct}%) بين 0 و95% لكلٍّ منهما. تم حصر القيم.`))
     s.soilingLossPct = clamp(s.soilingLossPct, 0, 95); s.shadingLossPct = clamp(s.shadingLossPct, 0, 95)
   }
   const siteFixes: string[] = []
@@ -370,8 +370,8 @@ function computeCore(p: Project): Results {
   }
   const autonomyIn = d.autonomyDays
   d.autonomyDays = isGT ? 0 : clamp(autonomyIn, 0, 10)
-  if (!isGT && (!Number.isFinite(autonomyIn) || autonomyIn < 0 || autonomyIn > 10)) checks.push(mk('autonomy', 'warn', 'design', `Autonomy ${autonomyIn} days is outside 0–10 days; ${d.autonomyDays} days was used.`,
-    `أيام الاستقلالية (${autonomyIn}) خارج النطاق 0–10 أيام؛ تم استخدام ${d.autonomyDays}.`))
+  if (!isGT && (!Number.isFinite(autonomyIn) || autonomyIn < 0 || autonomyIn > 10)) checks.push(mk('autonomy', 'warn', 'design', `Autonomy ${autonomyIn} days is outside 0 to 10 days; ${d.autonomyDays} days was used.`,
+    `أيام الاستقلالية (${autonomyIn}) خارج النطاق من 0 إلى 10 أيام؛ تم استخدام ${d.autonomyDays}.`))
   const fixes: string[] = []
   const guard = (key: keyof DesignInput, lo: number, hi: number, fallback: number) => {
     const v = d[key] as number
@@ -394,14 +394,14 @@ function computeCore(p: Project): Results {
   }
   if (fixes.length) checks.push(mk('design-input', 'warn', 'design', `Out-of-range design inputs were limited: ${fixes.join(', ')}.`, `تم حصر مدخلات تصميم خارج النطاق المسموح: ${fixes.join('، ')}.`))
   if (loadsIn.some((l) => l.hoursPerDay > 24 || l.hoursPerDay < 0 || l.nightSharePct < 0 || l.nightSharePct > 100 || l.watts < 0 || l.qty < 0 || !Number.isFinite(l.watts) || !Number.isFinite(l.hoursPerDay)))
-    checks.push(mk('load-input', 'warn', 'loads', 'Some load rows have hours above 24, a night share outside 0–100 % or negative values; they were limited.',
-      'بعض صفوف الأحمال تحتوي على ساعات تشغيل أكثر من 24 أو نسبة ليلية خارج 0–100% أو قيم سالبة؛ تم حصرها.'))
+    checks.push(mk('load-input', 'warn', 'loads', 'Some load rows have hours above 24, a night share outside 0 to 100 % or negative values; they were limited.',
+      'بعض صفوف الأحمال تحتوي على ساعات تشغيل أكثر من 24 أو نسبة ليلية خارج النطاق من 0 إلى 100% أو قيم سالبة؛ تم حصرها.'))
   const cur = s.currency || 'USD'
   if (cur !== 'USD' && !(s.fxRateToUsd > 0 && s.fxRateToUsd <= MAX_FX)) checks.push(mk('fx-invalid', 'error', 'site', `Exchange rate must be greater than 0 ${cur} per USD; 1 was used.`, `يجب أن يكون سعر الصرف أكبر من صفر (${cur} لكل دولار)؛ تم استخدام 1.`))
-  else if (!PEGGED_1_TO_1.has(cur) && s.fxRateToUsd === 1) checks.push(mk('fx-unset', 'error', 'site', `Exchange rate is 1 ${cur} per USD — enter the current rate on the Site step before quoting.`, `سعر الصرف مضبوط على 1 ${cur} لكل دولار — أدخل سعر الصرف الحالي في خطوة الموقع قبل إصدار العرض.`))
+  else if (!PEGGED_1_TO_1.has(cur) && s.fxRateToUsd === 1) checks.push(mk('fx-unset', 'error', 'site', `Exchange rate is 1 ${cur} per USD. Enter the current rate on the Site step before quoting.`, `سعر الصرف مضبوط على 1 ${cur} لكل دولار. أدخل سعر الصرف الحالي في خطوة الموقع قبل إصدار العرض.`))
   const pc = effectivePercents(pr)
   if (pc.markupPct !== pr.marginPct || pc.discountPct !== pr.discountPct || pc.vatPct !== pr.vatPct)
-    checks.push(mk('pricing-input', 'warn', 'bom', 'Markup (0–1000 %), discount (0–100 %) or VAT (0–100 %) was out of range and has been limited.', 'كانت نسبة الإضافة (0–1000%) أو الخصم (0–100%) أو ضريبة القيمة المضافة (0–100%) خارج النطاق وتم حصرها.'))
+    checks.push(mk('pricing-input', 'warn', 'bom', 'Markup (0 to 1000 %), discount (0 to 100 %) or VAT (0 to 100 %) was out of range and has been limited.', 'كانت نسبة الإضافة (من 0 إلى 1000%) أو الخصم (من 0 إلى 100%) أو ضريبة القيمة المضافة (من 0 إلى 100%) خارج النطاق وتم حصرها.'))
 
   // ---- Loads (§1) — or the electricity bill (§16.1)
   const items = sanitize(loadsIn)
@@ -426,8 +426,8 @@ function computeCore(p: Project): Results {
   const lat = s.lat ?? loc?.lat
   const tg = tiltGains({ lat, tiltDeg: s.tiltDeg, azimuthDeg: s.azimuthDeg, tiltGainFactor: s.tiltGainFactor, refTiltDeg: loc?.optimalTiltDeg ?? (lat != null ? optimalTiltFor(lat) : undefined), monthlyGhi: monthlyPshUsed })
   const tiltGainUsed = tg.annual
-  if (s.tiltDeg < 10) checks.push(mk('tilt-low', 'warn', 'site', `Tilt ${s.tiltDeg}° is below 10°: rain and wind will not self-clean the panels — expect higher soiling losses.`,
-    `زاوية الميل ${s.tiltDeg}° أقل من 10°: لن تنظّف الأمطار والرياح الألواح ذاتياً — توقّع خسائر أتربة أعلى.`))
+  if (s.tiltDeg < 10) checks.push(mk('tilt-low', 'warn', 'site', `Tilt ${s.tiltDeg}° is below 10°: rain and wind will not self-clean the panels. Expect higher soiling losses.`,
+    `زاوية الميل ${s.tiltDeg}° أقل من 10°: لن تنظّف الأمطار والرياح الألواح ذاتياً. توقّع خسائر أتربة أعلى.`))
   const azAbs = Math.abs(((((s.azimuthDeg + 180) % 360) + 360) % 360) - 180)
   if (tg.modelled && lat != null && azAbs > 45) {
     const loss = 1 - annualRatio(monthlyTiltRatios(lat, s.tiltDeg, s.azimuthDeg, monthlyPshUsed), monthlyPshUsed) / annualRatio(monthlyTiltRatios(lat, s.tiltDeg, 0, monthlyPshUsed), monthlyPshUsed)
@@ -520,7 +520,7 @@ function computeCore(p: Project): Results {
       `توصيل ${inverterQty} × ${inverter.brand} ${inverter.model} على التوازي يتجاوز حد الشركة المصنعة (${inverter.parallelMax})؛ اختر إنفرتراً أكبر أو جهد نظام أعلى.`))
     // §4.2 recommended DC bus by inverter power: 12 V ≤ 1 kW, 24 V ≤ 3 kW, 48 V ≤ 15 kW
     const busMax = sysV === 12 ? 1 : sysV === 24 ? 3 : sysV === 48 ? 15 : Infinity
-    if (inverterTotalKw > busMax) checks.push(mk('lv-bus', 'warn', 'design', `${inverterTotalKw} kW on a ${sysV} V bus means ~${r0((inverterTotalKw * 1000) / (sysVnum * INV_EFF_DC))} A of battery current; use ${sysV === 48 ? 'a high-voltage battery system' : sysV === 24 ? 'a 48 V bus' : 'a 24 V or 48 V bus'} above ${busMax} kW.`,
+    if (inverterTotalKw > busMax) checks.push(mk('lv-bus', 'warn', 'design', `${inverterTotalKw} kW on a ${sysV} V bus means about ${r0((inverterTotalKw * 1000) / (sysVnum * INV_EFF_DC))} A of battery current; use ${sysV === 48 ? 'a high-voltage battery system' : sysV === 24 ? 'a 48 V bus' : 'a 24 V or 48 V bus'} above ${busMax} kW.`,
       `قدرة ${inverterTotalKw} kW على جهد ${sysV} V تعني تيار بطارية يقارب ${r0((inverterTotalKw * 1000) / (sysVnum * INV_EFF_DC))} A؛ يُنصح باستخدام ${sysV === 48 ? 'بطاريات عالية الجهد' : sysV === 24 ? 'نظام 48 V' : 'نظام 24 V أو 48 V'} للأنظمة الأكبر من ${busMax} kW.`))
     if (inverter.type === 'gridtie') checks.push(mk('inv-type', 'error', 'design', `${inverter.brand} ${inverter.model} is a grid-tie inverter and cannot run from batteries; choose a ${d.systemType === 'hybrid' ? 'hybrid' : 'off-grid or hybrid'} inverter.`,
       `الإنفرتر ${inverter.brand} ${inverter.model} من النوع المتصل بالشبكة ولا يعمل على البطاريات؛ اختر إنفرتراً ${d.systemType === 'hybrid' ? 'هجيناً' : 'منفصلاً عن الشبكة أو هجيناً'}.`))
@@ -621,8 +621,8 @@ function computeCore(p: Project): Results {
       const t = controller!.type ?? 'MPPT'
       if (!controller!.batteryVoltages.includes(sysVnum)) checks.push(mk('cc-voltage', 'error', 'design', `${controller!.brand} ${controller!.model} does not support a ${sysV === 'hv' ? 'high-voltage' : sysV + ' V'} battery.`,
         `منظم الشحن ${controller!.brand} ${controller!.model} لا يدعم بطاريات بجهد ${sysV === 'hv' ? 'عالٍ (HV)' : sysV + ' V'}.`))
-      if (t === 'PWM') checks.push(mk('cc-pwm', 'warn', 'design', `${controller!.brand} ${controller!.model} is a PWM controller: the string Vmp must match the battery voltage and the extra voltage is wasted (≈ 20–30 % less energy). Use an MPPT controller.`,
-        `منظم الشحن ${controller!.brand} ${controller!.model} من نوع PWM: يجب أن يطابق جهد السلسلة جهد البطارية ويُهدر فرق الجهد (طاقة أقل بنحو 20–30%). استخدم منظم MPPT.`))
+      if (t === 'PWM') checks.push(mk('cc-pwm', 'warn', 'design', `${controller!.brand} ${controller!.model} is a PWM controller: the string Vmp must match the battery voltage and the extra voltage is wasted (about 20 to 30 % less energy). Use an MPPT controller.`,
+        `منظم الشحن ${controller!.brand} ${controller!.model} من نوع PWM: يجب أن يطابق جهد السلسلة جهد البطارية ويُهدر فرق الجهد (طاقة أقل بنحو 20 إلى 30%). استخدم منظم MPPT.`))
       if (controllerQty * controller!.maxChargeA < requiredControllerA * 0.999) checks.push(mk('cc-small', 'warn', 'design', `${controllerQty} × ${controller!.maxChargeA} A controller(s) are below the ${r0(requiredControllerA)} A the array needs (§6); expect clipping.`,
         `${controllerQty} × منظم ${controller!.maxChargeA} A أقل من ${r0(requiredControllerA)} A التي تحتاجها المصفوفة؛ يُتوقع قصّ في القدرة.`))
       checks.push(inverter.mpptCount === 0
@@ -650,7 +650,7 @@ function computeCore(p: Project): Results {
   const dcAcRatio = inverterTotalKw > 0 ? arrayKwp / inverterTotalKw : 0
   if (isGT && inverter) {
     // §3.4/§14: grid-tied DC:AC 1.1–1.3; off-grid / hybrid inverters are sized for the load, so a low ratio is normal there
-    if (dcAcRatio > 1.3) checks.push(mk('dcac-high', 'warn', 'design', `DC/AC ratio ${r2(dcAcRatio)} is high (>1.3); expect clipping — consider a larger inverter.`, `نسبة DC/AC ‏${r2(dcAcRatio)} مرتفعة (أكبر من 1.3)؛ يُتوقع قص في القدرة — يُنصح بإنفرتر أكبر.`))
+    if (dcAcRatio > 1.3) checks.push(mk('dcac-high', 'warn', 'design', `DC/AC ratio ${r2(dcAcRatio)} is high (>1.3); expect clipping. Consider a larger inverter.`, `نسبة DC/AC ‏${r2(dcAcRatio)} مرتفعة (أكبر من 1.3)؛ يُتوقع قص في القدرة. يُنصح بإنفرتر أكبر.`))
     // shown rounded down so the figure never reads as the threshold itself ("0.70 is below 0.7")
     const lowShown = (Math.floor(dcAcRatio * 100) / 100).toFixed(2)
     if (dcAcRatio > 0 && dcAcRatio < 0.7) checks.push(mk('dcac-low', 'warn', 'design', `DC/AC ratio ${lowShown} is low (<0.7); inverter is oversized for the array.`, `نسبة DC/AC ‏${lowShown} منخفضة (أقل من 0.7)؛ الإنفرتر أكبر من اللازم بالنسبة للمصفوفة.`))
@@ -664,7 +664,7 @@ function computeCore(p: Project): Results {
   const areaFactor = s.roofType === 'flat-concrete' || s.roofType === 'ground' ? Math.max(1.2, Math.cos(beta) + 2 * Math.sin(beta)) : 1.2
   const footprintM2 = arrayAreaM2 * areaFactor
   if (s.availableAreaM2 != null && s.availableAreaM2 > 0 && footprintM2 > s.availableAreaM2)
-    checks.push(mk('area', 'warn', 'site', `Array needs ~${r0(footprintM2)} m² (incl. row spacing/setbacks) but only ${s.availableAreaM2} m² is available.`, `تحتاج المصفوفة إلى نحو ${r0(footprintM2)} m² (شاملة المسافات بين الصفوف) بينما المساحة المتاحة ${s.availableAreaM2} m² فقط.`))
+    checks.push(mk('area', 'warn', 'site', `Array needs about ${r0(footprintM2)} m² (incl. row spacing/setbacks) but only ${s.availableAreaM2} m² is available.`, `تحتاج المصفوفة إلى نحو ${r0(footprintM2)} m² (شاملة المسافات بين الصفوف) بينما المساحة المتاحة ${s.availableAreaM2} m² فقط.`))
 
   // ---- Energy (§10)
   const monthlyProductionKwh = monthlyPshUsed.map((psh, m) => arrayKwp * psh * tg.monthly[m] * derate * DAYS_IN_MONTH[m])
@@ -682,14 +682,14 @@ function computeCore(p: Project): Results {
     if (dischargeA > battery.maxDischargeA * parallel) checks.push(mk('batt-discharge', 'warn', 'design', `Inverter can draw ${r0(dischargeA)} A but battery bank allows ${battery.maxDischargeA * parallel} A continuous. Add batteries in parallel, reduce inverter size or set its discharge limit to ≤ ${battery.maxDischargeA * parallel} A.`,
       `قد يسحب الإنفرتر ${r0(dischargeA)} A بينما يسمح بنك البطاريات بتفريغ مستمر قدره ${battery.maxDischargeA * parallel} A فقط. أضف بطاريات على التوازي أو اختر إنفرتراً أصغر أو اضبط حد التفريغ فيه على ${battery.maxDischargeA * parallel} A أو أقل.`))
     const chargeA = (arrayKwp * 1000 * 0.9) / battV
-    if (chargeA > battery.maxChargeA * parallel) checks.push(mk('batt-charge', 'warn', 'design', `PV charge current ~${r0(chargeA)} A exceeds bank limit ${battery.maxChargeA * parallel} A; the inverter will throttle charging.`,
+    if (chargeA > battery.maxChargeA * parallel) checks.push(mk('batt-charge', 'warn', 'design', `PV charge current about ${r0(chargeA)} A exceeds bank limit ${battery.maxChargeA * parallel} A; the inverter will throttle charging.`,
       `تيار الشحن من الألواح نحو ${r0(chargeA)} A يتجاوز حد البنك (${battery.maxChargeA * parallel} A)؛ سيقوم الإنفرتر بتقييد الشحن.`))
-    if (inverter.maxChargeA * inverterQty * battV < (battDailyWh || L.nightWh) / 5) checks.push(mk('charge-time', 'warn', 'design', `Inverter charger (${inverter.maxChargeA * inverterQty} A) may be too small to refill the bank in ~5 sun hours.`,
+    if (inverter.maxChargeA * inverterQty * battV < (battDailyWh || L.nightWh) / 5) checks.push(mk('charge-time', 'warn', 'design', `Inverter charger (${inverter.maxChargeA * inverterQty} A) may be too small to refill the bank in about 5 sun hours.`,
       `قد يكون شاحن الإنفرتر (${inverter.maxChargeA * inverterQty} A) صغيراً لإعادة شحن البنك خلال نحو 5 ساعات شمس.`))
     if (battery.chemistry === 'AGM' || battery.chemistry === 'Gel' || battery.chemistry === 'Flooded') {
       const cDis = dischargeA / Math.max(1, batteryAh), cChg = chargeA / Math.max(1, batteryAh)
-      if (cDis > 0.2 || cChg > 0.2) checks.push(mk('lead-crate', 'warn', 'design', `Lead-acid C-rate is high (discharge ${r2(cDis)} C, charge ${r2(cChg)} C; keep ≤ 0.2 C): usable capacity and life drop — add parallel strings or cap the inverter's currents.`,
-        `معدل التفريغ/الشحن لبطاريات الرصاص مرتفع (تفريغ ${r2(cDis)} C، شحن ${r2(cChg)} C؛ الحد ≤ 0.2 C): تقل السعة المتاحة والعمر — أضف سلاسل على التوازي أو حدّد تيارات الإنفرتر.`))
+      if (cDis > 0.2 || cChg > 0.2) checks.push(mk('lead-crate', 'warn', 'design', `Lead-acid C-rate is high (discharge ${r2(cDis)} C, charge ${r2(cChg)} C; keep ≤ 0.2 C): usable capacity and life drop. Add parallel strings or cap the inverter's currents.`,
+        `معدل التفريغ/الشحن لبطاريات الرصاص مرتفع (تفريغ ${r2(cDis)} C، شحن ${r2(cChg)} C؛ الحد ≤ 0.2 C): تقل السعة المتاحة والعمر. أضف سلاسل على التوازي أو حدّد تيارات الإنفرتر.`))
       if (d.systemType === 'offgrid' && autonomyDays < 2) checks.push(mk('lead-autonomy', 'warn', 'design', `Lead-acid off-grid bank gives ${r1(autonomyDays)} day(s) of autonomy; ≥ 2 days is recommended to avoid deep daily cycling.`,
         `بنك بطاريات الرصاص في النظام المنفصل يعطي ${r1(autonomyDays)} يوم استقلالية؛ يُنصح بيومين على الأقل لتجنب التفريغ العميق اليومي.`))
     }
@@ -709,7 +709,7 @@ function computeCore(p: Project): Results {
     else if (std != null) generatorKva = std
     else {
       generatorKva = Math.ceil(kva / 50) * 50
-      checks.push(mk('gen-range', 'warn', 'design', `Generator of ~${r0(kva)} kVA is above the standard range; use synchronised parallel sets.`, `المولد المطلوب نحو ${r0(kva)} kVA أكبر من المقاسات القياسية؛ استخدم مولدات متوازية متزامنة.`))
+      checks.push(mk('gen-range', 'warn', 'design', `Generator of about ${r0(kva)} kVA is above the standard range; use synchronised parallel sets.`, `المولد المطلوب نحو ${r0(kva)} kVA أكبر من المقاسات القياسية؛ استخدم مولدات متوازية متزامنة.`))
     }
   }
 
@@ -735,7 +735,7 @@ function computeCore(p: Project): Results {
       combinerOutputs = Math.min(inputs, ceilSafe(strings.strings / perInput))
       combiners = Math.max(ceilSafe(strings.strings / 6), 1)
       const arr = label(sizeCable('dc', panel.isc * perInput, COMBINER_TO_INVERTER_M, stringV, d.maxVoltageDropPct, false, { deviceList: STD_DC_FUSE_A, id: 'pv-array', count: combinerOutputs, deviceType: 'gPV NH fuse', deviceRatedV: strings.vocCold > 1000 ? 1500 : 1000 }),
-        'PV array (combiner → inverter) DC', 'خرج صندوق التجميع ← الإنفرتر DC')
+        'PV array (combiner to inverter) DC', 'من صندوق التجميع إلى الإنفرتر DC')
       arrayFuseA = arr.deviceStd ? arr.breakerA : null
     }
   }
@@ -747,7 +747,7 @@ function computeCore(p: Project): Results {
   }
   if (controller && controllerQty > 0 && battery) {
     label(sizeCable('battery', controller.maxChargeA, d.batteryCableRunM, sysVnum, Math.min(1, d.maxVoltageDropPct), false, { id: 'cc-battery', count: controllerQty, deviceType: 'class-T fuse', deviceRatedV: 125 }),
-      'Charge controller → battery DC', 'منظم الشحن ← البطارية DC')
+      'Charge controller to battery DC', 'من منظم الشحن إلى البطارية DC')
   }
   const three = d.phase === 3
   const acV = three ? 400 : 230
@@ -757,11 +757,11 @@ function computeCore(p: Project): Results {
     acMain = label(sizeCable('ac', acI(inverterTotalKw), d.acCableRunM, acV, d.maxVoltageDropPct, three, { id: 'ac', deviceType: 'MCB/MCCB' }),
       inverterQty > 1 ? 'Inverter AC (combined feeder)' : 'Inverter AC output', inverterQty > 1 ? 'خرج الإنفرترات AC (المغذي المجمع)' : 'خرج الإنفرتر AC')
     if (inverterQty > 1) acInv = label(sizeCable('ac', acI(inverter.ratedAcKw), AC_INV_TO_COMBINER_M, acV, d.maxVoltageDropPct, three, { id: 'ac-inverter', count: inverterQty, deviceType: 'MCB/MCCB' }),
-      'Inverter AC (each unit → AC combiner)', 'خرج كل إنفرتر AC ← لوحة التجميع')
+      'Inverter AC (each unit to the AC combiner)', 'خرج كل إنفرتر AC إلى لوحة التجميع')
     if (d.systemType === 'hybrid') label(sizeCable('ac', acI(inverterTotalKw), d.acCableRunM, acV, d.maxVoltageDropPct, three, { id: 'ac-grid', deviceType: 'MCB/MCCB' }),
-      'Grid → inverter AC input', 'الشبكة ← مدخل الإنفرتر AC')
+      'Grid to inverter AC input', 'من الشبكة إلى مدخل الإنفرتر AC')
     if (generatorKva) acGen = label(sizeCable('ac', three ? (generatorKva * 1000) / (Math.sqrt(3) * 400) : (generatorKva * 1000) / 230, d.acCableRunM, acV, d.maxVoltageDropPct, three, { id: 'ac-generator', deviceType: 'MCB/MCCB' }),
-      'Generator → ATS / inverter AC input', 'المولد ← مفتاح التحويل / مدخل الإنفرتر AC')
+      'Generator to ATS or inverter AC input', 'من المولد إلى مفتاح التحويل أو مدخل الإنفرتر AC')
   }
   const legacyId: Record<string, string> = { 'pv-string': 'dc', battery: 'battery', ac: 'ac' }
   for (const c of schedule) {
@@ -805,8 +805,8 @@ function computeCore(p: Project): Results {
     'المعدات الموجودة في الموقع جزء من التصميم وليست ضمن السعر؛ تُعرض الوفورات وفترة الاسترداد للنظام بالكامل.'))
   const hiddenIds = cat().hidden
   for (const x of [panelPick, manualInverter, manualBattery, getController(d.chargeControllerId)].filter((y): y is Panel | Inverter | Battery | ChargeController => !!y && hiddenIds.has(y.id)))
-    checks.push(mk(`not-stocked-${x.id}`, 'warn', 'design', `${x.brand} ${x.model} is marked "not stocked" in your price list — confirm availability before quoting.`,
-      `${x.brand} ${x.model} مُعلَّم "غير متوفر" في قائمة أسعارك — تأكّد من توفره قبل إصدار العرض.`))
+    checks.push(mk(`not-stocked-${x.id}`, 'warn', 'design', `${x.brand} ${x.model} is marked "not stocked" in your price list. Confirm availability before quoting.`,
+      `${x.brand} ${x.model} مُعلَّم "غير متوفر" في قائمة أسعارك. تأكّد من توفره قبل إصدار العرض.`))
 
   const { lines: bom, missing } = buildBom({ ...p, site: s, design: d }, pr, {
     panel, panelQty, arrayKwp, inverter, inverterQty, battery: batteryQty > 0 ? battery : null, batteryQty, batteryParallel: parallel, hvBattery,
@@ -814,7 +814,7 @@ function computeCore(p: Project): Results {
     dcInputs: viaController ? Math.max(1, controllerQty) : inverterQty, generatorKva,
     existing: { panels: Math.min(ex.panels, panelQty), batteries: Math.min(ex.batteries, batteryQty), inverters: inverter ? Math.min(ex.inverters, inverterQty) : 0 },
   })
-  for (const id of missing) checks.push(mk(`bom-missing-${id}`, 'warn', 'bom', `BOM item "${id}" is not in the catalogue and is priced at 0 — enter a price.`, `البند "${id}" غير موجود في الكتالوج وسعره صفر — أدخل السعر.`))
+  for (const id of missing) checks.push(mk(`bom-missing-${id}`, 'warn', 'bom', `BOM item "${id}" is not in the catalogue and is priced at 0. Enter a price.`, `البند "${id}" غير موجود في الكتالوج وسعره صفر. أدخل السعر.`))
   const fx = quoteFx(s)
   const q = buildQuoteFromBom(pr, s, bom)
   const equipmentCostUsd = q.equipmentCost / fx, labourUsd = q.servicesCost / fx, subtotalUsd = q.costSubtotal / fx
@@ -880,11 +880,11 @@ function computeItems(p: Project): Results {
   const q = buildQuoteFromBom(pr, s, bom)
   const cur = s.currency || 'USD'
   if (cur !== 'USD' && !(s.fxRateToUsd > 0 && s.fxRateToUsd <= MAX_FX)) checks.push(mk('fx-invalid', 'error', 'bom', `Exchange rate must be greater than 0 ${cur} per USD; 1 was used.`, `يجب أن يكون سعر الصرف أكبر من صفر (${cur} لكل دولار)؛ تم استخدام 1.`))
-  else if (!PEGGED_1_TO_1.has(cur) && s.fxRateToUsd === 1) checks.push(mk('fx-unset', 'error', 'bom', `Exchange rate is 1 ${cur} per USD — enter the current rate before quoting.`, `سعر الصرف مضبوط على 1 ${cur} لكل دولار — أدخل سعر الصرف الحالي قبل إصدار العرض.`))
+  else if (!PEGGED_1_TO_1.has(cur) && s.fxRateToUsd === 1) checks.push(mk('fx-unset', 'error', 'bom', `Exchange rate is 1 ${cur} per USD. Enter the current rate before quoting.`, `سعر الصرف مضبوط على 1 ${cur} لكل دولار. أدخل سعر الصرف الحالي قبل إصدار العرض.`))
   if (!lines.length) checks.push(mk('no-items', 'error', 'bom', 'Add the products to quote.', 'أضف المنتجات المطلوب تسعيرها.'))
   const pc = effectivePercents(pr)
   if (pc.markupPct !== pr.marginPct || pc.discountPct !== pr.discountPct || pc.vatPct !== pr.vatPct)
-    checks.push(mk('pricing-input', 'warn', 'bom', 'Markup (0–1000 %), discount (0–100 %) or VAT (0–100 %) was out of range and has been limited.', 'كانت نسبة الإضافة (0–1000%) أو الخصم (0–100%) أو ضريبة القيمة المضافة (0–100%) خارج النطاق وتم حصرها.'))
+    checks.push(mk('pricing-input', 'warn', 'bom', 'Markup (0 to 1000 %), discount (0 to 100 %) or VAT (0 to 100 %) was out of range and has been limited.', 'كانت نسبة الإضافة (من 0 إلى 1000%) أو الخصم (من 0 إلى 100%) أو ضريبة القيمة المضافة (من 0 إلى 100%) خارج النطاق وتم حصرها.'))
   const zero12 = Array<number>(12).fill(0)
   const panel = cat().panels[0]
   return {

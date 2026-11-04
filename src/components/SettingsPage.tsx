@@ -103,7 +103,7 @@ export function SettingsPage() {
       </div>
 
       <Section title={t.settings.brand}>
-        <div className="mb-5 overflow-hidden rounded-xl border border-slate-200" aria-label={t.settings.preview}>
+        <div className="mb-5 overflow-hidden rounded-lg border border-slate-200" aria-label={t.settings.preview}>
           <div className="flex items-center gap-3 px-4 py-3 text-white" style={{ background: company.primaryColor }}>
             {company.logoDataUrl ? <img src={company.logoDataUrl} alt={t.settings.logo} className="h-10 w-auto max-w-28 rounded bg-white object-contain p-1" /> : <span className="grid size-10 place-items-center rounded bg-white/20"><Sun size={22} /></span>}
             <div className="min-w-0"><p className="truncate font-semibold"><bdi>{name}</bdi></p><p className="truncate text-xs opacity-90"><bdi>{tagline}</bdi></p></div>
@@ -141,7 +141,7 @@ export function SettingsPage() {
         <div className="grid grid-cols-2 gap-x-3 gap-y-4 sm:gap-x-4">
           <Field label={t.settings.currency} className={`col-span-2 ${local ? 'sm:col-span-1' : ''}`}>
             <select className="input" value={company.currency || 'USD'} onChange={(e) => setCompany({ currency: e.target.value, fxRateToUsd: e.target.value === 'USD' ? 1 : defaultFx(e.target.value) })} data-testid="settings-currency">
-              {currencies.map((c) => <option key={c.code} value={c.code}>{`${c.code} — ${currencyName(c.code, lang)}`}</option>)}
+              {currencies.map((c) => <option key={c.code} value={c.code}>{`${c.code} · ${currencyName(c.code, lang)}`}</option>)}
             </select>
           </Field>
           {local && (
@@ -188,7 +188,7 @@ export function SettingsPage() {
 
       <Section title={tp.link.title} description={tp.link.help}>
         <button type="button" onClick={() => setView('prices')} data-testid="settings-prices-link"
-          className="flex min-h-14 w-full items-center gap-3 rounded-xl border border-slate-200 px-3 py-2 text-start hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500">
+          className="flex min-h-14 w-full items-center gap-3 rounded-lg border border-slate-200 px-3 py-2 text-start hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500">
           <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-brand-50 text-brand-700"><Tags size={20} /></span>
           <span className="min-w-0 flex-1">
             <span className="block text-sm font-medium text-slate-900">{tp.link.open}</span>
@@ -254,7 +254,7 @@ function FileAction({ icon, label, help, onClick, testId }: { icon: ReactNode; l
   return (
     <li>
       <button type="button" onClick={onClick} data-testid={testId}
-        className="flex h-full min-h-16 w-full items-start gap-3 rounded-xl border border-slate-200 p-3 text-start hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500">
+        className="flex h-full min-h-16 w-full items-start gap-3 rounded-lg border border-slate-200 p-3 text-start hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500">
         <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-600">{icon}</span>
         <span className="min-w-0"><span className="block text-sm font-medium text-slate-900">{label}</span><span className="mt-0.5 block text-xs text-slate-600">{help}</span></span>
       </button>

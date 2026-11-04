@@ -52,7 +52,7 @@ export function StringsTool() {
   const bad = new Set<StringField>(r.valid ? [] : r.invalid)
 
   const panelOpts: PickOpt[] = useMemo(() => [...cat.panels].sort((a, b) => a.watts - b.watts).map((p) => ({ id: p.id, title: `${p.brand} ${p.model}`, sub: [`${p.watts} W`, `Voc ${p.voc} V`, `Isc ${p.isc} A`], hidden: cat.hidden.has(p.id), search: `${p.brand} ${p.model} ${p.watts}` })), [cat])
-  const invOpts: PickOpt[] = useMemo(() => mpptInverters.map((i) => ({ id: i.id, title: `${i.brand} ${i.model}`, sub: [`${numT(i.ratedAcKw, 1)} kW`, `${i.mpptCount} MPPT`, `${i.mpptMinV}–${i.mpptMaxV} V`, `${i.maxInputCurrentPerMppt} A`], hidden: cat.hidden.has(i.id), search: `${i.brand} ${i.model} ${i.ratedAcKw}` })), [mpptInverters, cat])
+  const invOpts: PickOpt[] = useMemo(() => mpptInverters.map((i) => ({ id: i.id, title: `${i.brand} ${i.model}`, sub: [`${numT(i.ratedAcKw, 1)} kW`, `${i.mpptCount} MPPT`, `${i.mpptMinV}-${i.mpptMaxV} V`, `${i.maxInputCurrentPerMppt} A`], hidden: cat.hidden.has(i.id), search: `${i.brand} ${i.model} ${i.ratedAcKw}` })), [mpptInverters, cat])
   const ccOpts: PickOpt[] = useMemo(() => cat.chargeControllers.map((c) => ({ id: c.id, title: `${c.brand} ${c.model}`, sub: [`${c.maxChargeA} A`, `${c.maxPvVoltage} V`, c.type ?? 'MPPT'], hidden: cat.hidden.has(c.id), search: `${c.brand} ${c.model} ${c.maxChargeA}` })), [cat])
 
   const setPanel = (k: keyof typeof s.panel, v: N) => set((cur) => ({ panel: { ...cur.panel, [k]: v } }))

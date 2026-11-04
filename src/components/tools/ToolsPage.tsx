@@ -34,8 +34,8 @@ function ToolList() {
           return (
             <li key={id}>
               <button type="button" onClick={() => openTool(id)} data-testid={`tool-card-${id}`}
-                className="card flex h-full w-full items-start gap-4 p-4 text-start transition hover:border-brand-300 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 sm:p-5">
-                <span className="grid size-12 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-700"><Icon size={24} /></span>
+                className="card flex h-full w-full items-start gap-4 p-4 text-start transition hover:border-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 sm:p-5">
+                <span className="grid size-10 shrink-0 place-items-center rounded-md bg-slate-100 text-slate-700"><Icon size={20} /></span>
                 <span className="min-w-0 flex-1">
                   <span className="block text-title text-slate-900">{t.tools.names[id]}</span>
                   <span className="mt-1 block text-sm leading-6 text-slate-600">{t.tools.helps[id]}</span>

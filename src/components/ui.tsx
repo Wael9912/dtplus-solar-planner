@@ -183,7 +183,7 @@ export function Choice<T extends string>({ options, value, onChange, label, colu
         const on = value === o.value
         return (
           <button type="button" role="radio" aria-checked={on} tabIndex={on ? 0 : -1} key={o.value} onClick={() => onChange(o.value)} onKeyDown={(e) => arrowNav(e, dir)}
-            className={`flex min-h-11 items-start gap-3 rounded-xl border p-3 text-start transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 ${on ? 'border-brand-600 bg-brand-50 ring-1 ring-brand-600' : 'border-slate-200 bg-white hover:border-slate-300'}`}>
+            className={`flex min-h-11 items-start gap-3 rounded-lg border p-3 text-start transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 ${on ? 'border-brand-600 bg-brand-50/60 ring-1 ring-brand-600' : 'border-slate-200 bg-white hover:border-slate-400'}`}>
             <span className={`mt-0.5 grid size-5 shrink-0 place-items-center rounded-full border-2 ${on ? 'border-brand-700' : 'border-slate-300'}`}>{on && <span className="size-2.5 rounded-full bg-brand-700" />}</span>
             <span className="min-w-0">
               <span className="block text-sm font-semibold text-slate-900">{o.label}</span>
@@ -201,13 +201,13 @@ export const RadioCards = Choice
 export function Segmented<T extends string>({ options, value, onChange, label, kind = 'radio', className = '', full = false }: { options: { value: T; label: ReactNode; icon?: ReactNode; testId?: string }[]; value: T; onChange: (v: T) => void; label: string; kind?: 'radio' | 'tab'; className?: string; full?: boolean }) {
   const { dir } = useT()
   return (
-    <div role={kind === 'tab' ? 'tablist' : 'radiogroup'} aria-label={label} className={`inline-flex max-w-full items-center gap-1 rounded-lg bg-slate-100 p-1 ${full ? 'w-full' : ''} ${className}`}>
+    <div role={kind === 'tab' ? 'tablist' : 'radiogroup'} aria-label={label} className={`inline-flex max-w-full items-center gap-1 rounded-md bg-slate-100 p-1 ${full ? 'w-full' : ''} ${className}`}>
       {options.map((o) => {
         const on = value === o.value
         return (
           <button key={o.value} type="button" role={kind} aria-checked={kind === 'radio' ? on : undefined} aria-selected={kind === 'tab' ? on : undefined} tabIndex={on ? 0 : -1} data-testid={o.testId}
             onClick={() => onChange(o.value)} onKeyDown={(e) => arrowNav(e, dir)}
-            className={`inline-flex min-h-10 min-w-0 items-center justify-center gap-1.5 rounded-md px-3 py-1 text-sm leading-tight font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 ${full ? 'flex-1' : ''} ${on ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-200' : 'text-slate-600 hover:text-slate-900'}`}>
+            className={`inline-flex min-h-10 min-w-0 items-center justify-center gap-1.5 rounded px-3 py-1 text-sm leading-tight font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 ${full ? 'flex-1' : ''} ${on ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-200' : 'text-slate-600 hover:text-slate-900'}`}>
             {o.icon}<span className="min-w-0 text-center text-balance">{o.label}</span>
           </button>
         )
@@ -242,7 +242,7 @@ export function EmptyState({ icon: Icon, title, body, children, className = '' }
   )
 }
 export function Empty({ children }: { children: ReactNode }) {
-  return <div className="rounded-xl border border-dashed border-slate-300 p-6 text-center text-sm text-slate-600">{children}</div>
+  return <div className="rounded-lg border border-dashed border-slate-300 p-6 text-center text-sm text-slate-600">{children}</div>
 }
 
 export function IconButton({ label, children, className = 'btn-ghost', onClick, disabled, 'data-testid': testId }: { label: string; children: ReactNode; className?: string; onClick?: () => void; disabled?: boolean; 'data-testid'?: string }) {

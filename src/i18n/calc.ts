@@ -5,7 +5,7 @@ const I = (x: string) => '\u2068' + x + '\u2069'
 
 export const calcEn = {
   title: 'Load calculator',
-  intro: 'Add the appliances — the system size and an indicative price update as you go. No client details needed.',
+  intro: 'Add the appliances. The system size and an indicative price update as you go. No client details needed.',
   systemType: 'System type',
   city: 'City',
   sysTypes: { offgrid: 'off-grid', hybrid: 'hybrid', gridtie: 'grid-tied' } as Record<string, string>,
@@ -16,7 +16,7 @@ export const calcEn = {
   emptyBody: 'Pick a quick template or add appliances to see the system size and an indicative price.',
   emptyBar: 'Add appliances to see the system and price',
   price: 'Indicative price',
-  approx: (v: string) => `≈ ${v}`,
+  approx: (v: string) => `about ${v}`,
   perWp: (v: string) => `${v} per Wp`,
   inclVat: (p: string) => `incl. VAT ${p}%`,
   energy: 'Energy use',
@@ -34,14 +34,14 @@ export const calcEn = {
   panelsSub: (n: number, w: string) => `${n} × ${w} W panels`,
   battery: 'Battery',
   usable: (v: string) => `${v} kWh usable`,
-  backup: (h: string) => `≈ ${h} h night backup`,
+  backup: (h: string) => `about ${h} h night backup`,
   backupLong: 'more than 3 days of backup',
-  autonomy: (d: string) => `≈ ${d} days without sun`,
+  autonomy: (d: string) => `about ${d} days without sun`,
   noBattery: 'None (grid-tied)',
   inverter: 'Inverter',
   production: 'Yearly production',
   demandYear: (v: string, pct: string) => `demand ${v} kWh/yr · ${pct}% covered`,
-  assumptions: (city: string, psh: string) => `${city} · ${psh} sun-hours/day · indicative prices from your price list`,
+  assumptions: (city: string, psh: string) => `${city} · ${psh} sun hours/day · indicative prices from your price list`,
   // design checks in the result (top 3; the full list is in the project)
   toFix: (n: number) => `${n} ${n === 1 ? 'issue' : 'issues'} to fix`,
   toReview: (n: number) => `${n} ${n === 1 ? 'item' : 'items'} to review`,
@@ -54,8 +54,8 @@ export const calcEn = {
   copy: 'Copy', copyLong: 'Copy summary', copied: 'Summary copied', copyFailed: 'Could not copy the summary',
   share: 'Share', shareLong: 'Share summary',
   pdfBtn: 'PDF', pdfLong: '1-page PDF', preparing: 'Preparing…', downloaded: (name: string) => `Downloaded ${name}`, pdfReady: 'PDF ready',
-  pdfFailed: 'Could not create the PDF — try again.', fontFailed: 'The PDF font could not be loaded. Check the connection and try again.',
-  makeProposal: 'Make full proposal', proposalCreated: 'Saved as a project — add the client and finish the proposal',
+  pdfFailed: 'Could not create the PDF. Try again.', fontFailed: 'The PDF font could not be loaded. Check the connection and try again.',
+  makeProposal: 'Make full proposal', proposalCreated: 'Saved as a project. Add the client and finish the proposal',
   clear: 'Clear', cleared: 'Calculator cleared',
 
   // ---- plain-text summary (Copy / Share)
@@ -72,8 +72,8 @@ export const calcEn = {
     inverter: (qty: number, kw: string, model: string) => `Inverter: ${qty} × ${kw} kW${model ? ` (${model})` : ''}`,
     production: (prod: string, demand: string) => `Production: about ${prod} kWh/year (demand ${demand} kWh/year)`,
     price: (total: string, vat: string | null, perWp: string) => `Indicative price: about ${total}${vat ? ` incl. VAT ${vat}%` : ''} (${perWp} per Wp)`,
-    site: (city: string, psh: string) => `${city}, ${psh} peak sun-hours/day.`,
-    disclaimer: 'Indicative estimate — the final design and price follow a site survey.',
+    site: (city: string, psh: string) => `${city}, ${psh} peak sun hours per day.`,
+    disclaimer: 'Indicative estimate. The final design and price follow a site survey.',
   },
 
   // ---- 1-page summary PDF
@@ -109,32 +109,32 @@ export const calcEn = {
     priceSub: (vat: string | null, perWp: string) => `${vat ? `incl. VAT ${vat}% · ` : ''}${perWp} per Wp`,
     notes: 'Notes',
     assumptions: (city: string, psh: string, days: number, date: string) =>
-      `Sun hours for ${city}: ${psh} peak sun-hours per day. Equipment and prices from the current price list; prices valid for ${days} days (until ${date}).`,
-    disclaimer: 'Indicative estimate — the final design and price follow a site survey.',
+      `Sun hours for ${city}: ${psh} peak sun hours per day. Equipment and prices from the current price list; prices valid for ${days} days (until ${date}).`,
+    disclaimer: 'Indicative estimate. The final design and price follow a site survey.',
   },
 
   // ---- home screen (every feature, grouped by use) and the history list
   home: {
     title: 'Start something new',
     hello: 'What would you like to do?',
-    helloSub: 'Every tool in the app, grouped by what it is for.',
+    helloSub: '',
     resume: 'Pick up where you left off',
     allHistory: (n: number) => `All history (${n})`,
     groups: {
-      calc: 'Calculators', calcNote: 'Instant answers on one screen — no client details needed, nothing added to history.',
+      calc: 'Calculators', calcNote: 'Instant answers on one screen. No client details needed, nothing added to history.',
       quotes: 'Quotes & proposals', quotesNote: 'Priced documents for a client. Each one is saved in your history.',
       business: 'History & company', businessNote: 'Your saved work, your prices and your company details.',
     },
     /** One line under each home tile on phones (the full help shows on wider screens). */
     short: {
-      calc: 'Appliances or bill → size & price', strings: 'Panels per string, MPPT, fuse', battery: 'Modules, backup time, fuse',
+      calc: 'Appliances or bill to size and price', strings: 'Panels per string, MPPT, fuse', battery: 'Modules, backup time, fuse',
       cable: 'Cable size, voltage drop, breaker', generator: 'Generator kVA, inverter size',
       size: 'e.g. 5 kW + 10 kWh, priced', items: 'Pick products, get a quotation', design: 'Every step to a full proposal',
       prices: 'Selling prices & own products', settings: 'Name, logo, currency, terms', backup: 'Save or restore everything',
     },
     history: 'History', historyHelp: 'Every project and quote you saved: search, status, revisions and pipeline totals.',
     historyCount: (n: number) => (n ? `${n} saved` : 'Nothing saved yet'),
-    pricesHelp: 'Your selling prices, products you don’t stock and your own products — used in every quote.',
+    pricesHelp: 'Your selling prices, products you don’t stock and your own products, used in every quote.',
     settingsHelp: 'Company name, logo, contact details, currency, markup, VAT and quote terms.',
     backup: 'Backup & restore', backupHelp: 'Save every project to a file, restore a backup, or share the company file with staff.',
     newHere: 'New here?', newHereBody: 'Add your company name and logo so they print on every quote, or look around the sample projects first.',
@@ -151,7 +151,7 @@ export const calcEn = {
     // pipeline: per-status totals and superseded revisions
     superseded: (rev: string) => `Superseded by ${rev}`,
     supersededNewer: 'Superseded by a newer revision',
-    supersededHelp: 'A newer revision of this quote exists — it is not counted in the totals.',
+    supersededHelp: 'A newer revision of this quote exists, so it is not counted in the totals.',
     totalsNote: (cur: string) => `Totals per status incl. VAT, in ${cur}. Superseded revisions are not counted.`,
     totalsConverted: 'Projects in other currencies are converted at their own exchange rate (≈).',
   },
@@ -159,7 +159,7 @@ export const calcEn = {
 
 export const calcAr: typeof calcEn = {
   title: 'حاسبة الأحمال',
-  intro: 'أضف الأجهزة — يتحدّث حجم النظام والسعر التقريبي أثناء الإدخال. لا حاجة لبيانات العميل.',
+  intro: 'أضف الأجهزة، ويتحدّث حجم النظام والسعر التقريبي أثناء الإدخال. لا حاجة لبيانات العميل.',
   systemType: 'نوع النظام',
   city: 'المدينة',
   sysTypes: { offgrid: 'منفصل عن الشبكة', hybrid: 'هجين', gridtie: 'متصل بالشبكة' },
@@ -169,7 +169,7 @@ export const calcAr: typeof calcEn = {
   emptyBody: 'اختر نموذجاً جاهزاً أو أضف الأجهزة لترى حجم النظام والسعر التقريبي.',
   emptyBar: 'أضف الأجهزة لترى النظام والسعر',
   price: 'السعر التقريبي',
-  approx: (v: string) => `≈ ${I(v)}`,
+  approx: (v: string) => `نحو ${I(v)}`,
   perWp: (v: string) => `${I(v)} لكل Wp`,
   inclVat: (p: string) => `شامل ضريبة القيمة المضافة ${I(p + '%')}`,
   energy: 'الاستهلاك',
@@ -205,8 +205,8 @@ export const calcAr: typeof calcEn = {
   copy: 'نسخ', copyLong: 'نسخ الملخص', copied: 'نُسخ الملخص', copyFailed: 'تعذّر نسخ الملخص',
   share: 'مشاركة', shareLong: 'مشاركة الملخص',
   pdfBtn: 'PDF', pdfLong: 'ملف PDF من صفحة واحدة', preparing: 'جارٍ التحضير…', downloaded: (name: string) => `نُزّل ${name}`, pdfReady: 'ملف PDF جاهز',
-  pdfFailed: 'تعذّر إنشاء ملف PDF — حاول مرة أخرى.', fontFailed: 'تعذّر تحميل خط ملف PDF. تحقق من الاتصال وحاول مرة أخرى.',
-  makeProposal: 'إعداد عرض كامل', proposalCreated: 'حُفظ كمشروع — أضف بيانات العميل وأكمل العرض',
+  pdfFailed: 'تعذّر إنشاء ملف PDF. حاول مرة أخرى.', fontFailed: 'تعذّر تحميل خط ملف PDF. تحقق من الاتصال وحاول مرة أخرى.',
+  makeProposal: 'إعداد عرض كامل', proposalCreated: 'حُفظ كمشروع. أضف بيانات العميل وأكمل العرض',
   clear: 'مسح', cleared: 'مُسحت الحاسبة',
 
   text: {
@@ -223,7 +223,7 @@ export const calcAr: typeof calcEn = {
     production: (prod: string, demand: string) => `الإنتاج: نحو ${I(prod + ' kWh')} سنوياً (الطلب ${I(demand + ' kWh')} سنوياً)`,
     price: (total: string, vat: string | null, perWp: string) => `السعر التقريبي: نحو ${I(total)}${vat ? ` شامل ضريبة القيمة المضافة ${I(vat + '%')}` : ''} (${I(perWp)} لكل Wp)`,
     site: (city: string, psh: string) => `${city}، ${I(psh)} ساعة ذروة شمسية يومياً.`,
-    disclaimer: 'تقدير تقريبي — التصميم والسعر النهائيان بعد المعاينة الميدانية.',
+    disclaimer: 'تقدير تقريبي. التصميم والسعر النهائيان بعد المعاينة الميدانية.',
   },
 
   pdf: {
@@ -259,29 +259,29 @@ export const calcAr: typeof calcEn = {
     notes: 'ملاحظات',
     assumptions: (city: string, psh: string, days: number, date: string) =>
       `ساعات الشمس في ${city}: ${I(psh)} ساعة ذروة شمسية يومياً. المعدات والأسعار من قائمة الأسعار الحالية؛ الأسعار صالحة لمدة ${days} يوماً (حتى ${I(date)}).`,
-    disclaimer: 'تقدير تقريبي — التصميم والسعر النهائيان بعد المعاينة الميدانية.',
+    disclaimer: 'تقدير تقريبي. التصميم والسعر النهائيان بعد المعاينة الميدانية.',
   },
 
   home: {
     title: 'ابدأ عملاً جديداً',
     hello: 'ماذا تريد أن تفعل؟',
-    helloSub: 'كل أدوات التطبيق مرتّبة حسب الاستخدام.',
+    helloSub: '',
     resume: 'تابع من حيث توقفت',
     allHistory: (n: number) => `السجل كاملاً (${I(String(n))})`,
     groups: {
-      calc: 'الحاسبات', calcNote: 'إجابات فورية في شاشة واحدة — دون بيانات العميل، ولا تُضاف إلى السجل.',
+      calc: 'الحاسبات', calcNote: 'إجابات فورية في شاشة واحدة. دون بيانات العميل، ولا تُضاف إلى السجل.',
       quotes: 'عروض الأسعار', quotesNote: 'مستندات مسعّرة للعميل، ويُحفظ كل منها في السجل.',
       business: 'السجل والشركة', businessNote: 'أعمالك المحفوظة وأسعارك وبيانات شركتك.',
     },
     short: {
-      calc: 'الأجهزة أو الفاتورة ← الحجم والسعر', strings: `عدد الألواح في السلسلة، ${I('MPPT')}، الفيوز`, battery: 'الوحدات، زمن الاحتياط، الفيوز',
+      calc: 'من الأجهزة أو الفاتورة إلى الحجم والسعر', strings: `عدد الألواح في السلسلة، ${I('MPPT')}، الفيوز`, battery: 'الوحدات، زمن الاحتياط، الفيوز',
       cable: 'مقطع الكابل، هبوط الجهد، القاطع', generator: `قدرة المولد ${I('kVA')} وحجم الإنفرتر`,
       size: `مثل ${I('5 kW + 10 kWh')} مسعّراً`, items: 'اختر المنتجات واحصل على عرض سعر', design: 'كل الخطوات حتى العرض الكامل',
       prices: 'أسعار البيع ومنتجاتك الخاصة', settings: 'الاسم والشعار والعملة والشروط', backup: 'احفظ كل شيء أو استرجعه',
     },
     history: 'السجل', historyHelp: 'كل مشروع وعرض سعر حفظته: البحث والحالة والمراجعات ومجاميع المبيعات.',
     historyCount: (n: number) => (n ? `المحفوظ: ${I(String(n))}` : 'لا شيء محفوظ بعد'),
-    pricesHelp: 'أسعار البيع، والمنتجات غير المتوفرة لديك، ومنتجاتك الخاصة — تُستخدم في كل عرض سعر.',
+    pricesHelp: 'أسعار البيع، والمنتجات غير المتوفرة لديك، ومنتجاتك الخاصة، وتُستخدم في كل عرض سعر.',
     settingsHelp: 'اسم الشركة والشعار وبيانات التواصل والعملة ونسبة الربح والضريبة وشروط العرض.',
     backup: 'النسخ الاحتياطي والاستعادة', backupHelp: 'احفظ كل المشاريع في ملف، أو استرجع نسخة احتياطية، أو شارك ملف الشركة مع الموظفين.',
     newHere: 'جديد هنا؟', newHereBody: 'أضف اسم شركتك وشعارها ليظهرا في كل عرض سعر، أو تصفّح المشاريع النموذجية أولاً.',
@@ -297,7 +297,7 @@ export const calcAr: typeof calcEn = {
     noDemand: 'لا يوجد طلب بعد',
     superseded: (rev: string) => `حلّت محلها المراجعة ${I(rev)}`,
     supersededNewer: 'حلّت محلها مراجعة أحدث',
-    supersededHelp: 'توجد مراجعة أحدث لهذا العرض — لا يُحتسب في المجاميع.',
+    supersededHelp: 'توجد مراجعة أحدث لهذا العرض، لذا لا يُحتسب في المجاميع.',
     totalsNote: (cur: string) => `مجموع كل حالة شامل الضريبة بعملة ${I(cur)}. المراجعات القديمة لا تُحتسب.`,
     totalsConverted: 'المشاريع بعملات أخرى محوّلة بسعر الصرف الخاص بكل مشروع (≈).',
   },

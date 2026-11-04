@@ -156,7 +156,7 @@ export function StepExport({ project: p, results: r, quote: q, update, goTo }: S
   const docCard = ({ k, icon: I, title, help, badge, hero, children }: { k: DocKey; icon: Icon; title: string; help: string; badge?: ReactNode; hero?: boolean; children?: ReactNode }) => (
     <section className={`card flex flex-col gap-3 ${hero ? 'border-brand-200 p-4 sm:p-6' : 'p-4 sm:p-5'}`} data-testid={`export-card-${k}`}>
       <div className="flex items-start gap-3">
-        <span className={`grid shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-700 ${hero ? 'size-12' : 'size-10'}`}><I size={hero ? 24 : 20} /></span>
+        <span className={`grid shrink-0 place-items-center rounded-lg bg-brand-50 text-brand-700 ${hero ? 'size-12' : 'size-10'}`}><I size={hero ? 24 : 20} /></span>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2"><h3 className="text-base font-semibold text-slate-900">{title}</h3>{badge}</div>
           <p className="mt-1 text-sm leading-6 text-slate-600">{help}</p>

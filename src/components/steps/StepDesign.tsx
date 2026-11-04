@@ -32,7 +32,7 @@ function Picker({ open, onClose, title, options, value, autoId, autoTitle, autoS
   const row = (id: string, ttl: ReactNode, sub?: string[], price?: string, badge?: ReactNode) => (
     <li key={id || '_'}>
       <button type="button" onClick={() => { onPick(id); onClose() }} aria-pressed={value === id} data-testid={`pick-${id || 'none'}`}
-        className={`flex min-h-14 w-full items-center gap-3 rounded-xl px-3 py-2 text-start transition ${value === id ? 'bg-brand-50 ring-1 ring-brand-600' : 'hover:bg-slate-50'}`}>
+        className={`flex min-h-14 w-full items-center gap-3 rounded-lg px-3 py-2 text-start transition ${value === id ? 'bg-brand-50 ring-1 ring-brand-600' : 'hover:bg-slate-50'}`}>
         <span className="min-w-0 flex-1">
           <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5"><span className="font-medium text-slate-900 [overflow-wrap:anywhere]"><bdi>{ttl}</bdi></span>{badge}</span>
           {sub && <Parts parts={sub} className="mt-0.5 block text-xs text-slate-600" />}

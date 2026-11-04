@@ -12,8 +12,8 @@ export function InstallBanner() {
   const closed = usePwa((s) => s.bannerClosed)
   if (closed || way === 'installed' || way === 'other') return null
   return (
-    <section className="card relative flex flex-wrap items-center gap-x-3 gap-y-3 border-brand-200 bg-brand-50/60 p-3 sm:flex-nowrap sm:p-4 sm:pe-14" data-testid="install-banner">
-      <img src={ICON} alt="" width={44} height={44} className="size-11 shrink-0 rounded-xl" />
+    <section className="card relative flex flex-wrap items-center gap-x-3 gap-y-3 p-3 sm:flex-nowrap sm:p-4 sm:pe-14" data-testid="install-banner">
+      <img src={ICON} alt="" width={44} height={44} className="size-11 shrink-0 rounded-lg" />
       <p className="min-w-0 flex-1 basis-48 pe-9 text-sm text-slate-700 sm:pe-0">{t.install.banner}</p>
       <button type="button" className="btn-primary w-full shrink-0 sm:w-auto" onClick={() => void install()} data-testid="install-app"><Download size={18} />{t.install.button}</button>
       <button type="button" className="btn-ghost btn-icon absolute end-1 top-1" aria-label={t.install.close} title={t.install.close} onClick={closeBanner} data-testid="install-close"><X size={18} /></button>
@@ -46,7 +46,7 @@ export function InstallSheet() {
     <Sheet open={open && way !== 'installed'} onClose={closeInstallSheet} title={c.title} testId="install-sheet"
       footer={<button type="button" className="btn-primary flex-1 sm:flex-none" onClick={closeInstallSheet} data-testid="install-sheet-done">{t.common.done}</button>}>
       <div className="flex items-center gap-3">
-        <img src={ICON} alt="" width={48} height={48} className="size-12 shrink-0 rounded-xl" />
+        <img src={ICON} alt="" width={48} height={48} className="size-12 shrink-0 rounded-lg" />
         <p className="text-sm text-slate-600">{t.install.settingsHelp}</p>
       </div>
       <ol className="mt-4 space-y-3" data-testid="install-steps">
